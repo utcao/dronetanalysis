@@ -1,0 +1,11 @@
+# config.yaml
+# ------------------------------------------------------------------------------
+# Centralized configuration
+# ------------------------------------------------------------------------------
+timestamp_fmt: "%Y%m%d_%H%M%S"
+project_dirs:
+  rawdata_dir: "dataset/raw"
+  processed_data_dir: "dataset/processed"
+input_files:
+analysis_params:
+down_sample_inputs:

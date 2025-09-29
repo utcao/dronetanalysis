@@ -1,0 +1,12 @@
+# R specific files
+.Rhistory
+.RData
+.Rproj.user
+# project folds
+planning/
+manuscript/
+dataset/raw
+manuscript/
+planning/
+results/logs
+archives
