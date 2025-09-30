@@ -11,7 +11,6 @@ suppressPackageStartupMessages({
     library(data.table)
     library(glue)
     library(stringr)
-    library(purrr)
     library(ggplot2)
     library(tibble)  # for rownames_to_column / column_to_rownames
 })
