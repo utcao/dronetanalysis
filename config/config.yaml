@@ -8,5 +8,8 @@ project_dirs:
   processed_data_dir: "dataset/processed"
   test_data_dir: "dataset/test"
 input_files:
+  subset_data:
+    - file_A.csv
+    - file_B.csv
 analysis_params:
 down_sample_inputs:
