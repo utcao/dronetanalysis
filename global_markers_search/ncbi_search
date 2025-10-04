@@ -1,0 +1,159 @@
+"""
+PubMed Global Modifier Gene Search Tool
+
+This script searches PubMed databases for potential global modifier genes that can
+alter transcriptional expression networks in response to stress or environmental cues.
+"""
+
+from Bio import Entrez
+import time
+
+# Set your email for NCBI's E-utilities
+Entrez.email = "g.thornes@outlook.com"
+
+def search_database(query, database="pubmed", max_results=100):
+    """
+    Search NCBI database with given query and return list of IDs
+    """
+    try:
+        handle = Entrez.esearch(db=database, 
+                              term=query,
+                              retmax=max_results,
+                              sort="relevance")
+        results = Entrez.read(handle)
+        handle.close()
+        return results["IdList"]
+    except Exception as e:
+        print(f"Error during {database} search: {e}")
+        return []
+
+def fetch_details(id_list, database="pubmed"):
+    """
+    Fetch details for a list of IDs from specified database
+    """
+    try:
+        ids = ",".join(id_list)
+        if database == "gene":
+            # Use esummary for concise gene information
+            handle = Entrez.esummary(db=database, id=ids)
+            results = Entrez.read(handle)
+            handle.close()
+            
+            # Format gene information
+            result = []
+            for rec in results['DocumentSummarySet']['DocumentSummary']:
+                result.append(f"Gene ID: {rec.attributes['uid']}")
+                result.append(f"Name: {rec.get('Name', 'N/A')}")
+                result.append(f"Description: {rec.get('Description', 'N/A')}")
+                result.append(f"Type: {rec.get('Type', 'N/A')}")
+                result.append(f"Summary: {rec.get('Summary', 'N/A')}")
+                result.append("-" * 40)
+            
+            return "\n".join(result)
+            
+        elif database == "protein":
+            # Use esummary for concise protein information
+            handle = Entrez.esummary(db=database, id=ids)
+            results = Entrez.read(handle)
+            handle.close()
+            
+            # Format protein information
+            result = []
+            try:
+                for rec in results['DocumentSummarySet']['DocumentSummary']:
+                    result.append(f"Protein ID: {rec.attributes['uid']}")
+                    result.append(f"Title: {rec.get('Title', 'N/A')}")
+                    result.append(f"Extra: {rec.get('Extra', 'N/A')}")
+                    result.append("-" * 40)
+            except KeyError:
+                # Alternative format
+                for rec in results:
+                    result.append(f"Protein ID: {rec.get('Id', 'N/A')}")
+                    result.append(f"Title: {rec.get('Title', 'N/A')}")
+                    result.append(f"Status: {rec.get('Status', 'N/A')}")
+                    result.append("-" * 40)
+            
+            return "\n".join(result)
+            
+        else:  # pubmed
+            handle = Entrez.efetch(db=database, id=ids, rettype="medline", retmode="text")
+            records = handle.read()
+            handle.close()
+            return records
+            
+    except Exception as e:
+        print(f"Error fetching {database} details: {e}")
+        return None
+
+def main():
+    # Search terms for global modifiers in Drosophila melanogaster
+    gene_queries = [
+        '"Drosophila melanogaster"[Organism] AND ("transcription factor"[Gene Ontology] OR "chromatin modifier"[Gene Ontology])',
+        '"Drosophila melanogaster"[Organism] AND "stress response"[Gene Ontology]',
+        '"Drosophila melanogaster"[Organism] AND ("gene regulatory"[All Fields] AND "modifier"[All Fields])'
+    ]
+    
+    protein_queries = [
+        '"Drosophila melanogaster"[Organism] AND "transcription factor"[Protein Name]',
+        '"Drosophila melanogaster"[Organism] AND "chromatin remodeling"[Protein Function]',
+        '"Drosophila melanogaster"[Organism] AND "stress response"[Protein Function]'
+    ]
+    
+    # Create a single results file with timestamp
+    filename = f"dronetanalysis/global_markers_search/pubmed_combined_results.txt"
+    
+    with open(filename, "w", encoding="utf-8") as f:
+        # Search Gene database
+        f.write("="*80 + "\n")
+        f.write("GENE DATABASE RESULTS\n")
+        f.write("="*80 + "\n\n")
+        
+        for i, query in enumerate(gene_queries, 1):
+            print(f"\nSearching Gene database - query {i} of {len(gene_queries)}: {query}")
+            
+            f.write(f"\nGENE QUERY {i}: {query}\n")
+            f.write("-"*80 + "\n\n")
+            
+            ids = search_database(query, database="gene")
+            
+            if ids:
+                print(f"Found {len(ids)} gene results")
+                details = fetch_details(ids, database="gene")
+                
+                if details:
+                    f.write(details)
+                    f.write("\n\n")
+                    print(f"Gene results added to {filename}")
+            else:
+                f.write("No gene results found for this query.\n\n")
+            
+            time.sleep(0.34)
+        
+        # Search Protein database
+        f.write("\n" + "="*80 + "\n")
+        f.write("PROTEIN DATABASE RESULTS\n")
+        f.write("="*80 + "\n\n")
+        
+        for i, query in enumerate(protein_queries, 1):
+            print(f"\nSearching Protein database - query {i} of {len(protein_queries)}: {query}")
+            
+            f.write(f"\nPROTEIN QUERY {i}: {query}\n")
+            f.write("-"*80 + "\n\n")
+            
+            ids = search_database(query, database="protein")
+            
+            if ids:
+                print(f"Found {len(ids)} protein results")
+                details = fetch_details(ids, database="protein")
+                
+                if details:
+                    f.write(details)
+                    f.write("\n\n")
+                    print(f"Protein results added to {filename}")
+            else:
+                f.write("No protein results found for this query.\n\n")
+            
+            time.sleep(0.34)
+
+if __name__ == "__main__":
+    main()
