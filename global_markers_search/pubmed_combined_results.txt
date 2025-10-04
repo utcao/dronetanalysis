@@ -1,0 +1,653 @@
+================================================================================
+GENE DATABASE RESULTS
+================================================================================
+
+
+GENE QUERY 1: "Drosophila melanogaster"[Organism] AND ("transcription factor"[Gene Ontology] OR "chromatin modifier"[Gene Ontology])
+--------------------------------------------------------------------------------
+
+Gene ID: 34881
+Name: Su(H)
+Description: Suppressor of Hairless
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and histone acetyltransferase binding activity. Contributes to DNA-binding transcription repressor activity, RNA polymerase II-specific. Involved in several processes, including imaginal disc-derived appendage morphogenesis; regionalization; and regulation of transcription by RNA polymerase II. Located in cytoplasm; nucleus; and polytene chromosome. Part of CSL-Notch-Mastermind transcription factor complex and RNA polymerase II transcription repressor complex. Is expressed in several structures, including anlage in statu nascendi; brain; larval imaginal tissue; sensory nervous system primordium; and somatic precursor cell. Used to study Adams-Oliver syndrome and alcohol use disorder. Human ortholog(s) of this gene implicated in Adams-Oliver syndrome and dilated cardiomyopathy. Orthologous to human RBPJ (recombination signal binding protein for immunoglobulin kappa J region). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 2768677
+Name: p53
+Description: p53
+Type: N/A
+Summary: Enables several functions, including TFIIH-class transcription factor complex binding activity; enzyme binding activity; and promoter-specific chromatin binding activity. Involved in several processes, including cellular response to gamma radiation; generation of neurons; and positive regulation of metabolic process. Located in nucleus. Colocalizes with chromocenter and euchromatin. Is expressed in several structures, including embryonic/larval midgut primordium; foregut primordium; germline cell; gut section; and hindgut proper primordium. Used to study cancer and testicular cancer. Human ortholog(s) of this gene implicated in several diseases, including EEC syndrome (multiple); Li-Fraumeni syndrome (multiple); carcinoma (multiple); ectodermal dysplasia (multiple); and hematologic cancer (multiple). Orthologous to several human genes including TP53 (tumor protein p53). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 35540
+Name: EcR
+Description: Ecdysone receptor
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor activity, RNA polymerase II-specific; protein dimerization activity; and transcription coregulator binding activity. Involved in several processes, including heart development; instar larval or pupal development; and nervous system development. Acts upstream of with a positive effect on regulation of macroautophagy. Located in several cellular components, including dendrite; nucleus; and polytene chromosome. Part of activator ecdysone receptor complex and repressor ecdysone receptor complex. Is expressed in several structures, including epithelium; follicle cell; gland; gut section; and larval imaginal tissue. Human ortholog(s) of this gene implicated in cerebral infarction; cerebrovascular disease; myocardial infarction; obesity; and type 2 diabetes mellitus. Orthologous to several human genes including NR1H2 (nuclear receptor subfamily 1 group H member 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41363
+Name: pros
+Description: prospero
+Type: N/A
+Summary: Enables DNA-binding transcription repressor activity, RNA polymerase II-specific and sequence-specific DNA binding activity. Involved in several processes, including nervous system development; regulation of gene expression; and regulation of neuroblast proliferation. Located in several cellular components, including apical cortex; basal cortex; and nucleus. Is expressed in several structures, including glial cell; organism subdivision; sense organ; sensory organ cell; and somatic precursor cell. Used to study brain cancer and cancer. Orthologous to several human genes including PROX1 (prospero homeobox 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 35047
+Name: dl
+Description: dorsal
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and high mobility group box 1 binding activity. Involved in several processes, including Toll signaling pathway; positive regulation of hemocyte proliferation; and positive regulation of macromolecule biosynthetic process. Located in several cellular components, including cytosol; neuromuscular junction; and subsynaptic reticulum. Is expressed in several structures, including adult head; embryonic/larval hypodermal muscle cell; epithelium; germline cell; and neuromuscular junction. Human ortholog(s) of this gene implicated in several diseases, including breast cancer; carcinoma (multiple); ductal carcinoma in situ; immunodeficiency 53; and immunodeficiency 92. Orthologous to several human genes including RELA (RELA proto-oncogene, NF-kB subunit). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 42034
+Name: Ubx
+Description: Ultrabithorax
+Type: N/A
+Summary: Enables RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; protein domain specific binding activity; and transcription coregulator binding activity. Involved in several processes, including cell fate specification; imaginal disc-derived appendage development; and regulation of DNA-templated transcription. Located in nucleus and polytene chromosome band. Part of protein-DNA complex and transcription repressor complex. Is expressed in several structures, including anterior-posterior subdivision of organism; developmental compartment; imaginal disc; neuromere; and somatic trunk mesoderm derivative. Used to study leukemia. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 30982
+Name: sc
+Description: scute
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II transcription regulatory region sequence-specific DNA binding activity; and protein heterodimerization activity. Contributes to sequence-specific DNA binding activity. Involved in several processes, including Malpighian tubule tip cell differentiation; chaeta morphogenesis; and nervous system development. Part of transcription regulator complex. Is expressed in several structures, including adult mesothoracic sensillum; gut section; neurogenic region; procephalic segment; and somatic precursor cell. Orthologous to several human genes including ASCL1 (achaete-scute family bHLH transcription factor 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 42037
+Name: abd-A
+Description: abdominal A
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific; DNA-binding transcription factor binding activity; and cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including genital disc development; heart development; and neuroblast differentiation. Located in nucleus and polytene chromosome band. Part of RNA polymerase II transcription regulator complex. Is expressed in several structures, including anterior-posterior subdivision of organism; epithelium; imaginal disc; larval neurons; and ventral nerve cord. Used to study leukemia. Orthologous to human HOXA6 (homeobox A6). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 3772082
+Name: kay
+Description: kayak
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and protein heterodimerization activity. Involved in several processes, including imaginal disc fusion, thorax closure; locomotor rhythm; and nervous system development. Acts upstream of with a positive effect on G2/M transition of mitotic cell cycle and second mitotic wave involved in compound eye morphogenesis. Located in cytoplasm and nucleus. Part of transcription factor AP-1 complex. Is expressed in several structures, including epithelial cell; epithelium; gut section; motor neurons; and sensory neurons. Human ortholog(s) of this gene implicated in stomach cancer. Orthologous to human FOSL1 (FOS like 1, AP-1 transcription factor subunit); FOSL2 (FOS like 2, AP-1 transcription factor subunit); and FOS (Fos proto-oncogene, AP-1 transcription factor subunit). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 36039
+Name: eve
+Description: even skipped
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including gastrulation involving germ band extension; heart development; and regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including embryonic/larval motor neurons; gut section; larval internal muscle cell; parasegment; and somatic precursor cell. Orthologous to human EVX1 (even-skipped homeobox 1) and EVX2 (even-skipped homeobox 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40830
+Name: bcd
+Description: bicoid
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor activity, RNA polymerase II-specific; mRNA 3'-UTR binding activity; and translation repressor activity. Involved in several processes, including blastoderm segmentation; regulation of gene expression; and torso signaling pathway. Located in nucleus. Is expressed in several structures, including anterior endoderm anlage; egg chamber; foregut anlage in statu nascendi; germline cell; and ovary. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 31293
+Name: N
+Description: Notch
+Type: N/A
+Summary: Enables several functions, including WW domain binding activity; histone acetyltransferase binding activity; and transcription coactivator activity. Involved in several processes, including neurogenesis; regionalization; and regulation of cell development. Located in several cellular components, including adherens junction; apical plasma membrane; and cytoplasmic vesicle. Part of CSL-Notch-Mastermind transcription factor complex. Colocalizes with late endosome and lysosome. Is expressed in several structures, including anterior-posterior subdivision of organism; compartment boundary; epithelial cell; germline cell; and larval optic anlage. Used to study alcohol use disorder and cancer (multiple). Human ortholog(s) of this gene implicated in several diseases, including Adams-Oliver syndrome; Alagille syndrome; CADASIL 1; Hajdu-Cheney syndrome; and adult T-cell leukemia/lymphoma. Orthologous to several human genes including NOTCH1 (notch receptor 1) and NOTCH2 (notch receptor 2). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 41032
+Name: hb
+Description: hunchback
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including neuroblast fate determination; regulation of neural precursor cell proliferation; and regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; glial cell; head epidermis primordium; larval neurons; and somatic precursor cell. Orthologous to human ZNF518A (zinc finger protein 518A). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40835
+Name: Antp
+Description: Antennapedia
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and sequence-specific DNA binding activity. Involved in several processes, including muscle cell fate specification; neuroblast development; and regionalization. Located in cytoplasm and nucleus. Is expressed in several structures, including anterior-posterior subdivision of organism; embryonic segment posterior compartment; imaginal disc; neuroblast NB5-6; and neuromere. Orthologous to several human genes including HOXB7 (homeobox B7). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41273
+Name: hth
+Description: homothorax
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor activity, RNA polymerase II-specific; protein heterodimerization activity; and transcription coactivator binding activity. Involved in several processes, including imaginal disc-derived appendage morphogenesis; nervous system development; and positive regulation of cell proliferation involved in compound eye morphogenesis. Located in cytoplasm and nucleus. Part of RNA polymerase II transcription regulator complex and protein-DNA complex. Is expressed in several structures, including imaginal disc; organism subdivision; region of integument; segmental subdivision of organ system; and synaptic neuropil domain. Human ortholog(s) of this gene implicated in cleft palate; cleft palate, cardiac defects, and intellectual disability; learning disability; open-angle glaucoma; and orofacial cleft. Orthologous to several human genes including MEIS1 (Meis homeobox 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 38012
+Name: Kr
+Description: Kruppel
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and sequence-specific DNA binding activity. Involved in several processes, including Malpighian tubule bud morphogenesis; generation of neurons; and negative regulation of macromolecule biosynthetic process. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; anterior-posterior subdivision of organism; embryonic/larval hypodermal muscle cell; posterior ectoderm derivative; and somatic precursor cell. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 45328
+Name: sens
+Description: senseless
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific; bHLH transcription factor binding activity; and sequence-specific DNA binding activity. Contributes to DNA-binding transcription activator activity, RNA polymerase II-specific. Involved in several processes, including chaeta morphogenesis; neuron development; and sensory organ precursor cell fate determination. Located in chromatin and nucleus. Is expressed in several structures, including embryonic segment; imaginal disc; peripheral sensory precursor cell; sense organ; and sensory nervous system primordium. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 47763
+Name: Abd-B
+Description: Abdominal B
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including genital disc development; male pigmentation; and reproductive structure development. Located in nucleus and polytene chromosome band. Is expressed in several structures, including adult posterior abdominal ganglion neurons; anterior-posterior subdivision of organism; epithelium; genital disc; and somatic trunk mesoderm derivative. Human ortholog(s) of this gene implicated in congenital vertical talus and radioulnar synostosis. Orthologous to several human genes including HOXA10 (homeobox A10); HOXA11 (homeobox A11); and HOXC10 (homeobox C10). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 33529
+Name: Mad
+Description: Mothers against dpp
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor activity, RNA polymerase II-specific; co-SMAD binding activity; and transcription coactivator activity. Involved in several processes, including cell surface receptor protein serine/threonine kinase signaling pathway; imaginal disc morphogenesis; and regulation of transcription by RNA polymerase II. Located in cytosol and nucleus. Part of RNA polymerase II transcription repressor complex and heteromeric SMAD protein complex. Is expressed in several structures, including epithelium; germline cell; imaginal disc; larval efferent neurons; and wing vein. Used to study juvenile polyposis syndrome. Human ortholog(s) of this gene implicated in primary pulmonary hypertension. Orthologous to human SMAD1 (SMAD family member 1); SMAD5 (SMAD family member 5); and SMAD9 (SMAD family member 9). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40832
+Name: Dfd
+Description: Deformed
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific; DNA-binding transcription factor binding activity; and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including embryonic brain development; head segmentation; and regulation of transcription by RNA polymerase II. Located in neuronal cell body and nucleus. Is expressed in several structures, including adult mandibular neuromere; epithelium; ganglia; gut section; and organism subdivision. Used to study leukemia. Orthologous to several human genes including HOXD4 (homeobox D4). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 36240
+Name: en
+Description: engrailed
+Type: N/A
+Summary: Enables DNA-binding transcription repressor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including nervous system development; regionalization; and regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including anterior-posterior subdivision of organism; compartment; larval imaginal tissue; larval neurons; and neuroblasts. Human ortholog(s) of this gene implicated in Parkinson's disease and autistic disorder. Orthologous to several human genes including EN2 (engrailed homeobox 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 42550
+Name: E2f1
+Description: E2F transcription factor 1
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific; DNA-binding transcription factor binding activity; and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Contributes to DNA-binding transcription factor activity, RNA polymerase II-specific and sequence-specific DNA binding activity. Involved in several processes, including DNA endoreduplication; cellular response to gamma radiation; and regulation of macromolecule metabolic process. Located in nucleus. Part of Rb-E2F complex. Is expressed in several structures, including anlage in statu nascendi; embryonic/larval midgut primordium; gut section; head epidermis primordium; and nephrocyte. Used to study prostate cancer. Human ortholog(s) of this gene implicated in lung carcinoma (multiple); osteosarcoma; and pancreatic adenocarcinoma (multiple). Orthologous to several human genes including E2F1 (E2F transcription factor 1) and E2F2 (E2F transcription factor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 34413
+Name: da
+Description: daughterless
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; DNA-binding transcription factor binding activity; and protein heterodimerization activity. Contributes to DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including Malpighian tubule tip cell differentiation; generation of neurons; and protein stabilization. Located in nucleus. Part of transcription regulator complex. Is expressed in several structures, including epithelium; follicle cell; imaginal disc; presumptive embryonic/larval system; and salivary gland. Used to study Pitt-Hopkins syndrome and developmental disorder of mental health. Human ortholog(s) of this gene implicated in several diseases, including Fuchs' endothelial dystrophy; Lynch syndrome; Pitt-Hopkins syndrome; agammaglobulinemia (multiple); and craniosynostosis 3. Orthologous to several human genes including TCF4 (transcription factor 4). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41709
+Name: foxo
+Description: forkhead box, sub-group O
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including regulation of catabolic process; regulation of signal transduction; and regulation of transcription by RNA polymerase II. Acts upstream of with a negative effect on regulation of hemocyte proliferation and regulation of organ growth. Located in cytosol and nucleus. Is expressed in several structures, including embryonic segment; embryonic/larval midgut primordium; epidermis; fat body; and gut section. Used to study Parkinson's disease. Human ortholog(s) of this gene implicated in alveolar rhabdomyosarcoma. Orthologous to several human genes including FOXO4 (forkhead box O4). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 36057
+Name: Jra
+Description: Jun-related antigen
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and protein heterodimerization activity. Involved in several processes, including defense response to bacterium; egg chorion assembly; and imaginal disc fusion, thorax closure. Located in cytosol and nucleus. Part of transcription factor AP-1 complex. Is expressed in several structures, including amnioserosa primordium; dorsal ectoderm; epithelial cell; epithelium; and larval internal muscle motor neurons. Human ortholog(s) of this gene implicated in head and neck squamous cell carcinoma; melanoma; and pulmonary tuberculosis. Orthologous to several human genes including JUNB (JunB proto-oncogene, AP-1 transcription factor subunit) and JUND (JunD proto-oncogene, AP-1 transcription factor subunit). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 31151
+Name: arm
+Description: armadillo
+Type: N/A
+Summary: Enables several functions, including cadherin binding activity; kinase binding activity; and transcription coactivator activity. Involved in several processes, including generation of neurons; instar larval or pupal development; and regulation of transcription by RNA polymerase II. Located in several cellular components, including apical plasma membrane; rhabdomere; and zonula adherens. Part of beta-catenin-TCF complex and catenin complex. Is active in germline ring canal. Is expressed in several structures, including anterior-posterior subdivision of organism; ganglia; germline cell; gut section; and imaginal disc. Used to study cancer; carcinoma; and obesity. Human ortholog(s) of this gene implicated in several diseases, including cardiomyopathy (multiple); hepatocellular carcinoma (multiple); palmoplantar keratosis (multiple); reproductive organ cancer (multiple); and urinary system cancer (multiple). Orthologous to several human genes including CTNNB1 (catenin beta 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 42428
+Name: Stat92E
+Description: Signal-transducer and activator of transcription protein at 92E
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and histone binding activity. Involved in several processes, including larval development; oogenesis; and regionalization. Located in cytoplasmic side of apical plasma membrane; cytosol; and nucleus. Is expressed in several structures, including follicle cell; germline cell; gut section; head epidermis primordium; and somatic cell of testis. Human ortholog(s) of this gene implicated in several diseases, including Zika fever; colorectal cancer (multiple); growth hormone insensitivity syndrome with immune dysregulation 1; growth hormone insensitivity syndrome with immune dysregulation 2; and immunodeficiency 44. Orthologous to several human genes including STAT5A (signal transducer and activator of transcription 5A) and STAT5B (signal transducer and activator of transcription 5B). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41087
+Name: Rel
+Description: Relish
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II transcription regulatory region sequence-specific DNA binding activity; and lncRNA binding activity. Involved in several processes, including defense response to other organism; neuron development; and regulation of defense response. Located in cytosol; euchromatin; and nucleus. Is expressed in several structures, including Malpighian tubule; amnioserosa; embryonic/larval midgut primordium; germline cell; and gut section. Used to study neurodegenerative disease and opportunistic bacterial infectious disease. Human ortholog(s) of this gene implicated in several diseases, including HTLV-1-associated myelopathy/tropical spastic paraparesis; carcinoma (multiple); common variable immunodeficiency (multiple); melanoma; and prostate cancer. Orthologous to human NFKB1 (nuclear factor kappa B subunit 1) and NFKB2 (nuclear factor kappa B subunit 2). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 31310
+Name: Myc
+Description: Myc
+Type: N/A
+Summary: Enables DNA binding activity; DNA-binding transcription factor activity; and ubiquitin-specific protease binding activity. Involved in several processes, including DNA endoreduplication; positive regulation of developmental growth; and positive regulation of macromolecule biosynthetic process. Located in nucleolus. Part of protein-containing complex. Colocalizes with histone locus body. Is expressed in several structures, including anlage in statu nascendi; cuboidal/columnar epithelium; embryonic/larval midgut primordium; germline cell; and gut section. Used to study brain cancer and cancer. Human ortholog(s) of this gene implicated in several diseases, including angiosarcoma; carcinoma (multiple); demyelinating disease; hematologic cancer (multiple); and prostate cancer (multiple). Orthologous to human MYC (MYC proto-oncogene, bHLH transcription factor). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 30981
+Name: ac
+Description: achaete
+Type: N/A
+Summary: Enables protein heterodimerization activity. Contributes to sequence-specific DNA binding activity. Involved in several processes, including Malpighian tubule development; chaeta morphogenesis; and positive regulation of antibacterial peptide biosynthetic process. Located in nucleus. Part of transcription regulator complex. Is expressed in several structures, including adult thoracic mechanosensory chaeta; imaginal disc; neuroblasts; neurogenic region; and procephalic segment. Orthologous to several human genes including ASCL2 (achaete-scute family bHLH transcription factor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 32567
+Name: exd
+Description: extradenticle
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor activity, RNA polymerase II-specific; protein heterodimerization activity; and transcription coactivator activity. Involved in several processes, including nervous system development; oenocyte development; and positive regulation of transcription by RNA polymerase II. Located in cytoplasm and nucleus. Part of RNA polymerase II transcription regulator complex and protein-DNA complex. Is expressed in several structures, including anlage in statu nascendi; embryonic/larval midgut primordium; head epidermis primordium; neuroblast NB5-6; and segmental subdivision of organ system. Human ortholog(s) of this gene implicated in congenital anomalies of kidney and urinary tract syndrome with or without hearing loss, abnormal ears, or developmental delay. Orthologous to several human genes including PBX1 (PBX homeobox 1) and PBX3 (PBX homeobox 3). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40287
+Name: kni
+Description: knirps
+Type: N/A
+Summary: Enables DNA-binding transcription factor binding activity and DNA-binding transcription repressor activity, RNA polymerase II-specific. Involved in negative regulation of DNA-templated transcription and regulation of mitotic nuclear division. Predicted to be active in chromatin and nucleus. Is expressed in several structures, including clypeo-labral anlage; endoderm anlage; gut section; head epidermis primordium; and primary tracheal branch. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 38872
+Name: Clk
+Description: Clock
+Type: N/A
+Summary: Enables DNA binding activity; chromatin binding activity; and protein heterodimerization activity. Contributes to RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including circadian regulation of heart rate; locomotor rhythm; and regulation of gene expression. Part of CLOCK-BMAL transcription complex. Is expressed in several structures, including Bolwig nerve; adult fat body; brain; intrinsic neurons; and pacemaker neurons. Human ortholog(s) of this gene implicated in Alzheimer's disease and alcohol use disorder. Orthologous to human CLOCK (clock circadian regulator) and NPAS2 (neuronal PAS domain protein 2). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 34908
+Name: sna
+Description: snail
+Type: N/A
+Summary: Enables DNA-binding transcription factor binding activity and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Contributes to transcription corepressor activity. Involved in several processes, including embryonic morphogenesis; nervous system development; and regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including epithelial furrow; glial cell; head epidermis primordium; imaginal disc; and somatic precursor cell. Used to study carcinoma. Human ortholog(s) of this gene implicated in piebaldism. Orthologous to human SNAI2 (snail family transcriptional repressor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 37476
+Name: Tbp
+Description: TATA binding protein
+Type: N/A
+Summary: Enables RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; RNA polymerase III type 3 promoter sequence-specific DNA binding activity; and TFIIA-class transcription factor complex binding activity. Contributes to RNA polymerase II general transcription initiation factor activity. Involved in DNA-templated transcription. Located in nucleus. Part of transcription factor TFIID complex and transcription factor TFIIIB complex. Is expressed in several structures, including germline cell; male accessory gland; seminal vesicle; terminal filament; and testis. Used to study neurodegenerative disease. Human ortholog(s) of this gene implicated in late onset Parkinson's disease; schizophrenia; spinocerebellar ataxia type 17; and type 1 diabetes mellitus. Orthologous to several human genes including TBP (TATA-box binding protein). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 2768981
+Name: Trl
+Description: Trithorax-like
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; POZ domain binding activity; and protein dimerization activity. Involved in several processes, including amyloid fibril formation; regulation of gene expression; and syncytial blastoderm mitotic cell cycle. Located in chromosome and nucleus. Part of protein-containing complex. Is expressed in several structures, including embryonic/larval midgut primordium; eye photoreceptor cell; ganglia; gut section; and somatic trunk mesoderm derivative. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 44849
+Name: pnr
+Description: pannier
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific; RNA polymerase II-specific DNA-binding transcription factor binding activity; and protein heterodimerization activity. Involved in several processes, including heart development; pericardial nephrocyte differentiation; and regulation of transcription by RNA polymerase II. Acts upstream of with a positive effect on imaginal disc fusion, thorax closure. Located in nucleus. Is expressed in several structures, including amnioserosa anlage; anterior-posterior subdivision of organism; cardiogenic mesoderm; epithelium; and imaginal disc. Human ortholog(s) of this gene implicated in several diseases, including adenocarcinoma (multiple); artery disease (multiple); atrial fibrillation (multiple); congenital heart disease (multiple); and pancreatic hypoplasia-diabetes-congenital heart disease syndrome. Orthologous to several human genes including GATA5 (GATA binding protein 5). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 42757
+Name: pnt
+Description: pointed
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and transcription cis-regulatory region binding activity. Involved in several processes, including cell surface receptor protein tyrosine kinase signaling pathway; larval lymph gland hemocyte differentiation; and morphogenesis of an epithelium. Located in nucleus. Is expressed in several structures, including glial cell; gut section; imaginal disc; organism subdivision; and somatic precursor cell. Human ortholog(s) of this gene implicated in type 1 diabetes mellitus. Orthologous to human ETS1 (ETS proto-oncogene 1, transcription factor) and ETS2 (ETS proto-oncogene 2, transcription factor). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40833
+Name: Scr
+Description: Sex combs reduced
+Type: N/A
+Summary: Enables RNA polymerase II transcription regulatory region sequence-specific DNA binding activity and protein homodimerization activity. Involved in positive regulation of transcription by RNA polymerase II and sex comb development. Located in nucleus. Is expressed in several structures, including ganglia; gut section; imaginal disc; organism subdivision; and thoracic adult muscle precursor cell. Orthologous to several human genes including HOXA5 (homeobox A5). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 43656
+Name: tll
+Description: tailless
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and transcription corepressor binding activity. Involved in several processes, including inter-male aggressive behavior; nervous system development; and regulation of transcription by RNA polymerase II. Is expressed in several structures, including anlage in statu nascendi; head epidermis primordium; neuromere; procephalic neuroblast; and supraesophageal ganglion. Used to study brain cancer. Orthologous to human NR2E1 (nuclear receptor subfamily 2 group E member 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 44540
+Name: ct
+Description: cut
+Type: N/A
+Summary: Enables transcription cis-regulatory region binding activity. Involved in several processes, including Malpighian tubule bud morphogenesis; formation of a compartment boundary; and imaginal disc-derived appendage morphogenesis. Acts upstream of with a positive effect on dendrite arborization. Located in nucleus. Is expressed in several structures, including Malpighian tubule; adult epithelial cell; antennal lobe projection neurons; embryonic/larval sensory neurons; and ganglia. Used to study cancer and hematologic cancer. Human ortholog(s) of this gene implicated in developmental and epileptic encephalopathy 67. Orthologous to several human genes including CUX2 (cut like homeobox 2). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 40975
+Name: ato
+Description: atonal
+Type: N/A
+Summary: Enables protein heterodimerization activity. Contributes to DNA-binding transcription factor activity, RNA polymerase II-specific. Involved in several processes, including eye morphogenesis; nervous system development; and regulation of gene expression. Located in nucleus. Is expressed in several structures, including brain; chordotonal organ; embryonic head segment; imaginal disc; and somatic precursor cell. Human ortholog(s) of this gene implicated in persistent hyperplastic primary vitreous. Orthologous to human ATOH7 (atonal bHLH transcription factor 7). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 33059
+Name: run
+Description: runt
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity and sequence-specific DNA binding activity. Involved in several processes, including axon guidance; germ-band extension; and regulation of DNA-templated transcription. Located in nucleus. Is expressed in several structures, including U neuron; anlage in statu nascendi; head epidermis primordium; inner photoreceptor cell; and somatic precursor cell. Human ortholog(s) of this gene implicated in several diseases, including breast cancer (multiple); female reproductive organ cancer (multiple); lung non-small cell carcinoma; osteochondrodysplasia (multiple); and pancreatic cancer. Orthologous to human RUNX2 (RUNX family transcription factor 2) and RUNX3 (RUNX family transcription factor 3). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 43769
+Name: pan
+Description: pangolin
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and transcription corepressor binding activity. Involved in several processes, including instar larval or pupal development; regulation of transcription by RNA polymerase II; and segment polarity determination. Located in nucleus. Part of beta-catenin-TCF complex. Is expressed in embryonic brain; embryonic segment; organism; procephalic segment; and visceral trunk mesoderm. Human ortholog(s) of this gene implicated in breast cancer; colorectal cancer; diabetes mellitus (multiple); pancreatic cancer; and reproductive organ cancer (multiple). Orthologous to several human genes including LEF1 (lymphoid enhancer binding factor 1); TCF7 (transcription factor 7); and TCF7L1 (transcription factor 7 like 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 31227
+Name: gt
+Description: giant
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including negative regulation of transcription by RNA polymerase II; regionalization; and ring gland development. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; circulatory system primordium; epithelial furrow; head epidermis primordium; and head segment. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40834
+Name: ftz
+Description: fushi tarazu
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including germ cell migration; gonadal mesoderm development; and regulation of transcription by RNA polymerase II. Predicted to be active in nucleus. Is expressed in several structures, including germ layer; glial cell; larval CNS neuron; parasegment; and somatic precursor cell. Orthologous to human HOXA7 (homeobox A7). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 3354888
+Name: rl
+Description: rolled
+Type: N/A
+Summary: Enables DNA-binding transcription factor binding activity; MAP kinase activity; and protein kinase binding activity. Involved in several processes, including cell surface receptor protein tyrosine kinase signaling pathway; larval lymph gland hemocyte differentiation; and regionalization. Located in cytosol; neuromuscular junction; and nucleus. Is expressed in several structures, including imaginal disc; somatic precursor cell; tracheal primordium; trunk visceral muscle primordium; and wing vein. Used to study cancer and chromosome 16p11.2 deletion syndrome, 593-kb. Human ortholog(s) of this gene implicated in Noonan syndrome 13; Parkinson's disease; carcinoma (multiple); melanoma; and pulmonary hypertension. Orthologous to several human genes including MAPK1 (mitogen-activated protein kinase 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 43767
+Name: ci
+Description: cubitus interruptus
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription activator activity, RNA polymerase II-specific; cAMP response element binding protein binding activity; and protein homodimerization activity. Involved in several processes, including negative regulation of hippo signaling; regionalization; and regulation of transcription by RNA polymerase II. Located in cytosol and nucleus. Part of Hedgehog signaling complex. Is expressed in several structures, including anlage in statu nascendi; developmental compartment; germ layer; head epidermis primordium; and imaginal disc. Used to study primary bacterial infectious disease. Human ortholog(s) of this gene implicated in several diseases, including Culler-Jones syndrome; Pallister-Hall syndrome; anodontia; polydactyly (multiple); and synostosis (multiple). Orthologous to several human genes including GLI2 (GLI family zinc finger 2) and GLI3 (GLI family zinc finger 3). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40162
+Name: cyc
+Description: cycle
+Type: N/A
+Summary: Enables DNA binding activity and protein heterodimerization activity. Contributes to RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including circadian regulation of gene expression; circadian regulation of heart rate; and regulation of circadian sleep/wake cycle, sleep. Predicted to be located in cytoplasm. Predicted to be part of aryl hydrocarbon receptor complex. Predicted to be active in nucleus. Is expressed in several structures, including embryonic/larval midgut; ganglia; head; pacemaker neurons; and unpaired neurons. Human ortholog(s) of this gene implicated in alcohol dependence; bipolar disorder; hypertension; and type 2 diabetes mellitus. Orthologous to human BMAL1 (basic helix-loop-helix ARNT like 1) and BMAL2 (basic helix-loop-helix ARNT like 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 35045
+Name: Dif
+Description: Dorsal-related immunity factor
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including Toll signaling pathway; defense response to other organism; and positive regulation of macromolecule biosynthetic process. Located in cytosol and nucleus. Is expressed in adult heart; embryonic/larval fat body; embryonic/larval posterior spiracle; and embryonic/larval salivary gland. Used to study bacterial infectious disease. Human ortholog(s) of this gene implicated in several diseases, including breast cancer; carcinoma (multiple); ductal carcinoma in situ; immunodeficiency 53; and immunodeficiency 92. Orthologous to several human genes including RELA (RELA proto-oncogene, NF-kB subunit) and RELB (RELB proto-oncogene, NF-kB subunit). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 35341
+Name: cad
+Description: caudal
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including germ-band extension; positive regulation of macromolecule biosynthetic process; and regionalization. Located in cytoplasm and nucleus. Is expressed in several structures, including Malpighian tubule; anal pad; genital disc; germline cell; and gut section. Orthologous to several human genes including CDX1 (caudal type homeobox 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 37655
+Name: twi
+Description: twist
+Type: N/A
+Summary: Enables DNA binding activity; DNA-binding transcription factor activity, RNA polymerase II-specific; and protein dimerization activity. Involved in several processes, including embryonic morphogenesis; positive regulation of transcription by RNA polymerase II; and salivary gland morphogenesis. Located in cytoplasm and nucleus. Is expressed in several structures, including germ layer; gut section; muscle cell; myoblast; and trunk visceral muscle primordium. Human ortholog(s) of this gene implicated in Barber-Say syndrome; Sweeney-Cox syndrome; ablepharon macrostomia syndrome; breast cancer (multiple); and synostosis (multiple). Orthologous to human TWIST1 (twist family bHLH transcription factor 1) and TWIST2 (twist family bHLH transcription factor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 32536
+Name: sd
+Description: scalloped
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and transcription coregulator binding activity. Involved in several processes, including imaginal disc-derived appendage morphogenesis; negative regulation of neuroblast proliferation; and regulation of DNA-templated transcription. Located in nucleus. Part of RNA polymerase II transcription regulator complex. Is expressed in several structures, including ganglia; imaginal disc; myoblast; sense organ; and somatic muscle cell. Human ortholog(s) of this gene implicated in Sveinsson chorioretinal atrophy. Orthologous to several human genes including TEAD1 (TEA domain transcription factor 1) and TEAD3 (TEA domain transcription factor 3). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 32457
+Name: gce
+Description: germ cell-expressed bHLH-PAS
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor binding activity; juvenile hormone binding activity; and nuclear receptor activity. Involved in juvenile hormone mediated signaling pathway; negative regulation of programmed cell death; and positive regulation of transcription by RNA polymerase II. Predicted to be located in cytoplasm. Predicted to be part of aryl hydrocarbon receptor complex. Predicted to be active in nucleus. Is expressed in several structures, including gland; larval neurosecretory cell of pars lateralis; mushroom body; synaptic neuropil domain; and synaptic neuropil layer. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 39570
+Name: D
+Description: Dichaete
+Type: N/A
+Summary: Enables several functions, including DNA binding activity; DNA-binding transcription factor activity, RNA polymerase II-specific; and mRNA 3'-UTR binding activity. Involved in several processes, including nervous system development; regionalization; and regulation of transcription by RNA polymerase II. Located in cytoplasm and nucleus. Is expressed in several structures, including anlage in statu nascendi; epithelium; glial cell; gut section; and segmentally-repeated neuroblast. Human ortholog(s) of this gene implicated in X-linked panhypopituitarism; breast cancer; nasal cavity cancer; oral cavity cancer; and syndromic microphthalmia 3. Orthologous to human SOX1 (SRY-box transcription factor 1); SOX2 (SRY-box transcription factor 2); and SOX3 (SRY-box transcription factor 3). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 35800
+Name: dpn
+Description: deadpan
+Type: N/A
+Summary: Enables DNA-binding transcription repressor activity, RNA polymerase II-specific and cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including generation of neurons; positive regulation of neuroblast proliferation; and regulation of gene expression. Located in cytosol and nucleus. Is expressed in several structures, including embryonic segment; head epidermis primordium; larval optic anlage; neurogenic region; and somatic stem cell. Used to study brain cancer and central nervous system cancer. Orthologous to human HES1 (hes family bHLH transcription factor 1) and HES4 (hes family bHLH transcription factor 4). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 42743
+Name: cnc
+Description: cap-n-collar
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and protein heterodimerization activity. Contributes to DNA-binding transcription factor activity. Involved in several processes, including determination of adult lifespan; oocyte axis specification; and regulation of intracellular mRNA localization. Located in nucleus and polytene chromosome puff. Is expressed in several structures, including adult brain; adult pars intercerebralis; antennal anlage; cuboidal/columnar epithelium; and head segment. Human ortholog(s) of this gene implicated in Alzheimer's disease; cataract; hepatocellular carcinoma; macular degeneration; and tuberculosis. Orthologous to several human genes including NFE2 (nuclear factor, erythroid 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 31883
+Name: lz
+Description: lozenge
+Type: N/A
+Summary: Enables transcription cis-regulatory region binding activity. Involved in several processes, including compound eye morphogenesis; embryonic crystal cell differentiation; and regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including adult antennal sensillum; adult olfactory antennal lobe glomerulus; eye photoreceptor cell; hemocyte; and imaginal disc. Human ortholog(s) of this gene implicated in acute myeloid leukemia and esophagus squamous cell carcinoma. Orthologous to human RUNX1 (RUNX family transcription factor 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 34669
+Name: nub
+Description: nubbin
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and transcription cis-regulatory region binding activity. Involved in several processes, including dendrite morphogenesis; regulation of gene expression; and regulation of neural precursor cell proliferation. Located in nucleus. Is expressed in several structures, including gut section; head epidermis primordium; larval neurons; organism subdivision; and somatic precursor cell. Used to study immune system disease. Orthologous to several human genes including POU2F1 (POU class 2 homeobox 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40817
+Name: lab
+Description: labial
+Type: N/A
+Summary: Enables cis-regulatory region sequence-specific DNA binding activity and protein heterodimerization activity. Contributes to DNA-binding transcription factor activity, RNA polymerase II-specific. Involved in brain segmentation; head morphogenesis; and positive regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including anterior-posterior subdivision of organism; germ layer; gut section; midgut enterocyte; and midgut primordium. Human ortholog(s) of this gene implicated in Athabaskan brainstem dysgenesis syndrome and autistic disorder. Orthologous to several human genes including HOXD1 (homeobox D1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41612
+Name: sim
+Description: single-minded
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and protein heterodimerization activity. Contributes to DNA-binding transcription activator activity, RNA polymerase II-specific. Involved in several processes, including adult walking behavior; determination of genital disc primordium; and nervous system development. Located in cytoplasm and nucleus. Is expressed in several structures, including CNS neuron; anterior-posterior subdivision of organism; ganglia; gut section; and midline glial cell. Human ortholog(s) of this gene implicated in obesity. Orthologous to human SIM1 (SIM bHLH transcription factor 1) and SIM2 (SIM bHLH transcription factor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 39962
+Name: Eip74EF
+Description: Ecdysone-induced protein 74EF
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific. Involved in several processes, including autophagic cell death; positive regulation of transcription by RNA polymerase II; and spermatogenesis. Located in nucleus. Is expressed in adult head; embryonic/larval salivary gland; and organism. Orthologous to several human genes including ELF2 (E74 like ETS transcription factor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 37851
+Name: yki
+Description: yorkie
+Type: N/A
+Summary: Enables several functions, including 14-3-3 protein binding activity; kinase binding activity; and transcription coactivator activity. Involved in several processes, including R8 cell development; epithelial cell differentiation; and regulation of cell development. Located in cytosol; lateral cell cortex; and nucleus. Part of RNA polymerase II transcription regulator complex. Is expressed in several structures, including CNS glial cell; cortical zone of lymph gland primary lobe; crystal cell primordium; embryonic/larval crystal cell; and embryonic/larval optic stalk. Used to study cancer (multiple); heart disease; nephrolithiasis; and neurodegenerative disease. Human ortholog(s) of this gene implicated in uveal coloboma-cleft lip and palate-intellectual disability. Orthologous to human WWTR1 (WW domain containing transcription regulator 1) and YAP1 (Yes1 associated transcriptional regulator). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 43151
+Name: E(spl)mgamma-HLH
+Description: Enhancer of split mgamma, helix-loop-helix
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity; DNA-binding transcription factor binding activity; and cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including neuronal stem cell population maintenance; positive regulation of neuroblast proliferation; and wing disc dorsal/ventral pattern formation. Located in nucleus. Is expressed in several structures, including adult ventral external mesothorax; chaeta; embryonic segment; head epidermis primordium; and larval optic anlage. Used to study central nervous system cancer. Orthologous to several human genes including HES1 (hes family bHLH transcription factor 1) and HES4 (hes family bHLH transcription factor 4). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40940
+Name: dsx
+Description: doublesex
+Type: N/A
+Summary: Enables several functions, including DNA-binding transcription factor activity, RNA polymerase II-specific; protein homodimerization activity; and zinc ion binding activity. Involved in axon midline choice point recognition; imaginal disc-derived genitalia development; and regulation of transcription by RNA polymerase II. Predicted to be active in nucleus. Is expressed in several structures, including adult doublesex neurons; adult muscle cell; imaginal disc; organism subdivision; and sense organ. Orthologous to human DMRTB1 (DMRT like family B with proline rich C-terminal 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 38995
+Name: hry
+Description: hairy
+Type: N/A
+Summary: Enables DNA-binding transcription repressor activity, RNA polymerase II-specific; E-box binding activity; and transcription corepressor binding activity. Involved in several processes, including negative regulation of transcription by RNA polymerase II; response to hypoxia; and salivary gland morphogenesis. Predicted to be active in nucleus. Is expressed in several structures, including adult CNS glial cell; anal pad; germ layer; gut section; and imaginal disc. Orthologous to human HES1 (hes family bHLH transcription factor 1) and HES4 (hes family bHLH transcription factor 4). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 31379
+Name: bi
+Description: bifid
+Type: N/A
+Summary: Enables DNA binding activity. Involved in several processes, including compound eye morphogenesis; negative regulation of transcription by RNA polymerase II; and wing disc development. Located in nucleus. Is expressed in several structures, including anterior-posterior subdivision of organism; compartment boundary; head epidermis primordium; imaginal disc; and synaptic neuropil domain. Used to study cancer. Human ortholog(s) of this gene implicated in atrial heart septal defect; heart septal defect; ulnar-mammary syndrome; and vertebral anomalies and variable endocrine and T-cell dysfunction. Orthologous to human TBX2 (T-box transcription factor 2) and TBX3 (T-box transcription factor 3). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41944
+Name: srp
+Description: serpent
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and transcription coactivator binding activity. Involved in several processes, including embryonic development via the syncytial blastoderm; hemopoiesis; and positive regulation of metabolic process. Part of RNA polymerase II transcription regulator complex. Is active in nucleus. Is expressed in several structures, including circulatory system primordium; endoderm anlage; hemocyte; prohemocyte; and somatic trunk mesoderm derivative. Human ortholog(s) of this gene implicated in several diseases, including X-linked recessive disease (multiple); bone marrow cancer (multiple); colon adenocarcinoma; depressive disorder; and myeloid leukemia associated with Down Syndrome. Orthologous to human GATA1 (GATA binding protein 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 33392
+Name: aop
+Description: anterior open
+Type: N/A
+Summary: Enables DNA-binding transcription repressor activity, RNA polymerase II-specific; RNA polymerase II cis-regulatory region sequence-specific DNA binding activity; and protein domain specific binding activity. Involved in several processes, including cell surface receptor protein tyrosine kinase signaling pathway; negative regulation of cell differentiation; and regulation of gene expression. Located in cytosol and nucleus. Is expressed in several structures, including embryonic gnathal segment; epithelium; germ layer; larval optic anlage; and synaptic neuropil domain. Human ortholog(s) of this gene implicated in hematologic cancer (multiple) and thrombocytopenia. Orthologous to human ETV6 (ETS variant transcription factor 6) and ETV7 (ETS variant transcription factor 7). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 33583
+Name: odd
+Description: odd skipped
+Type: N/A
+Summary: Predicted to enable DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in Malpighian tubule morphogenesis; regulation of transcription by RNA polymerase II; and segmentation. Predicted to be active in nucleus. Is expressed in several structures, including dMP2 neuron; gut section; head epidermis primordium; nephrocyte; and somatic precursor cell. Orthologous to human OSR1 (odd-skipped related transcription factor 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 43856
+Name: nej
+Description: nejire
+Type: N/A
+Summary: Enables several functions, including histone H3 acetyltransferase activity; histone methyltransferase binding activity; and transcription coactivator activity. Involved in several processes, including nervous system development; regulation of canonical Wnt signaling pathway; and regulation of cell cycle process. Located in nucleus and polytene chromosome. Part of histone acetyltransferase complex and histone methyltransferase complex. Is expressed in several structures, including adult brain cell body rind; embryonic peripheral glial cell; and larval nervous system. Used to study Rubinstein-Taybi syndrome and alcohol use disorder. Human ortholog(s) of this gene implicated in Rubinstein-Taybi syndrome; colorectal cancer; congestive heart failure; idiopathic pulmonary fibrosis; and leukemia (multiple). Orthologous to human CREBBP (CREB binding protein) and EP300 (E1A binding protein p300). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 30985
+Name: ase
+Description: asense
+Type: N/A
+Summary: Enables DNA binding activity; protein heterodimerization activity; and protein homodimerization activity. Contributes to RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including Malpighian tubule development; negative regulation of mitotic nuclear division; and neuroblast fate determination. Located in nucleus. Is expressed in several structures, including ganglia; imaginal disc; presumptive embryonic/larval system; sensory nervous system primordium; and somatic precursor cell. Orthologous to human ASCL1 (achaete-scute family bHLH transcription factor 1) and ASCL2 (achaete-scute family bHLH transcription factor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 42226
+Name: fru
+Description: fruitless
+Type: N/A
+Summary: Predicted to enable DNA-binding transcription factor activity. Involved in several processes, including male courtship behavior; mating behavior, sex discrimination; and neuron development. Predicted to be active in nucleus. Is expressed in several structures, including epithelium; imaginal disc; neurons; organism subdivision; and synaptic neuropil subdomain. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40045
+Name: ftz-f1
+Description: ftz transcription factor 1
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific; RNA polymerase II-specific DNA-binding transcription factor binding activity; and transcription cis-regulatory region binding activity. Involved in several processes, including instar larval or pupal development; juvenile hormone mediated signaling pathway; and nervous system development. Located in nucleus. Is expressed in several structures, including appendage; follicle cell; gland; gut section; and ring gland. Human ortholog(s) of this gene implicated in 46,XX sex reversal 4; 46,XY sex reversal 3; Zellweger syndrome; primary ovarian insufficiency 7; and spermatogenic failure 8. Orthologous to several human genes including NR5A1 (nuclear receptor subfamily 5 group A member 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 47285
+Name: repo
+Description: reversed polarity
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific; DNA-binding transcription repressor activity, RNA polymerase II-specific; and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including nervous system development; positive regulation of glial cell differentiation; and regulation of gene expression. Located in cytoplasm and nucleus. Is expressed in several structures, including brain; glial cell; glioblast; imaginal disc; and sensory nervous system primordium. Orthologous to several human genes including ESX1 (ESX homeobox 1); RHOXF1 (Rhox homeobox family member 1); and RHOXF2 (Rhox homeobox family member 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 43383
+Name: fkh
+Description: fork head
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including DNA endoreduplication; autophagic cell death; and determination of adult lifespan. Located in nucleus. Is expressed in several structures, including CNS glial cell; epithelium; gut section; head epidermis primordium; and primary neurons. Human ortholog(s) of this gene implicated in breast cancer; gastrointestinal system cancer (multiple); lung cancer (multiple); and type 2 diabetes mellitus. Orthologous to several human genes including FOXA2 (forkhead box A2). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 37038
+Name: grh
+Description: grainy head
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific; protein homodimerization activity; and sequence-specific DNA binding activity. Involved in several processes, including chitin-based embryonic cuticle biosynthetic process; compound eye photoreceptor cell differentiation; and open tracheal system development. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; anterior-posterior subdivision of organism; epithelium; ganglia; and neuroblasts. Human ortholog(s) of this gene implicated in autosomal dominant nonsyndromic deafness 28 and posterior polymorphous corneal dystrophy 4. Orthologous to human GRHL1 (grainyhead like transcription factor 1); GRHL2 (grainyhead like transcription factor 2); and GRHL3 (grainyhead like transcription factor 3). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 36032
+Name: Mef2
+Description: Myocyte enhancer factor 2
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including anterior midgut development; carbohydrate storage; and positive regulation of macromolecule biosynthetic process. Located in nucleus. Is expressed in several structures, including Kenyon cell; adult pacemaker neurons; dorsal vessel wall cell; muscle cell; and synaptic neuropil subdomain. Used to study attention deficit hyperactivity disorder. Human ortholog(s) of this gene implicated in dilated cardiomyopathy and neurodevelopmental disorder with hypotonia, stereotypic hand movements, and impaired language. Orthologous to several human genes including MEF2A (myocyte enhancer factor 2A) and MEF2C (myocyte enhancer factor 2C). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 37973
+Name: Dll
+Description: Distal-less
+Type: N/A
+Summary: Predicted to enable DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including imaginal disc-derived appendage morphogenesis; regionalization; and regulation of gene expression. Located in nucleus. Is expressed in several structures, including ganglia; imaginal disc; imaginal disc primordium; optic lobe intrinsic neurons; and organism subdivision. Human ortholog(s) of this gene implicated in amelogenesis imperfecta type 4; orofacial cleft 15; split hand-foot malformation 1; split hand-foot malformation 1 with sensorineural hearing loss; and trichodontoosseous syndrome. Orthologous to several human genes including DLX3 (distal-less homeobox 3). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 31003
+Name: vnd
+Description: ventral nervous system defective
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and DNA-binding transcription factor binding activity. Involved in negative regulation of gene expression; nervous system development; and regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; embryonic procephalic segment; gut; gut section; and neuroblasts. Orthologous to human NKX2-2 (NK2 homeobox 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 45318
+Name: kn
+Description: knot
+Type: N/A
+Summary: Predicted to enable DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including determination of muscle attachment site; larval somatic muscle development; and regionalization. Is expressed in several structures, including anterior-posterior subdivision of organism; embryonic myoblast; larval neurons; larval somatic muscle cell; and sensory nervous system primordium. Human ortholog(s) of this gene implicated in hypotonia, ataxia, and delayed development syndrome. Orthologous to several human genes including EBF1 (EBF transcription factor 1). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 43812
+Name: ey
+Description: eyeless
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including adult walking behavior; nervous system development; and regulation of insulin-like growth factor receptor signaling pathway. Predicted to be located in nucleus. Is expressed in several structures, including intrinsic neurons; neuromere; somatic stem cell; synaptic neuropil domain; and synaptic neuropil subdomain. Human ortholog(s) of this gene implicated in diabetic ketoacidosis; maturity-onset diabetes of the young type 9; type 1 diabetes mellitus; and type 2 diabetes mellitus. Orthologous to human PAX4 (paired box 4). [provided by Alliance of Genome Resources, Apr 2025]
+----------------------------------------
+Gene ID: 33916
+Name: eya
+Description: eyes absent
+Type: N/A
+Summary: Enables DNA-binding transcription factor binding activity; protein tyrosine phosphatase activity; and transcription coactivator activity. Involved in several processes, including eye morphogenesis; nervous system development; and positive regulation of macromolecule biosynthetic process. Located in cytosol and nucleus. Is expressed in several structures, including anlage in statu nascendi; anterior-posterior subdivision of organism; head epidermis primordium; somatic cell of ovariole; and somatic trunk mesoderm derivative. Used to study branchiootorenal syndrome and eye disease. Human ortholog(s) of this gene implicated in auditory system disease (multiple); branchiootorenal syndrome (multiple); congestive heart failure; and dilated cardiomyopathy (multiple). Orthologous to several human genes including EYA4 (EYA transcriptional coactivator and phosphatase 4). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 33607
+Name: slp1
+Description: sloppy paired 1
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in heart formation; negative regulation of transcription by RNA polymerase II; and specification of segmental identity, head. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; circulatory system primordium; proventriculus; segment; and somatic precursor cell. Human ortholog(s) of this gene implicated in blepharophimosis, ptosis, and epicanthus inversus syndrome; lung non-small cell carcinoma; and primary ovarian insufficiency 3. Orthologous to human FOXL2 (forkhead box L2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 30983
+Name: l(1)sc
+Description: lethal of scute
+Type: N/A
+Summary: Enables protein heterodimerization activity. Contributes to DNA-binding transcription factor activity and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in Malpighian tubule development; neuroblast fate determination; and positive regulation of transcription by RNA polymerase II. Part of transcription regulator complex. Is expressed in several structures, including anlage in statu nascendi; head epidermis primordium; larval midline neurons; midline glial cell; and somatic precursor cell. Orthologous to several human genes including ASCL1 (achaete-scute family bHLH transcription factor 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 32817
+Name: CrebB
+Description: Cyclic-AMP response element binding protein B
+Type: N/A
+Summary: Enables sequence-specific DNA binding activity. Involved in several processes, including memory; positive regulation of feeding behavior; and thermosensory behavior. Located in nucleus. Is expressed in adult head and organism. Used to study alcohol use disorder. Human ortholog(s) of this gene implicated in Parkinson's disease; alcohol dependence; and heroin dependence. Orthologous to human ATF1 (activating transcription factor 1); CREB1 (cAMP responsive element binding protein 1); and CREM (cAMP responsive element modulator). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 39765
+Name: Taf4
+Description: TBP-associated factor 4
+Type: N/A
+Summary: Enables DNA binding activity; DNA-binding transcription factor binding activity; and TFIIA-class transcription factor complex binding activity. Contributes to RNA polymerase II general transcription initiation factor activity. Involved in transcription initiation at RNA polymerase II promoter. Located in nucleus. Part of transcription factor TFIID complex. Is expressed in epithelial cell; epithelium; male accessory gland; seminal vesicle; and testis. Human ortholog(s) of this gene implicated in autosomal dominant intellectual developmental disorder 73 and spermatogenic failure 13. Orthologous to several human genes including TAF4B (TATA-box binding protein associated factor 4b). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 35509
+Name: ap
+Description: apterous
+Type: N/A
+Summary: Enables RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including imaginal disc pattern formation; imaginal disc-derived appendage morphogenesis; and positive regulation of macromolecule biosynthetic process. Located in nucleus. Is expressed in several structures, including ganglia; imaginal disc; larval external muscle cell; optic lobe intrinsic columnar neurons; and organism subdivision. Orthologous to human LHX2 (LIM homeobox 2) and LHX9 (LIM homeobox 9). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 2768974
+Name: ind
+Description: intermediate neuroblasts defective
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity; DNA-binding transcription factor binding activity; and sequence-specific DNA binding activity. Involved in central nervous system development; negative regulation of gene expression; and negative regulation of transcription by RNA polymerase II. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; central brain anlage; embryonic procephalic segment; ganglia; and neuroblasts. Human ortholog(s) of this gene implicated in cerebral infarction; hyperglycemia; maturity-onset diabetes of the young type 4; pancreatic agenesis 1; and type 2 diabetes mellitus. Orthologous to human GSX1 (GS homeobox 1); GSX2 (GS homeobox 2); and PDX1 (pancreatic and duodenal homeobox 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41740
+Name: su(Hw)
+Description: suppressor of Hairy wing
+Type: N/A
+Summary: Enables chromatin insulator sequence binding activity; euchromatin binding activity; and sequence-specific DNA binding activity. Involved in negative regulation of macromolecule biosynthetic process; protein localization to euchromatin; and response to ecdysone. Located in chromatin and nucleus. Is expressed in several structures, including germline cell; gut section; head epidermis primordium; somatic trunk mesoderm derivative; and trunk visceral muscle primordium. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 34569
+Name: salm
+Description: spalt major
+Type: N/A
+Summary: Predicted to enable DNA-binding transcription factor activity, RNA polymerase II-specific. Involved in several processes, including neurogenesis; open tracheal system development; and regulation of RNA metabolic process. Located in nucleus. Is expressed in several structures, including anlage in statu nascendi; epithelium; glial cell; parasegment; and photoreceptor neurons. Used to study carcinoma. Human ortholog(s) of this gene implicated in Duane retraction syndrome; Duane-radial ray syndrome; Holt-Oram syndrome; IVIC syndrome; and ventricular septal defect. Orthologous to several human genes including SALL3 (spalt like transcription factor 3). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 37890
+Name: bs
+Description: blistered
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and DNA-binding transcription factor binding activity. Contributes to DNA-binding transcription activator activity, RNA polymerase II-specific. Involved in several processes, including instar larval or pupal development; short-term memory; and terminal branching, open tracheal system. Located in nucleus. Is expressed in several structures, including gut section; larval muscle cell; organism subdivision; presumptive embryonic/larval central nervous system; and wing vein. Human ortholog(s) of this gene implicated in cardiomyopathy and lymphangioleiomyomatosis. Orthologous to human SRF (serum response factor). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 41737
+Name: trx
+Description: trithorax
+Type: N/A
+Summary: Enables several functions, including protein homodimerization activity; protein methyltransferase activity; and protein phosphatase 1 binding activity. Involved in several processes, including germ cell migration; haltere development; and positive regulation of transcription elongation by RNA polymerase II. Located in nucleus and polytene chromosome band. Part of MLL1/2 complex; histone acetyltransferase complex; and transcription elongation factor complex. Is expressed in several structures, including epithelium; ganglia; gut section; head epidermis primordium; and imaginal disc. Used to study congenital heart disease. Human ortholog(s) of this gene implicated in autosomal dominant intellectual developmental disorder 68; cervical cancer; dystonia 28, childhood-onset; gastrointestinal system cancer (multiple); and hematologic cancer (multiple). Orthologous to human KMT2A (lysine methyltransferase 2A) and KMT2B (lysine methyltransferase 2B). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 43161
+Name: E(spl)m8-HLH
+Description: Enhancer of split m8, helix-loop-helix
+Type: N/A
+Summary: Enables DNA-binding transcription repressor activity, RNA polymerase II-specific; protein dimerization activity; and sequence-specific DNA binding activity. Involved in several processes, including compound eye development; dendrite morphogenesis; and sensory organ precursor cell fate determination. Predicted to be active in nucleus. Is expressed in several structures, including germ layer; head epidermis primordium; larval optic anlage; organism subdivision; and somatic precursor cell. Orthologous to human HES2 (hes family bHLH transcription factor 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 40826
+Name: pb
+Description: proboscipedia
+Type: N/A
+Summary: Predicted to enable DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in proboscis development; specification of segmental identity, labial segment; and specification of segmental identity, maxillary segment. Located in nucleus. Is expressed in several structures, including anterior ectoderm; embryonic segment; embryonic/larval foregut; ganglia; and labial disc. Orthologous to several human genes including HOXB2 (homeobox B2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 36461
+Name: Dp
+Description: DP transcription factor
+Type: N/A
+Summary: Enables DNA binding activity and DNA-binding transcription factor binding activity. Contributes to DNA-binding transcription factor activity, RNA polymerase II-specific and sequence-specific DNA binding activity. Involved in several processes, including dorsal/ventral axis specification, ovarian follicular epithelium; intrinsic apoptotic signaling pathway in response to DNA damage; and positive regulation of nurse cell apoptotic process. Located in nucleus. Part of Myb complex and Rb-E2F complex. Is expressed in several structures, including embryonic/larval midgut primordium; epithelium; ganglia; imaginal disc; and male germline cell. Human ortholog(s) of this gene implicated in mismatch repair cancer syndrome. Orthologous to human TFDP3 (transcription factor Dp family member 3); TFDP1 (transcription factor Dp-1); and TFDP2 (transcription factor Dp-2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 44226
+Name: Xbp1
+Description: X box binding protein-1
+Type: N/A
+Summary: Predicted to enable DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II transcription regulatory region sequence-specific DNA binding activity. Involved in several processes, including IRE1-mediated unfolded protein response; intestinal stem cell homeostasis; and regulation of primary metabolic process. Predicted to be active in nucleus. Is expressed in several structures, including adult antennal olfactory receptor neurons; amnioserosa primordium; dorsal epidermis primordium; epithelium; and gut section. Orthologous to human XBP1 (X-box binding protein 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 31165
+Name: usp
+Description: ultraspiracle
+Type: N/A
+Summary: Enables several functions, including core promoter sequence-specific DNA binding activity; nuclear receptor activity; and protein heterodimerization activity. Contributes to DNA-binding transcription activator activity, RNA polymerase II-specific and ecdysone binding activity. Involved in several processes, including border follicle cell migration; instar larval or pupal development; and nervous system development. Located in dendrite and nucleus. Part of activator ecdysone receptor complex. Is expressed in several structures, including adult cuticle; central nervous system; female germline cell; gland; and imaginal disc. Human ortholog(s) of this gene implicated in lung non-small cell carcinoma and pancreatic cancer. Orthologous to human RXRA (retinoid X receptor alpha); RXRB (retinoid X receptor beta); and RXRG (retinoid X receptor gamma). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 45588
+Name: Pdp1
+Description: PAR-domain protein 1
+Type: N/A
+Summary: Enables DNA-binding transcription activator activity, RNA polymerase II-specific and sequence-specific DNA binding activity. Involved in circadian rhythm; positive regulation of DNA-templated transcription; and regulation of lipid metabolic process. Located in nucleus. Is expressed in several structures, including adult pacemaker neurons; gut section; midgut primordium; pharyngeal muscle cell; and somatic trunk mesoderm derivative. Human ortholog(s) of this gene implicated in osteoporosis. Orthologous to human DBP (D-box binding PAR bZIP transcription factor); HLF (HLF transcription factor, PAR bZIP family member); and TEF (TEF transcription factor, PAR bZIP family member). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 42536
+Name: tin
+Description: tinman
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity, RNA polymerase II-specific and RNA polymerase II cis-regulatory region sequence-specific DNA binding activity. Involved in several processes, including digestive tract development; gonadal mesoderm development; and heart development. Located in nucleus. Is expressed in several structures, including adult heart; cardiogenic mesoderm; dorsal vessel; dorsal vessel wall cell; and pericardial cell. Used to study congenital heart disease. Orthologous to human NKX2-2 (NK2 homeobox 2). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+
+
+GENE QUERY 2: "Drosophila melanogaster"[Organism] AND "stress response"[Gene Ontology]
+--------------------------------------------------------------------------------
+
+Gene ID: 39089
+Name: MTF-1
+Description: Metal response element-binding Transcription Factor-1
+Type: N/A
+Summary: Enables DNA-binding transcription factor activity and transcription cis-regulatory region binding activity. Involved in several processes, including positive regulation of transcription by RNA polymerase II; response to copper ion; and stress response to metal ion. Located in cytoplasm and nucleus. Is expressed in several structures, including embryonic/larval garland cell; embryonic/larval midgut primordium; garland cell primordium; gut section; and larval muscle cell. Orthologous to human MTF1 (metal regulatory transcription factor 1). [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+Gene ID: 14462465
+Name: lncRNA:CR44138
+Description: long non-coding RNA:CR44138
+Type: N/A
+Summary: Involved in stress response to metal ion. [provided by Alliance of Genome Resources, Jul 2025]
+----------------------------------------
+
+
+GENE QUERY 3: "Drosophila melanogaster"[Organism] AND ("gene regulatory"[All Fields] AND "modifier"[All Fields])
+--------------------------------------------------------------------------------
+
+No gene results found for this query.
+
+
+================================================================================
+PROTEIN DATABASE RESULTS
+================================================================================
+
+
+PROTEIN QUERY 1: "Drosophila melanogaster"[Organism] AND "transcription factor"[Protein Name]
+--------------------------------------------------------------------------------
+
+
+PROTEIN QUERY 2: "Drosophila melanogaster"[Organism] AND "chromatin remodeling"[Protein Function]
+--------------------------------------------------------------------------------
+
+No protein results found for this query.
+
+
+PROTEIN QUERY 3: "Drosophila melanogaster"[Organism] AND "stress response"[Protein Function]
+--------------------------------------------------------------------------------
+
+No protein results found for this query.
+

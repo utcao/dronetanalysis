@@ -3,6 +3,7 @@ source("dronetanalysis/src/utils/utils_io.R")
 # -----  Extract Key Settings from config.yaml -----
 library(yaml)  # to read the YAML config
 config <- yaml::read_yaml("config/config.yaml")
+install.packages("data.table")
 suppressPackageStartupMessages({
     library(purrr)
     library(data.table)
