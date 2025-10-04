@@ -100,7 +100,7 @@ def main():
     ]
     
     # Create a single results file with timestamp
-    filename = f"dronetanalysis/global_markers_search/pubmed_combined_results.txt"
+    filename = f"dronetanalysis/global_modifiers_search/pubmed_combined_results.txt"
     
     with open(filename, "w", encoding="utf-8") as f:
         # Search Gene database
