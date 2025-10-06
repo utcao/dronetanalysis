@@ -1,9 +1,6 @@
-#!/usr/bin/env Rscript
-source("dronetanalysis/src/utils/utils_io.R")
+#!/usr/bin/R Rscript
 # -----  Extract Key Settings from config.yaml -----
 library(yaml)  # to read the YAML config
-config <- yaml::read_yaml("config/config.yaml")
-install.packages("data.table")
 suppressPackageStartupMessages({
     library(purrr)
     library(data.table)
@@ -15,15 +12,13 @@ suppressPackageStartupMessages({
 library(data.table)
 
 #read table (genes in first column)
-dt <- fread("logCPM_Ctrl_Dros.csv")   # adjust filename
+dt <- fread("dataset/processed/logCPM_ct_dros_subset.csv")   # adjust filename
 setnames(dt, 1, "gene")     # ensure first col named "gene"
 
 #quick inspection
 # per-sample ranges & how many negatives
 summary_dt <- dt[, lapply(.SD, function(x) list(min=min(x, na.rm=TRUE), max=max(x, na.rm=TRUE))), .SDcols = -1]
-print(summary_dt)
 neg_counts <- dt[, lapply(.SD, function(x) sum(x < 0, na.rm=TRUE)), .SDcols = -1]
-print(neg_counts)
 
 #convert to matrix (genes x samples) for numeric ops
 mat <- as.matrix(dt[, -1, with = FALSE])
@@ -54,3 +49,4 @@ edges=cor_dt[,abs_corr :=abs(correlation)>0.7]
 # top 3 partners for each geneA (example)
 setorder(edges, geneA, -abs_corr)
 top3 <- edges[, head(.SD, 3), by = geneA]
+print(top3)
