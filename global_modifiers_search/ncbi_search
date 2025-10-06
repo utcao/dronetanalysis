@@ -86,11 +86,12 @@ def fetch_details(id_list, database="pubmed"):
         return None
 
 def main():
-    # Search terms for global modifiers in Drosophila melanogaster
+    # Search terms
     gene_queries = [
         '"Drosophila melanogaster"[Organism] AND ("transcription factor"[Gene Ontology] OR "chromatin modifier"[Gene Ontology])',
         '"Drosophila melanogaster"[Organism] AND "stress response"[Gene Ontology]',
-        '"Drosophila melanogaster"[Organism] AND ("gene regulatory"[All Fields] AND "modifier"[All Fields])'
+        '"Drosophila melanogaster"[Organism] AND ("gene regulatory"[All Fields] AND "modifier"[All Fields])',
+        '"Drosophila melanogaster"[Organism] AND "buffering" [Gene Ontology]'
     ]
     
     protein_queries = [
@@ -99,7 +100,7 @@ def main():
         '"Drosophila melanogaster"[Organism] AND "stress response"[Protein Function]'
     ]
     
-    # Create a single results file with timestamp
+    # Create a single results file
     filename = f"dronetanalysis/global_modifiers_search/pubmed_combined_results.txt"
     
     with open(filename, "w", encoding="utf-8") as f:

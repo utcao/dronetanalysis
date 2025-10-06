@@ -631,6 +631,12 @@ GENE QUERY 3: "Drosophila melanogaster"[Organism] AND ("gene regulatory"[All Fie
 No gene results found for this query.
 
 
+GENE QUERY 4: "Drosophila melanogaster"[Organism] AND "buffering" [Gene Ontology]
+--------------------------------------------------------------------------------
+
+No gene results found for this query.
+
+
 ================================================================================
 PROTEIN DATABASE RESULTS
 ================================================================================
