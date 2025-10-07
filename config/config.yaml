@@ -15,6 +15,10 @@ raw_files:
     - "dataset/raw/VOOM_surrogates/TMM_Voom_sv2_10.txt"
     - "dataset/raw/VOOM_surrogates/TMM_Voom_sv3_10.txt"
     - "dataset/raw/VOOM_surrogates/TMM_Voom_sv4_10.txt"
+  vst_surrogate_files:
+    - "dataset/raw/VST_surrogates/VST_sv1_10.txt"
+    - "dataset/raw/VST_surrogates/VST_sv2_10.txt"
+    - "dataset/raw/VST_surrogates/VST_sv3_10.txt"
 input_files:
   subset_data:
     - file_A.csv

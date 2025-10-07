@@ -14,10 +14,13 @@ library(DESeq2)
 library(dplyr)
 library(edgeR)
 library(limma)
-library(tidyr)
-
-# Working Directory 
-setwd("C:\\Users\\jtanshengyi\\Desktop\\Projects\\veQTL Netherlands Normal vs High Sugar Adult\\Data\\")
+library(tidyr) 
+library(yaml)
+config <- yaml::read_yaml("config/config.yaml")
+rawcount_file <- config$raw_files$rawcount_file
+rawmeta_file <- config$raw_files$rawmeta_file
+voom_surrogate_files <- config$raw_files$voom_surrogate_files
+vst_surrogate_files <- config$raw_files$vst_surrogate_files
 
 #####################
 ##### Datasets ######
@@ -46,7 +49,7 @@ vst.sv3 <- vst.sv3$x
 # Based on PC inspection - Include 3 SVs for VST; 4 SVs for voom
 
 # Expression - raw counts of filtered samples (see MakingGeneExpressionMatrix_head_HS&CTRL.R for filtering criteria)
-raw.counts <- read.table("RawCounts_noY_CPM1_head_hsctrl_onlyGEMMAsamples_Mar21.21.txt",h=T,check.names = F)
+raw.counts <- read.table("RawCounts_noY_CPM1_head_hsctrl_onlyGEMMAsamples_Mar21.txt",h=T,check.names = F)
 
 # Only metadata on samples with counts
 cov <- tibble::column_to_rownames(head.info, "id")
@@ -55,7 +58,7 @@ cov2 <- cov[c(colnames(raw.counts)),]
 # Merge expression and metadata 
 raw.counts.t <- data.frame(t(raw.counts)) 
 raw.counts.t <- tibble::rownames_to_column(raw.counts.t, "id")
-head.data <- merge(raw.counts.t,head.info,by = 'id')
+head.data <- merge(raw.counts.t, head.info, by = 'id')
 head.data <- tibble::column_to_rownames(head.data, "id")
 
 ############################
