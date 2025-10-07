@@ -5,7 +5,7 @@
 # project folds
 planning/
 manuscript/
-dataset/raw
+dataset/
 manuscript/
 planning/
 results/logs
