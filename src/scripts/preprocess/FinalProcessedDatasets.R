@@ -1,6 +1,7 @@
-# voom/logCPM matrix and vst matrix
+# voom/logCPM matrix and vst matrix acquisition for co-expression network analysis
 
 # Script by James Tan
+# Edited by Gabriel Thornes
 
 # Last Updated: 7/10/25
 
@@ -27,29 +28,29 @@ vst_surrogate_files <- config$raw_files$vst_surrogate_files
 #####################
 
 # Metadata on all samples, e.g., conditions and batches
-head.info   <- read.table("Info_RawCounts_CPM1_head_hsctrl_Jul9.20.txt",h=T)
+head.info   <- read.table(rawmeta_file, h=T)
 
 # Surrogate variables, estimated in the NvsHS_SurrogateVariables R scripts
-tmm.voom.sv1 <- read.table('TMM_Voom_sv1_10.txt')
+tmm.voom.sv1 <- read.table(voom_surrogate_files[[1]])
 tmm.voom.sv1 <- tmm.voom.sv1$x
-tmm.voom.sv2 <- read.table('TMM_Voom_sv2_10.txt')
+tmm.voom.sv2 <- read.table(voom_surrogate_files[[2]])
 tmm.voom.sv2 <- tmm.voom.sv2$x
-tmm.voom.sv3 <- read.table('TMM_Voom_sv3_10.txt')
+tmm.voom.sv3 <- read.table(voom_surrogate_files[[3]])
 tmm.voom.sv3 <- tmm.voom.sv3$x
-tmm.voom.sv4 <- read.table('TMM_Voom_sv4_10.txt')
+tmm.voom.sv4 <- read.table(voom_surrogate_files[[4]])
 tmm.voom.sv4 <- tmm.voom.sv4$x
 
-vst.sv1 <- read.table('VST_sv1_10.txt')
+vst.sv1 <- read.table(vst_surrogate_files[[1]])
 vst.sv1 <- vst.sv1$x
-vst.sv2 <- read.table('VST_sv2_10.txt')
+vst.sv2 <- read.table(vst_surrogate_files[[2]])
 vst.sv2 <- vst.sv2$x
-vst.sv3 <- read.table('VST_sv3_10.txt')
+vst.sv3 <- read.table(vst_surrogate_files[[3]])
 vst.sv3 <- vst.sv3$x
 
 # Based on PC inspection - Include 3 SVs for VST; 4 SVs for voom
 
 # Expression - raw counts of filtered samples (see MakingGeneExpressionMatrix_head_HS&CTRL.R for filtering criteria)
-raw.counts <- read.table("RawCounts_noY_CPM1_head_hsctrl_onlyGEMMAsamples_Mar21.txt",h=T,check.names = F)
+raw.counts <- read.table(rawcount_file, h=T, check.names = F)
 
 # Only metadata on samples with counts
 cov <- tibble::column_to_rownames(head.info, "id")
@@ -118,6 +119,14 @@ voom.counts.bc <- as.data.frame(voom.counts.bc)
 voomdataN <- voom.counts.bc[,c(which(conditions==conditionsLevel[1]))]
 voomdataHS <- voom.counts.bc[,c(which(conditions==conditionsLevel[2]))]
 
+# Write VOOM data to tables
+write.table(voomdataHS, 
+           file=file.path(config$project_dirs$processed_data_dir, "voomdataHS.txt"),
+           sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
+
+write.table(voomdataN, 
+           file=file.path(config$project_dirs$processed_data_dir, "voomdataN.txt"),
+           sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
 
 #####################
 ##### VST ###########
@@ -143,3 +152,12 @@ vst.counts.bc.t <- t(vst.counts.bc)
 # Split data by control or high sugar
 VSTdataN <- vst.counts.bc[,c(which(conditions==conditionsLevel[1]))]
 VSTdataHS <- vst.counts.bc[,c(which(conditions==conditionsLevel[2]))]
+
+# Write VST data to tables
+write.table(VSTdataHS, 
+           file=file.path(config$project_dirs$processed_data_dir, "VSTdataHS.txt"),
+           sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
+
+write.table(VSTdataN, 
+           file=file.path(config$project_dirs$processed_data_dir, "VSTdataN.txt"),
+           sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
