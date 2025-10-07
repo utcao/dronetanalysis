@@ -3,9 +3,6 @@
 .RData
 .Rproj.user
 # project folds
-planning/
-manuscript/
-dataset/
 manuscript/
 planning/
 results/logs
