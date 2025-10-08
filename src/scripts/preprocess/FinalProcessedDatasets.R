@@ -52,6 +52,11 @@ vst.sv3 <- vst.sv3$x
 # Expression - raw counts of filtered samples (see MakingGeneExpressionMatrix_head_HS&CTRL.R for filtering criteria)
 raw.counts <- read.table(rawcount_file, h=T, check.names = F)
 
+# Eliminate bimodal genes
+Bimodal_genes <- read.csv('dataset/bimodal_genes/Bimodal_Genes.csv',row.names = 1) 
+Non_bimodal_genes <- setdiff(rownames(raw.counts),rownames(Bimodal_genes))
+raw.counts <- raw.counts[Non_bimodal_genes,]
+
 # Only metadata on samples with counts
 cov <- tibble::column_to_rownames(head.info, "id")
 cov2 <- cov[c(colnames(raw.counts)),]
@@ -121,11 +126,11 @@ voomdataHS <- voom.counts.bc[,c(which(conditions==conditionsLevel[2]))]
 
 # Write VOOM data to tables
 write.table(voomdataHS, 
-           file=file.path(config$project_dirs$processed_data_dir, "voomdataHS.txt"),
+           file=file.path(config$project_dirs$processed_data_dir, "VOOM", "voomdataHS.txt"),
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
 
 write.table(voomdataN, 
-           file=file.path(config$project_dirs$processed_data_dir, "voomdataN.txt"),
+           file=file.path(config$project_dirs$processed_data_dir, "VOOM", "voomdataN.txt"),
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
 
 #####################
@@ -155,9 +160,9 @@ VSTdataHS <- vst.counts.bc[,c(which(conditions==conditionsLevel[2]))]
 
 # Write VST data to tables
 write.table(VSTdataHS, 
-           file=file.path(config$project_dirs$processed_data_dir, "VSTdataHS.txt"),
+           file=file.path(config$project_dirs$processed_data_dir, "VST", "VSTdataHS.txt"),
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
 
 write.table(VSTdataN, 
-           file=file.path(config$project_dirs$processed_data_dir, "VSTdataN.txt"),
+           file=file.path(config$project_dirs$processed_data_dir, "VST", "VSTdataN.txt"),
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
