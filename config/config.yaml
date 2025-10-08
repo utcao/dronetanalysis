@@ -6,6 +6,7 @@ timestamp_fmt: "%Y%m%d_%H%M%S"
 project_dirs:
   rawdata_dir: "dataset/raw"
   processed_data_dir: "dataset/processed"
+  subset_data_dir: "dataset/subset"
   test_data_dir: "dataset/test"
 raw_files:
   rawcount_file: "dataset/raw/RawCounts_noY_CPM1_head_hsctrl_onlyGEMMAsamples_Mar21.21.txt"
@@ -19,6 +20,11 @@ raw_files:
     - "dataset/raw/VST_surrogates/VST_sv1_10.txt"
     - "dataset/raw/VST_surrogates/VST_sv2_10.txt"
     - "dataset/raw/VST_surrogates/VST_sv3_10.txt"
+processed_files:
+  voom_ctrl_file: "dataset/processed/VOOM/vomdataN.txt"
+  voom_hs_file: "dataset/processed/VOOM/vomdataHS.txt"
+  vst_ctrl_file: "dataset/processed/VST/VSTdataN.txt"
+  vst_hs_file: "dataset/processed/VST/VSTdataHS.txt"
 input_files:
   subset_data:
     - file_A.csv

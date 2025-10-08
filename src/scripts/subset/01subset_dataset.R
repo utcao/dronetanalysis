@@ -1,11 +1,25 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
-# subset dataset for drosophila transcriptomic network analysis
+# Subset dataset for drosophila transcriptomic network analysis
 #
-# This script performs:
-#   1. format strings in data table
-#   2. subset dataset
+#
+# Script by Gabriel Thornes and Yu-tao Cao
+#
+# Last Updated: 08/10/2025
+#
+# This script::
+#   1. Takes VOOM and VST processed matrices as input
+#   1. Formats strings in data table
+#   2. Subsets dataset for easier testing and debugging
 # ==============================================================================
+
+
+#################################
+##### Packages and Setup ########
+#################################
+
+rm(list = ls())
+
 suppressPackageStartupMessages({
     library(purrr)
     library(data.table)
@@ -19,49 +33,117 @@ source("src/utils/utils_io.R")
 # -----  Extract Key Settings from config.yaml -----
 library(yaml)  # to read the YAML config
 config <- yaml::read_yaml("config/config.yaml")
+
 # Output prefixes
 rawdata_dir <- config$project_dirs$rawdata_dir
 processed_data_dir <- config$project_dirs$processed_data_dir
+subset_data_dir <- config$project_dirs$subset_data_dir
 test_data_dir <- config$project_dirs$test_data_dir
 
+# Create directories if they do not exist
 create_directories(c(rawdata_dir, processed_data_dir, test_data_dir))
 
-# ----- subset dataset -----
-ct_file <- file.path(rawdata_dir, "logCPM_Ctrl_Dros.csv")
-hs_file <- file.path(rawdata_dir, "logCPM_HS_Dros.csv")
-subset_ct_file <- file.path(processed_data_dir, "logCPM_ct_dros_subset.csv")
-subset_hs_file <- file.path(processed_data_dir, "logCPM_hs_dros_subset.csv")
-test_ct_file <- file.path(test_data_dir, "logCPM_ct_dros_subset.csv")
-test_hs_file <- file.path(test_data_dir, "logCPM_hs_dros_subset.csv")
-# data load
-dro_tab_list <- purrr::map(c(ct_file, hs_file), function(f){
-    tab <- fread(f)
-    setnames(tab, "V1", "gene_id")
+#####################
+##### Datasets ######
+#####################
+
+# VST processed files
+vst_ct_file <- file.path(processed_data_dir, "VST", "VSTdataN.txt")  # N = Normal/Control
+vst_hs_file <- file.path(processed_data_dir, "VST", "VSTdataHS.txt") # HS = Heat Stress
+# VOOM processed files  
+voom_ct_file <- file.path(processed_data_dir, "VOOM", "voomdataN.txt") # N = Normal/Control
+voom_hs_file <- file.path(processed_data_dir, "VOOM", "voomdataHS.txt") # HS = Heat Stress
+
+# Output files for subsets
+subset_vst_ct_file <- file.path(subset_data_dir, "VSTdataN_subset.txt")
+subset_vst_hs_file <- file.path(subset_data_dir, "VSTdataHS_subset.txt")
+subset_voom_ct_file <- file.path(subset_data_dir, "voomdataN_subset.txt")
+subset_voom_hs_file <- file.path(subset_data_dir, "voomdataHS_subset.txt")
+
+# Test files (smaller subsets)
+test_vst_ct_file <- file.path(test_data_dir, "VSTdataN_test.txt")
+test_vst_hs_file <- file.path(test_data_dir, "VSTdataHS_test.txt")
+test_voom_ct_file <- file.path(test_data_dir, "voomdataN_test.txt")
+test_voom_hs_file <- file.path(test_data_dir, "voomdataHS_test.txt")
+
+# data load - VST data
+vst_data_list <- purrr::map(c(vst_ct_file, vst_hs_file), function(f){
+    cat("Loading:", f, "\n")
+    tab <- fread(f, header = TRUE)
+    # First column gene names/IDs
+    if(!"gene_id" %in% colnames(tab)) {
+        setnames(tab, 1, "gene_id")  # rename first column to gene_id
+    }
+    return(tab)
+})
+
+# data load - VOOM data
+voom_data_list <- purrr::map(c(voom_ct_file, voom_hs_file), function(f){
+    cat("Loading:", f, "\n")
+    tab <- fread(f, header = TRUE)
+    # First column gene names/IDs
+    if(!"gene_id" %in% colnames(tab)) {
+        setnames(tab, 1, "gene_id")  # rename first column to gene_id
+    }
+    return(tab)
 })
 # random samples
 set.seed(1234)
 subset_size <- 100
-dro_subtab_list <- purrr::map(dro_tab_list, function(tab){
-    samples <- colnames(tab)[-1]
-    sub_samples <- sample(samples, subset_size)
+
+# Create subsets for VST data
+vst_subset_list <- purrr::map(vst_data_list, function(tab){
+    samples <- colnames(tab)[-1]  # exclude gene_id column
+    sub_samples <- sample(samples, min(subset_size, length(samples)))
     tab[, .SD, .SDcols = c("gene_id", sub_samples)]
 })
-# write subsets for both conditions
-purrr::walk2(dro_subtab_list,
-            c(subset_ct_file, subset_hs_file),
-            ~fwrite(.x, .y))
+
+# Create subsets for VOOM data
+voom_subset_list <- purrr::map(voom_data_list, function(tab){
+    samples <- colnames(tab)[-1]  # exclude gene_id column
+    sub_samples <- sample(samples, min(subset_size, length(samples)))
+    tab[, .SD, .SDcols = c("gene_id", sub_samples)]
+})
+
+# write subsets for VST data
+purrr::walk2(vst_subset_list,
+            c(subset_vst_ct_file, subset_vst_hs_file),
+            ~fwrite(.x, .y, sep = "\t"))
+
+# write subsets for VOOM data
+purrr::walk2(voom_subset_list,
+            c(subset_voom_ct_file, subset_voom_hs_file),
+            ~fwrite(.x, .y, sep = "\t"))
 
 # create test dataset: 30 genes * 30 samples
 test_size <- 30
-dro_test_tab_list <- purrr::map(dro_tab_list, function(tab){
+
+# Create test datasets for VST data
+vst_test_list <- purrr::map(vst_data_list, function(tab){
     samples <- colnames(tab)[-1]
     genes <- tab$gene_id
-    sub_samples <- sample(samples, test_size)
-    sub_genes <- sample(genes, test_size)
+    sub_samples <- sample(samples, min(test_size, length(samples)))
+    sub_genes <- sample(genes, min(test_size, length(genes)))
     tab[gene_id %in% sub_genes, .SD, .SDcols = c("gene_id", sub_samples)]
 })
 
-# write test dataset for both conditions
-purrr::walk2(dro_test_tab_list,
-            c(test_ct_file, test_hs_file),
-            ~fwrite(.x, .y))
+# Create test datasets for VOOM data
+voom_test_list <- purrr::map(voom_data_list, function(tab){
+    samples <- colnames(tab)[-1]
+    genes <- tab$gene_id
+    sub_samples <- sample(samples, min(test_size, length(samples)))
+    sub_genes <- sample(genes, min(test_size, length(genes)))
+    tab[gene_id %in% sub_genes, .SD, .SDcols = c("gene_id", sub_samples)]
+})
+
+# write test datasets for VST data
+purrr::walk2(vst_test_list,
+            c(test_vst_ct_file, test_vst_hs_file),
+            ~fwrite(.x, .y, sep = "\t"))
+
+# write test datasets for VOOM data
+purrr::walk2(voom_test_list,
+            c(test_voom_ct_file, test_voom_hs_file),
+            ~fwrite(.x, .y, sep = "\t"))
+
+cat("Subset creation complete\n")
