@@ -9,8 +9,9 @@
 #
 # This script::
 #   1. Takes VOOM and VST processed matrices as input
-#   1. Formats strings in data table
-#   2. Subsets dataset for easier testing and debugging
+#   2. Formats strings in data table
+#   3. Subsets dataset for easier testing and debugging
+#   4. Creates test datasets with smaller dimensions
 # ==============================================================================
 
 
@@ -87,6 +88,13 @@ voom_data_list <- purrr::map(c(voom_ct_file, voom_hs_file), function(f){
     }
     return(tab)
 })
+
+
+###########################
+##### Create subsets ######
+###########################
+
+
 # random samples
 set.seed(1234)
 subset_size <- 100
@@ -115,7 +123,12 @@ purrr::walk2(voom_subset_list,
             c(subset_voom_ct_file, subset_voom_hs_file),
             ~fwrite(.x, .y, sep = "\t"))
 
-# create test dataset: 30 genes * 30 samples
+
+#################################
+##### Create test datasets ######
+#################################
+
+# set test matrix size = 30*30
 test_size <- 30
 
 # Create test datasets for VST data
