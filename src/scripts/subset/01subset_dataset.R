@@ -1,7 +1,6 @@
-#!/usr/bin/env Rscript
+# !/usr/bin/env Rscript
 # ==============================================================================
 # Subset dataset for drosophila transcriptomic network analysis
-#
 #
 # Script by Gabriel Thornes and Yu-tao Cao
 #
@@ -49,11 +48,10 @@ create_directories(c(rawdata_dir, processed_data_dir, test_data_dir))
 #####################
 
 # VST processed files
-vst_ct_file <- file.path(processed_data_dir, "VST", "VSTdataN.txt")  # N = Normal/Control
-vst_hs_file <- file.path(processed_data_dir, "VST", "VSTdataHS.txt") # HS = Heat Stress
-# VOOM processed files  
-voom_ct_file <- file.path(processed_data_dir, "VOOM", "voomdataN.txt") # N = Normal/Control
-voom_hs_file <- file.path(processed_data_dir, "VOOM", "voomdataHS.txt") # HS = Heat Stress
+vst_files <- config$processed_files$vst_processed_files
+
+# VOOM processed files
+voom_files <- config$processed_files$voom_processed_files
 
 # Output files for subsets
 subset_vst_ct_file <- file.path(subset_data_dir, "VSTdataN_subset.txt")
@@ -68,7 +66,7 @@ test_voom_ct_file <- file.path(test_data_dir, "voomdataN_test.txt")
 test_voom_hs_file <- file.path(test_data_dir, "voomdataHS_test.txt")
 
 # data load - VST data
-vst_data_list <- purrr::map(c(vst_ct_file, vst_hs_file), function(f){
+vst_data_list <- purrr::map(c(vst_files), function(f){
     cat("Loading:", f, "\n")
     tab <- fread(f, header = TRUE)
     # First column gene names/IDs
@@ -79,7 +77,7 @@ vst_data_list <- purrr::map(c(vst_ct_file, vst_hs_file), function(f){
 })
 
 # data load - VOOM data
-voom_data_list <- purrr::map(c(voom_ct_file, voom_hs_file), function(f){
+voom_data_list <- purrr::map(c(voom_files), function(f){
     cat("Loading:", f, "\n")
     tab <- fread(f, header = TRUE)
     # First column gene names/IDs
