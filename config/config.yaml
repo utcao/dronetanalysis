@@ -8,6 +8,13 @@ project_dirs:
   processed_data_dir: "dataset/processed"
   subset_data_dir: "dataset/subset"
   test_data_dir: "dataset/test"
+output_dirs:
+  figures_dir: "results/figures"
+  tables_dir: "results/tables"
+  logs_dir: "results/logs"
+  reports_dir: "results/reports"
+  wgcna_dir: "results/WGCNA"
+  GWENA_dir: "results/GWENA"
 raw_files:
   rawcount_file: "dataset/raw/RawCounts_noY_CPM1_head_hsctrl_onlyGEMMAsamples_Mar21.21.txt"
   rawmeta_file: "dataset/raw/Info_RawCounts_CPM1_head_hsctrl_Jul9.20.txt"
