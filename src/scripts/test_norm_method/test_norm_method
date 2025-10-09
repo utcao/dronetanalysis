@@ -43,15 +43,15 @@ create_directories(c(test_data_dir))
 #####################
 
 # Test files (smaller subsets)
-test_vst_ct_file <- file.path(test_data_dir, "VSTdataN_test.txt")
+test_vst_ctrl_file <- file.path(test_data_dir, "VSTdataCtrl_test.txt")
 test_vst_hs_file <- file.path(test_data_dir, "VSTdataHS_test.txt")
-test_voom_ct_file <- file.path(test_data_dir, "voomdataN_test.txt")
+test_voom_ctrl_file <- file.path(test_data_dir, "voomdataCtrl_test.txt")
 test_voom_hs_file <- file.path(test_data_dir, "voomdataHS_test.txt")
 
 # Read in test datasets
-vst_ct <- fread(test_vst_ct_file, data.table = F)
+vst_ct <- fread(test_vst_ctrl_file, data.table = F)
 vst_hs <- fread(test_vst_hs_file, data.table = F)
-voom_ct <- fread(test_voom_ct_file, data.table = F)
+voom_ct <- fread(test_voom_ctrl_file, data.table = F)
 voom_hs <- fread(test_voom_hs_file, data.table = F)
 
 # Set rownames

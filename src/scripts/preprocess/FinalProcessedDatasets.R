@@ -130,7 +130,7 @@ write.table(voomdataHS,
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
 
 write.table(voomdataN, 
-           file=file.path(config$project_dirs$processed_data_dir, "VOOM", "voomdataN.txt"),
+           file=file.path(config$project_dirs$processed_data_dir, "VOOM", "voomdataCtrl.txt"),
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
 
 #####################
@@ -164,5 +164,5 @@ write.table(VSTdataHS,
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)
 
 write.table(VSTdataN, 
-           file=file.path(config$project_dirs$processed_data_dir, "VST", "VSTdataN.txt"),
+           file=file.path(config$project_dirs$processed_data_dir, "VST", "VSTdataCtrl.txt"),
            sep="\t", row.names=TRUE, col.names=TRUE, quote=FALSE)

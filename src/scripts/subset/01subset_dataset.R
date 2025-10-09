@@ -54,15 +54,15 @@ vst_files <- config$processed_files$vst_processed_files
 voom_files <- config$processed_files$voom_processed_files
 
 # Output files for subsets
-subset_vst_ct_file <- file.path(subset_data_dir, "VSTdataN_subset.txt")
+subset_vst_ctrl_file <- file.path(subset_data_dir, "VSTdataCtrl_subset.txt")
 subset_vst_hs_file <- file.path(subset_data_dir, "VSTdataHS_subset.txt")
-subset_voom_ct_file <- file.path(subset_data_dir, "voomdataN_subset.txt")
+subset_voom_ctrl_file <- file.path(subset_data_dir, "voomdataCtrl_subset.txt")
 subset_voom_hs_file <- file.path(subset_data_dir, "voomdataHS_subset.txt")
 
 # Test files (smaller subsets)
-test_vst_ct_file <- file.path(test_data_dir, "VSTdataN_test.txt")
+test_vst_ctrl_file <- file.path(test_data_dir, "VSTdataCtrl_test.txt")
 test_vst_hs_file <- file.path(test_data_dir, "VSTdataHS_test.txt")
-test_voom_ct_file <- file.path(test_data_dir, "voomdataN_test.txt")
+test_voom_ctrl_file <- file.path(test_data_dir, "voomdataCtrl_test.txt")
 test_voom_hs_file <- file.path(test_data_dir, "voomdataHS_test.txt")
 
 # data load - VST data
@@ -113,12 +113,12 @@ voom_subset_list <- purrr::map(voom_data_list, function(tab){
 
 # write subsets for VST data
 purrr::walk2(vst_subset_list,
-            c(subset_vst_ct_file, subset_vst_hs_file),
+            c(subset_vst_ctrl_file, subset_vst_hs_file),
             ~fwrite(.x, .y, sep = "\t"))
 
 # write subsets for VOOM data
 purrr::walk2(voom_subset_list,
-            c(subset_voom_ct_file, subset_voom_hs_file),
+            c(subset_voom_ctrl_file, subset_voom_hs_file),
             ~fwrite(.x, .y, sep = "\t"))
 
 
@@ -149,12 +149,12 @@ voom_test_list <- purrr::map(voom_data_list, function(tab){
 
 # write test datasets for VST data
 purrr::walk2(vst_test_list,
-            c(test_vst_ct_file, test_vst_hs_file),
+            c(test_vst_ctrl_file, test_vst_hs_file),
             ~fwrite(.x, .y, sep = "\t"))
 
 # write test datasets for VOOM data
 purrr::walk2(voom_test_list,
-            c(test_voom_ct_file, test_voom_hs_file),
+            c(test_voom_ctrl_file, test_voom_hs_file),
             ~fwrite(.x, .y, sep = "\t"))
 
 cat("Subset creation complete\n")

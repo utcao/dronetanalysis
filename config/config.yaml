@@ -22,10 +22,10 @@ raw_files:
     - "dataset/raw/VST_surrogates/VST_sv3_10.txt"
 processed_files:
   voom_processed_files:
-    - "dataset/processed/VOOM/voomdataN.txt"
+    - "dataset/processed/VOOM/voomdataCtrl.txt"
     - "dataset/processed/VOOM/voomdataHS.txt"
   vst_processed_files:
-    - "dataset/processed/VST/VSTdataN.txt"
+    - "dataset/processed/VST/VSTdataCtrl.txt"
     - "dataset/processed/VST/VSTdataHS.txt"
 input_files:
   subset_data:
