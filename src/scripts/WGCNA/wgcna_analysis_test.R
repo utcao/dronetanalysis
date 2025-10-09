@@ -49,8 +49,12 @@ powers <- c(1:20)
 # Call the network topology analysis function
 sft <- pickSoftThreshold(datExpr, powerVector = powers, verbose = 5)
 
-# Plot the results
-pdf(file = file.path(config$output_dirs$figures_dir, "WGCNA", "scale_independence.pdf"), width = 9, height = 5)
+# Create output directories if they don't exist  
+dir.create(config$output_dirs$figures_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(config$output_dirs$wgcna_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Plot the results - save to the WGCNA directory
+pdf(file = file.path(config$output_dirs$wgcna_dir, "scale_independence.pdf"), width = 9, height = 5)
 par(mfrow = c(1,2))
 cex1 = 0.9
 
@@ -72,7 +76,7 @@ text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1, col="red")
 dev.off()
 
 # Choose an appropriate soft-thresholding power based on the plot (R^2 > 0.9)
-softPower <- # Change this based on your results
+softPower <- 2 # Change this based on your results
 
 # Calculate adjacency matrix
 adjacency <- adjacency(datExpr, power = softPower)
@@ -96,7 +100,7 @@ dynamicMods <- cutreeDynamic(dendro = geneTree, distM = dissTOM,
 dynamicColors <- labels2colors(dynamicMods)
 
 # Plot the dendrogram and colors underneath
-pdf(file = file.path(config$output_dirs$figures_dir, "WGCNA", "module_dendrogram_test.pdf"), width = 12, height = 6)
+pdf(file = file.path(config$output_dirs$wgcna_dir, "module_dendrogram_test2.pdf"), width = 12, height = 6)
 plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut",
                    dendroLabels = FALSE, hang = 0.03,
                    addGuide = TRUE, guideHang = 0.05,
@@ -109,7 +113,7 @@ dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Save module colors and tree
 save(dynamicMods, dynamicColors, geneTree, 
-     file = file.path(output_dir$wgcna_dir, "network_analysis_results.RData"))
+     file = file.path(output_dir, "network_analysis_results.RData"))
 
 # Create a data frame with gene information and module assignment
 geneInfo <- data.frame(
@@ -122,4 +126,4 @@ write.table(geneInfo,
            file = file.path(output_dir, "gene_module_assignment_test.txt"),
            sep = "\t", row.names = FALSE, quote = FALSE)
 
-cat("WGCNA analysis complete. Results saved to:", output_dirs$wgcna_dir, "\n")
+cat("WGCNA analysis complete. Results saved to:", output_dir, "\n")
