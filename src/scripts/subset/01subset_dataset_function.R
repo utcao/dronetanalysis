@@ -10,9 +10,16 @@
 #   1. Takes VOOM and VST processed matrices as input
 #   2. Formats strings in data table
 #   3. Subsets dataset for easier testing and debugging
-#   4. Creates test datasets with smaller dimensions
 # ==============================================================================
 
+#######################################################
+### || Enter subset and test dataset sizes below || ###
+### \/ ### enter NULL for all samples/genes #### \/ ###
+
+subset_sample_size <- NULL
+subset_gene_size   <- 30
+test_sample_size   <- 20
+test_gene_size     <- 20
 
 #################################
 ##### Packages and Setup ########
@@ -92,69 +99,30 @@ voom_data_list <- purrr::map(c(voom_files), function(f){
 ##### Create subsets ######
 ###########################
 
-
-# random samples
-set.seed(1234)
-subset_size <- 100
+# Define subset configurations
+subset_configs <- list(
+    list(name = "subset", n_genes = subset_gene_size, n_samples = subset_sample_size),
+    list(name = "test", n_genes = test_gene_size, n_samples = test_sample_size)
+)
 
 # Create subsets for VST data
-vst_subset_list <- purrr::map(vst_data_list, function(tab){
-    samples <- colnames(tab)[-1]  # exclude gene_id column
-    sub_samples <- sample(samples, min(subset_size, length(samples)))
-    tab[, .SD, .SDcols = c("gene_id", sub_samples)]
-})
+cat("Creating VST subsets...\n")
+vst_subsets <- create_multiple_subsets(vst_data_list, subset_configs, seed = 1234)
 
-# Create subsets for VOOM data
-voom_subset_list <- purrr::map(voom_data_list, function(tab){
-    samples <- colnames(tab)[-1]  # exclude gene_id column
-    sub_samples <- sample(samples, min(subset_size, length(samples)))
-    tab[, .SD, .SDcols = c("gene_id", sub_samples)]
-})
+# Create subsets for VOOM data  
+cat("Creating VOOM subsets...\n")
+voom_subsets <- create_multiple_subsets(voom_data_list, subset_configs, seed = 1234)
 
-# write subsets for VST data
-purrr::walk2(vst_subset_list,
-            c(subset_vst_ctrl_file, subset_vst_hs_file),
-            ~fwrite(.x, .y, sep = "\t"))
+# Write VST subsets
+fwrite(vst_subsets$subset[[1]], subset_vst_ctrl_file, sep = "\t")
+fwrite(vst_subsets$subset[[2]], subset_vst_hs_file, sep = "\t")
+fwrite(vst_subsets$test[[1]], test_vst_ctrl_file, sep = "\t")
+fwrite(vst_subsets$test[[2]], test_vst_hs_file, sep = "\t")
 
-# write subsets for VOOM data
-purrr::walk2(voom_subset_list,
-            c(subset_voom_ctrl_file, subset_voom_hs_file),
-            ~fwrite(.x, .y, sep = "\t"))
-
-
-#################################
-##### Create test datasets ######
-#################################
-
-# set test matrix size = 30*30
-test_size <- 30
-
-# Create test datasets for VST data
-vst_test_list <- purrr::map(vst_data_list, function(tab){
-    samples <- colnames(tab)[-1]
-    genes <- tab$gene_id
-    sub_samples <- sample(samples, min(test_size, length(samples)))
-    sub_genes <- sample(genes, min(test_size, length(genes)))
-    tab[gene_id %in% sub_genes, .SD, .SDcols = c("gene_id", sub_samples)]
-})
-
-# Create test datasets for VOOM data
-voom_test_list <- purrr::map(voom_data_list, function(tab){
-    samples <- colnames(tab)[-1]
-    genes <- tab$gene_id
-    sub_samples <- sample(samples, min(test_size, length(samples)))
-    sub_genes <- sample(genes, min(test_size, length(genes)))
-    tab[gene_id %in% sub_genes, .SD, .SDcols = c("gene_id", sub_samples)]
-})
-
-# write test datasets for VST data
-purrr::walk2(vst_test_list,
-            c(test_vst_ctrl_file, test_vst_hs_file),
-            ~fwrite(.x, .y, sep = "\t"))
-
-# write test datasets for VOOM data
-purrr::walk2(voom_test_list,
-            c(test_voom_ctrl_file, test_voom_hs_file),
-            ~fwrite(.x, .y, sep = "\t"))
+# Write VOOM subsets
+fwrite(voom_subsets$subset[[1]], subset_voom_ctrl_file, sep = "\t")
+fwrite(voom_subsets$subset[[2]], subset_voom_hs_file, sep = "\t")
+fwrite(voom_subsets$test[[1]], test_voom_ctrl_file, sep = "\t")
+fwrite(voom_subsets$test[[2]], test_voom_hs_file, sep = "\t")
 
 cat("Subset creation complete\n")
