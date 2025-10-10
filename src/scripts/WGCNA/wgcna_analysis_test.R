@@ -31,6 +31,16 @@ config <- yaml::read_yaml("config/config.yaml")
 # Options for the analysis
 options(stringsAsFactors = FALSE)
 
+# Choose a set of soft-thresholding powers
+powers <- c(1:20)
+
+# Create output directories if they don't exist  
+dir.create(config$output_dirs$wgcna_dir, recursive = TRUE, showWarnings = FALSE)
+
+###############################
+##### Data Loading ############
+###############################
+
 # Load test data for VST control
 data_file <- file.path(config$project_dirs$subset_data_dir, "VSTdataCtrl_subset.txt")
 data <- read.table(data_file, header=TRUE, sep="\t", row.names=1)
@@ -50,15 +60,12 @@ if (!gsg$allOK) {
   original_gene_names <- original_gene_names[gsg$goodGenes]
 }
 
-# Choose a set of soft-thresholding powers
-powers <- c(1:20)
+###############################
+##### Network Topology ########
+###############################
 
 # Call the network topology analysis function
 sft <- pickSoftThreshold(datExpr, powerVector = powers, verbose = 5)
-
-# Create output directories if they don't exist  
-dir.create(config$output_dirs$figures_dir, recursive = TRUE, showWarnings = FALSE)
-dir.create(config$output_dirs$wgcna_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Plot the results - save to the WGCNA directory
 pdf(file = file.path(config$output_dirs$wgcna_dir, "scale_independence.pdf"), width = 9, height = 5)
@@ -94,6 +101,10 @@ dissTOM <- 1-TOM
 
 # Call the hierarchical clustering function
 geneTree <- hclust(as.dist(dissTOM), method = "average")
+
+###############################
+##### Module Construction #####
+###############################
 
 # Set the minimum module size
 minModuleSize <- 30
@@ -175,6 +186,10 @@ write.table(geneInfo,
            file = file.path(output_dir, "gene_module_assignment_test.txt"),
            sep = "\t", row.names = FALSE, quote = FALSE)
 
+#################################
+##### Hub Gene Identification ###
+#################################
+
 # Identify hub genes for each module
 uniqueModules <- unique(moduleColors)
 
@@ -182,14 +197,14 @@ uniqueModules <- unique(moduleColors)
 cat("\n=== MODULE SUMMARY ===\n")
 cat("Number of modules identified (original):", length(unique(dynamicColors)), "\n")
 cat("Number of modules after merging:", length(uniqueModules), "\n")
-cat("Module colors:", paste(uniqueModules, collapse = ", "), "\n")
+cat("Module colours:", paste(uniqueModules, collapse = ", "), "\n")
 
 # Count genes per module
 module_counts <- table(moduleColors)
 cat("\nGenes per module:\n")
 print(module_counts)
 
-# Alternative hub gene identification that preserves original gene names
+# Function to identify hub genes based on intramodular connectivity
 hubGeneList <- sapply(uniqueModules, function(mod) {
   # Get genes in this module
   genes_in_module <- which(moduleColors == mod)
@@ -213,10 +228,6 @@ hubGeneList <- sapply(uniqueModules, function(mod) {
 # Set names for the hub gene list
 names(hubGeneList) <- uniqueModules
 
-# Debug: Let's see what our custom function returns
-cat("\nDEBUG: Hub genes from custom function:\n")
-print(hubGeneList[1:3])  # Show first 3
-
 hubGeneList <- na.omit(hubGeneList)
 cat("\nModules with valid hub genes:", length(hubGeneList), "out of", length(uniqueModules), "\n")
 
@@ -225,10 +236,9 @@ hubGeneDF <- data.frame(
   Hub_Gene = as.character(hubGeneList)
 )
 
-# Write the hub genes to a file
+# Write the hub genes to a CSV file for ease of gene_id acquisition
 write.table(hubGeneDF, 
-           file = file.path(output_dir, "hub_genes_test.txt"),
-           sep = "\t", row.names = FALSE, quote = FALSE)
+           file = file.path(output_dir, "hub_genes_test.csv"),
+           sep = ",", row.names = FALSE, quote = FALSE)
 
-cat(hubGeneDF$Hub_Gene, sep = "\n") # Print hub genes to console for easy copying into FlyBase query
 cat("WGCNA analysis complete. Results saved to:", output_dir, "\n")
