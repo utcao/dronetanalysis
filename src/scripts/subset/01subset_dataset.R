@@ -77,22 +77,40 @@ test_voom_hs_file <- file.path(test_data_dir, "voomdataHS_test.txt")
 # data load - VST data
 vst_data_list <- purrr::map(c(vst_files), function(f){
     cat("Loading:", f, "\n")
-    tab <- fread(f, header = TRUE)
-    # First column gene names/IDs
-    if(!"gene_id" %in% colnames(tab)) {
-        setnames(tab, 1, "gene_id")  # rename first column to gene_id
-    }
+    
+    # First, read the header line to get sample IDs
+    header_line <- readLines(f, n = 1)
+    sample_ids <- unlist(strsplit(header_line, "\t"))
+    
+    # Now read the data without treating first line as header
+    tab <- fread(f, header = FALSE, skip = 1)
+    
+    # Set proper column names: gene_id + sample_ids
+    setnames(tab, c("gene_id", sample_ids))
+    
+    cat("Loaded data with", nrow(tab), "genes and", ncol(tab)-1, "samples\n")
+    cat("Sample IDs:", paste(head(sample_ids, 5), collapse = ", "), "...\n")
+    
     return(tab)
 })
 
 # data load - VOOM data
 voom_data_list <- purrr::map(c(voom_files), function(f){
     cat("Loading:", f, "\n")
-    tab <- fread(f, header = TRUE)
-    # First column gene names/IDs
-    if(!"gene_id" %in% colnames(tab)) {
-        setnames(tab, 1, "gene_id")  # rename first column to gene_id
-    }
+    
+    # First, read the header line to get sample IDs
+    header_line <- readLines(f, n = 1)
+    sample_ids <- unlist(strsplit(header_line, "\t"))
+    
+    # Now read the data without treating first line as header
+    tab <- fread(f, header = FALSE, skip = 1)
+    
+    # Set proper column names: gene_id + sample_ids
+    setnames(tab, c("gene_id", sample_ids))
+    
+    cat("Loaded data with", nrow(tab), "genes and", ncol(tab)-1, "samples\n")
+    cat("Sample IDs:", paste(head(sample_ids, 5), collapse = ", "), "...\n")
+    
     return(tab)
 })
 
@@ -116,15 +134,17 @@ cat("Creating VOOM subsets...\n")
 voom_subsets <- create_multiple_subsets(voom_data_list, subset_configs, seed = 1234)
 
 # Write VST subsets
-fwrite(vst_subsets$subset[[1]], subset_vst_ctrl_file, sep = "\t")
-fwrite(vst_subsets$subset[[2]], subset_vst_hs_file, sep = "\t")
-fwrite(vst_subsets$test[[1]], test_vst_ctrl_file, sep = "\t")
-fwrite(vst_subsets$test[[2]], test_vst_hs_file, sep = "\t")
+cat("Writing VST subsets...\n")
+fwrite(vst_subsets$subset[[1]], subset_vst_ctrl_file, sep = "\t", col.names = TRUE, row.names = FALSE)
+fwrite(vst_subsets$subset[[2]], subset_vst_hs_file, sep = "\t", col.names = TRUE, row.names = FALSE)
+fwrite(vst_subsets$test[[1]], test_vst_ctrl_file, sep = "\t", col.names = TRUE, row.names = FALSE)
+fwrite(vst_subsets$test[[2]], test_vst_hs_file, sep = "\t", col.names = TRUE, row.names = FALSE)
 
 # Write VOOM subsets
-fwrite(voom_subsets$subset[[1]], subset_voom_ctrl_file, sep = "\t")
-fwrite(voom_subsets$subset[[2]], subset_voom_hs_file, sep = "\t")
-fwrite(voom_subsets$test[[1]], test_voom_ctrl_file, sep = "\t")
-fwrite(voom_subsets$test[[2]], test_voom_hs_file, sep = "\t")
+cat("Writing VOOM subsets...\n")
+fwrite(voom_subsets$subset[[1]], subset_voom_ctrl_file, sep = "\t", col.names = TRUE, row.names = FALSE)
+fwrite(voom_subsets$subset[[2]], subset_voom_hs_file, sep = "\t", col.names = TRUE, row.names = FALSE)
+fwrite(voom_subsets$test[[1]], test_voom_ctrl_file, sep = "\t", col.names = TRUE, row.names = FALSE)
+fwrite(voom_subsets$test[[2]], test_voom_hs_file, sep = "\t", col.names = TRUE, row.names = FALSE)
 
 cat("Subset creation complete\n")
