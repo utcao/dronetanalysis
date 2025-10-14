@@ -136,7 +136,7 @@ permutation_test_stat_tab <- function(coexp_expr_tab,
                     permute_coexp_tab[i, unlist(.SD),
                                         .SDcols=patterns(permut_cols_pattern)])
                 )
-        if (i %% 10000 == 0) cat("Processed", i, "genes\n")
+        if (i %% 10000 == 0) cat("Processed", i, "gene pairs\n")
     }
     # keeps observation columns and result
     permut_cols <- permute_coexp_tab[, colnames(.SD),
