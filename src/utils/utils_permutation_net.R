@@ -124,9 +124,16 @@ get_lower_pair_coexp <- function(coexp_file, value_name_melt = "coexpr",
                                 pair_id_col = "gene_pairs"){
     flog.info("The input matrix must be symmetric")
     coexp_reduncols <- c("gene_id", "gene_pair")
-    coexp_tab <- fread(coexp_file) |>
+    if(is.character(coexp_file)){
+        coexp_tab <- fread(coexp_file) |>
                 tibble::column_to_rownames("gene_id") |>
                 as.matrix()
+    }else{
+        coexp_tab <- coexp_file |>
+                tibble::column_to_rownames("gene_id") |>
+                as.matrix()
+    }
+    
     row.names(coexp_tab) <- colnames(coexp_tab)
     coexp_tab[lower.tri(coexp_tab, diag = TRUE)] <- NA
     coexp_upper_l <- coexp_tab |>
