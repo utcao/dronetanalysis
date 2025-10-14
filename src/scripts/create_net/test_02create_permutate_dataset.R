@@ -1,46 +1,3 @@
-# !/usr/bin/env Rscript
-# ==============================================================================
-# Trim unsignificant edge in permutation test before transcriptomic network analysis
-#
-# Script by Yu-tao Cao
-#
-# Last Updated: 08/10/2025
-#
-# This script::
-#   1. create permutation datasets
-#   2. trim connection accroding to the wilcox test
-#   3. write out result table
-# ==============================================================================
-
-rm(list = ls())
-
-suppressPackageStartupMessages({
-    library(purrr)
-    library(data.table)
-    library(glue)
-    library(stringr)
-    library(ggplot2)
-    library(tibble)  # for rownames_to_column / column_to_rownames
-    library(futile.logger)
-})
-
-# ----- 1. Source Configuration and Utility Scripts -----
-library(yaml)  # to read the YAML config
-config <- yaml::read_yaml("config/config.yaml")
-
-# If you have utility scripts (optional):
-source("src/utils/utils_io.R")  # e.g., create_directories()
-source("src/utils/utils_permutation_net.R")
-
-# ----- 2. Extract Key Settings from config.yaml -----
-expcor_tab_dir <- "results/spearman_correlation/"
-
-expcor_tab_file <- file.path(expcor_tab_dir, "spearman_correlation_matrix.csv")
-
-# ----- 3. Load data -----
-coexp_expr_tab <- fread(expcor_tab_file)[1:3000, 1:3001]
-
-# ----- 4. create permutation datasets by shuffle gene_id -----
 # or consider split shuffle and permutation test into separate scripts
 
 #' Perform Permutation Test for Coexpression Network Edge Significance
@@ -194,13 +151,3 @@ permutation_test_stat_tab <- function(coexp_expr_tab,
     fwrite(sig_coexp_pairs, file.path(permutate_res_tab_dir, sig_edge_tab_file))
     return(sig_coexp_pairs[])
 }
-
-sig_edge_tab_file <- "sig_edges_coexpr_net.csv"
-
-sig_coexp_pairs <- permutation_test_stat_tab(coexp_expr_tab[1:30, 1:31],
-                        sig_edge_tab_file,
-                        expcor_tab_dir,
-                        obs_col_pattern = "seed1",
-                        permut_cols_pattern = "(seed1[0-9])|(seed[2-9])",
-                        permutation_num = 20,
-                        alpha = 1)
