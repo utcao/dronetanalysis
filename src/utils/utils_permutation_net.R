@@ -36,7 +36,8 @@ suppressPackageStartupMessages({
 #' @export
 permutate_p_two <- function(obs, permu){
     stopifnot({
-        !is.numeric(obs) || length(obs) != 1
+        !is.numeric(obs)
+        length(obs) != 1
         all(!is.numeric(permu))
         length(permu) > 0
     })
@@ -126,7 +127,7 @@ get_lower_pair_coexp <- function(coexp_file, value_name_melt = "coexpr",
     coexp_tab <- fread(coexp_file) |>
                 tibble::column_to_rownames("gene_id") |>
                 as.matrix()
-
+    row.names(coexp_tab) <- colnames(coexp_tab)
     coexp_tab[lower.tri(coexp_tab, diag = TRUE)] <- NA
     coexp_upper_l <- coexp_tab |>
                 as.data.table(keep.rownames = "gene_id") |>
