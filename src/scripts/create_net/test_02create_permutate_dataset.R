@@ -49,4 +49,4 @@ sig_coexp_pairs <- permutation_test_stat_tab(coexp_expr_tab[1:300, 1:301],
                         obs_col = "rho",
                         permut_cols_pattern = "seed",
                         permutation_num = 20,
-                        alpha = 0.5)
+                        alpha = 1)
