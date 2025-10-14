@@ -34,25 +34,31 @@ source("src/utils/utils_permutation_net.R")
 
 # ----- 2. Extract Key Settings from config.yaml -----
 expcor_tab_dir <- "results/spearman_correlation/"
-permutate_response_dir <- file.path(expcor_tab_dir, "shuffle")
-permutate_res_tab_dir <- file.path(expcor_tab_dir, "permutation_test")
-
-create_directories(c(permutate_response_dir, permutate_res_tab_dir))
 
 expcor_tab_file <- file.path(expcor_tab_dir, "spearman_correlation_matrix.csv")
-sig_edge_tab_file <- file.path(permutate_res_tab_dir,
-                                "sig_edges_coexpr_net.csv")
 
 # ----- 3. Load data -----
 coexp_expr_tab <- fread(expcor_tab_file)[1:3000, 1:3001]
 
 # ----- 4. create permutation datasets by shuffle gene_id -----
 # or consider split shuffle and permutation test into separate scripts
-permutation_test_stat_tab <- function(coexp_expr_tab, sig_edge_tab_file,
-                                    permutation_num = 50){
+permutation_test_stat_tab <- function(coexp_expr_tab,
+                                    sig_edge_tab_file, tab_output_dir,
+                                    obs_col_pattern,
+                                    permutate_col = "gene_id",
+                                    permut_cols_pattern = "seed",
+                                    permutation_num = 50, alpha = 0.05){
+    stopifnot({
+        is.data.table(coexp_expr_tab)
+        permutate_col %in% colnames(coexp_expr_tab)
+    })
+    permutate_dir <- file.path(tab_output_dir, "shuffle")
+    permutate_res_tab_dir <- file.path(tab_output_dir, "permutation_test")
+
+    create_directories(c(permutate_dir, permutate_res_tab_dir))
     
-    permute_coexp_list <- permutate_col(coexp_expr_tab, "gene_id", permutation_num,
-                permutate_response_dir, prefix="permute_corexp_gene_id")
+    permute_coexp_list <- permutate_col(coexp_expr_tab, permutate_col, permutation_num,
+                permutate_dir, prefix="permute_corexp_gene_id")
 
     permutate_seeds <- map(permute_coexp_list, str_extract, pattern = "seed[0-9]+")
     permute_coexp_tab_list <- map2(permute_coexp_list, permutate_seeds,
@@ -61,21 +67,39 @@ permutation_test_stat_tab <- function(coexp_expr_tab, sig_edge_tab_file,
     permute_coexp_tab <- permute_coexp_tab_list |>
         purrr::reduce(merge, by = "gene_pairs")
 
-    # test example
-    # permute_coexp_tab_all <- permute_coexp_tab_list[1:3] |>
-    #     purrr::reduce(merge, by = "gene_pairs", all = TRUE)
-
-    # permutation test
+    # permutation test between obeservation and permutation
     for( i in permute_coexp_tab[, .I]){
         set(permute_coexp_tab, i, "p_twotail",
-                permutate_p_two(permute_coexp_tab[i, unlist(.SD),.SDcols=patterns("seed50")],
-                    permute_coexp_tab[i, unlist(.SD),.SDcols=patterns("seed[1-4][0-9]*")]) )
+                permutate_p_two(
+                    permute_coexp_tab[i, unlist(.SD),
+                                        .SDcols=patterns(obs_col_pattern)],
+                    permute_coexp_tab[i, unlist(.SD),
+                                        .SDcols=patterns(permut_cols_pattern)])
+                )
         if (i %% 10000 == 0) cat("Processed", i, "genes\n")
     }
+    # keeps observation columns and result
+    permut_cols <- permute_coexp_tab[, colnames(.SD),
+                                        .SDcols=patterns(permut_cols_pattern)]
+    flog.info("The permutation comes from:")
+    print(permut_cols)
+    
+    keep_cols <- setdiff(colnames(permute_coexp_tab), permut_cols)
+    flog.info("The obersavation value will be kept in the output:")
+    print(keep_cols)
 
-    sig_coexp_pairs <- permute_coexp_tab[p_twotail < 0.05, list(gene_pairs, p_twotail)]
-    fwrite(tab_output_dir, sig_edge_tab_file)
+    sig_coexp_pairs <- permute_coexp_tab[p_twotail <= alpha, .SD, .SDcols = keep_cols]
+    sig_coexp_pairs[, q_twotail_fdr:=p.adjust(p_twotail, method = "fdr")]
+    fwrite(sig_coexp_pairs, file.path(permutate_res_tab_dir, sig_edge_tab_file))
+    return(sig_coexp_pairs[])
 }
 
-permutation_test_stat_tab(coexp_expr_tab, permutation_test_stat_tab,
-                        permutation_num = 50)
+sig_edge_tab_file <- "sig_edges_coexpr_net.csv"
+
+sig_coexp_pairs <- permutation_test_stat_tab(coexp_expr_tab[1:30, 1:31],
+                        sig_edge_tab_file,
+                        expcor_tab_dir,
+                        obs_col_pattern = "seed1",
+                        permut_cols_pattern = "(seed1[0-9])|(seed[2-9])",
+                        permutation_num = 20,
+                        alpha = 1)
