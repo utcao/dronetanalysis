@@ -84,7 +84,7 @@ cat("Mean absolute correlation:", mean(abs(spearman_cor[upper.tri(spearman_cor)]
 cat("Median absolute correlation:", median(abs(spearman_cor[upper.tri(spearman_cor)])), "\n")
 
 ###############################
-##### WGCNA on Spearman #######
+########## WGCNA ##############
 ###############################
 
 cat("\n=== WGCNA USING SPEARMAN CORRELATIONS ===\n")
@@ -108,7 +108,7 @@ write.csv(sft$fitIndices, file = sft_file, row.names = FALSE)
 
 # Plot the results - save to the WGCNA directory
 pdf(file = file.path(config$output_dirs$spearman_dir, "scale_independence.pdf"), width = 9, height = 5)
-par(mfrow = c(1,2))
+par(mfrow = c(1,2)) 
 cex1 = 0.9
 
 # Scale-free topology fit index as a function of the soft-thresholding power
@@ -126,6 +126,18 @@ plot(sft$fitIndices[,1], sft$fitIndices[,5],
      ylab="Mean Connectivity", type="n",
      main = "Mean connectivity")
 text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1, col="red")
+
+plot(sft$fitIndices[,1],sft$fitIndices[,6],
+     xlab="Soft Threshold (power)",
+     ylab="Median Connectivity",type="n",
+     main = "Median connectivity")
+text(sft$fitIndices[,1], sft$fitIndices[,6], labels=powers,cex=cex1,col="blue")
+
+plot(sft$fitIndices[,1],sft$fitIndices[,7],
+     xlab="Soft Threshold (power)",
+     ylab="Max Connectivity",type="n",
+     main = "Max connectivity")
+text(sft$fitIndices[,1], sft$fitIndices[,7], labels=powers,cex=cex1,col="blue")
 dev.off()
 
 # For WGCNA, we can use the correlation matrix directly as adjacency
@@ -166,7 +178,7 @@ dynamicMods <- cutreeDynamic(dendro = geneTree, distM = dissTOM,
                             deepSplit = 2, pamRespectsDendro = FALSE,
                             minClusterSize = minModuleSize)
 
-# Convert numeric labels into colors
+# Convert numeric labels into colours
 dynamicColors <- labels2colors(dynamicMods)
 
 cat("Initial modules identified:", length(unique(dynamicColors)), "\n")
