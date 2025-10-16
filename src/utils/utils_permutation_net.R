@@ -133,8 +133,7 @@ get_lower_pair_coexp <- function(coexp_file, value_name_melt = "coexpr",
                 tibble::column_to_rownames("gene_id") |>
                 as.matrix()
     }
-    
-    row.names(coexp_tab) <- colnames(coexp_tab)
+    colnames(coexp_tab) <- row.names(coexp_tab)
     coexp_tab[lower.tri(coexp_tab, diag = TRUE)] <- NA
     coexp_upper_l <- coexp_tab |>
                 as.data.table(keep.rownames = "gene_id") |>
@@ -143,4 +142,63 @@ get_lower_pair_coexp <- function(coexp_file, value_name_melt = "coexpr",
     coexp_upper_l[, (pair_id_col):= paste0(gene_id, "_", gene_pair)]
     coexp_upper_l[, (coexp_reduncols):=NULL]
     coexp_upper_l
+}
+
+#' Convert long matrix of significant gene pairs to wide matrix
+#' 
+#' This function converts a long-format data table of gene pairs and their associated values
+#' into a wide-format square matrix. The resulting matrix has genes as both row and column
+#' names, with the values filled in from the input data table. The matrix is symmetric
+#' with self-correlations (diagonal) set to 1.
+#' @param long_dt A data.table in long format containing gene pairs and their values.
+#' @param gene_pairs_col The name of the column containing gene pair identifiers.
+#' @param value_col The name of the column containing the values to fill in the matrix.
+#' @param separator The separator used in the gene pair identifiers (default is "_").
+#' @return A wide-format square matrix with genes as both row and column names.
+#' \item{gene1}{Row gene names}
+#' \item{gene2}{Column gene names}
+#' \item{value}{Values from the input data table}
+#' @details The function performs the following steps:
+#' \enumerate{
+#'   \item Splits the gene pair identifiers into two separate columns.
+#'   \item Creates both directions for symmetry (gene1-gene2 and gene2-gene1).
+#'   \item Adds diagonal entries (self-correlations = 1).
+#'   \item Casts the combined data table to wide format using \code{\link[reshape2]{dcast}}.
+#'   \item Converts the resulting data table to a matrix with proper row names.
+#' }
+#' @examples
+#' \dontrun{
+#' # Example usage
+#' long_dt <- data.table(gene_pairs = c("geneA_geneB", "geneA_geneC", "geneB_geneC"),
+#'                       rho = c(0.8, 0.5, 0.6))
+#' wide_matrix <- long_to_square_dcast(long_dt, gene_pairs_col = "gene_pairs", value_col = "rho")
+#' }
+#' @importFrom data.table tstrsplit dcast
+#' @export
+long_to_square_dcast <- function(long_dt, gene_pairs_col = "gene_pairs", 
+                                value_col = "rho", separator = "_") {
+    
+    # Split gene pairs and duplicate for symmetry
+    long_dt[, c("gene1", "gene2") := tstrsplit(get(gene_pairs_col), separator, fixed = TRUE)]
+    
+    # Create both directions for symmetry
+    dt1 <- long_dt[, .(gene1, gene2, value = get(value_col))]
+    dt2 <- long_dt[, .(gene1 = gene2, gene2 = gene1, value = get(value_col))]
+    combined_dt <- rbind(dt1, dt2)
+    
+    # Add diagonal (self-correlations = 1)
+    all_genes <- unique(c(combined_dt$gene1, combined_dt$gene2))
+    diagonal_dt <- data.table(gene1 = all_genes, gene2 = all_genes, value = 1)
+    combined_dt <- rbind(combined_dt, diagonal_dt)
+    
+    # Cast to wide format
+    square_matrix <- dcast(combined_dt, gene1 ~ gene2, value.var = "value", fill = NA)
+    
+    # Convert to matrix with proper row names
+    gene_names <- square_matrix$gene1
+    square_matrix[, gene1 := NULL]
+    square_matrix <- as.matrix(square_matrix)
+    rownames(square_matrix) <- gene_names
+    
+    return(square_matrix)
 }

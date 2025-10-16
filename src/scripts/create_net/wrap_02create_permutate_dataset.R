@@ -136,8 +136,9 @@ permutation_test_stat_tab <- function(coexp_expr_tab,
                     permute_coexp_tab[i, unlist(.SD),
                                         .SDcols=patterns(permut_cols_pattern)])
                 )
-        if (i %% 10000 == 0) cat("Processed", i, "genes\n")
+        if (i %% 10000 == 0) cat("Processed", i, "gene pairs\n")
     }
+    
     # keeps observation columns and result
     permut_cols <- permute_coexp_tab[, colnames(.SD),
                                         .SDcols=patterns(permut_cols_pattern)]
@@ -152,4 +153,46 @@ permutation_test_stat_tab <- function(coexp_expr_tab,
     sig_coexp_pairs[, q_twotail_fdr:=p.adjust(p_twotail, method = "fdr")]
     fwrite(sig_coexp_pairs, file.path(permutate_res_tab_dir, sig_edge_tab_file))
     return(sig_coexp_pairs[])
+}
+
+
+permutation_test_plot <- function(coexp_expr_tab,
+                                    sig_edge_tab_file, tab_output_dir,
+                                    obs_col = "rho",
+                                    permutate_col = "gene_id",
+                                    permut_cols_pattern = "seed",
+                                    permutation_num = 50, alpha = 0.05){
+    stopifnot({
+        is.data.table(coexp_expr_tab)
+        permutate_col %in% colnames(coexp_expr_tab)
+    })
+    permutate_dir <- file.path(tab_output_dir, "shuffle")
+    permutate_res_tab_dir <- file.path(tab_output_dir, "permutation_test")
+
+    create_directories(c(permutate_dir, permutate_res_tab_dir))
+    
+    permute_coexp_list <- permutate_col(coexp_expr_tab, permutate_col, permutation_num,
+                permutate_dir, prefix="permute_corexp_gene_id")
+
+    permutate_seeds <- map(permute_coexp_list, str_extract, pattern = "seed[0-9]+")
+    permute_coexp_tab_list <- map2(permute_coexp_list, permutate_seeds,
+            function(x, y) get_lower_pair_coexp(x, y))
+
+    coexp_pairs <- get_lower_pair_coexp(coexp_expr_tab, obs_col)
+
+    permute_coexp_tab <- c(list(coexp_pairs), permute_coexp_tab_list) |>
+        purrr::reduce(merge, by = "gene_pairs")
+
+    # permutation test between obeservation and permutation
+    for( i in permute_coexp_tab[, .I]){
+        set(permute_coexp_tab, i, "p_twotail",
+                permutate_p_two(
+                    permute_coexp_tab[i, unlist(.SD),
+                                        .SDcols=patterns(obs_col)],
+                    permute_coexp_tab[i, unlist(.SD),
+                                        .SDcols=patterns(permut_cols_pattern)])
+                )
+        if (i %% 10000 == 0) cat("Processed", i, "gene pairs\n")
+    }
+    return(permute_coexp_tab[])
 }
