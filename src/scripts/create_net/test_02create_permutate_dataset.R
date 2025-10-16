@@ -4,7 +4,7 @@
 #
 # Script by Yu-tao Cao
 #
-# Last Updated: 08/10/2025
+# Last Updated: 14/10/2025
 #
 # This script::
 #   1. create permutation datasets
@@ -43,10 +43,27 @@ coexp_expr_tab <- fread(expcor_tab_file)[1:3000, 1:3001]
 # ----- 4. create permutation datasets by shuffle gene_id -----
 sig_edge_tab_file <- "sig_edges_coexpr_net.csv"
 
-sig_coexp_pairs <- permutation_test_stat_tab(coexp_expr_tab[1:300, 1:301],
+
+# sig_coexp_pairs <- permutation_test_stat_tab(coexp_expr_tab[1:300, 1:301],
+#                         sig_edge_tab_file,
+#                         expcor_tab_dir,
+#                         obs_col = "rho",
+#                         permut_cols_pattern = "seed",
+#                         permutation_num = 100,
+#                         alpha = 1)
+
+# # Check if observed correlations look reasonable
+# summary(sig_coexp_pairs$rho)
+
+
+# plot
+sig_coexp_pairs <- permutation_test_plot(coexp_expr_tab[1:30, 1:31],
                         sig_edge_tab_file,
                         expcor_tab_dir,
                         obs_col = "rho",
                         permut_cols_pattern = "seed",
-                        permutation_num = 20,
+                        permutation_num = 30,
                         alpha = 1)
+
+sig_coexp_pairs[order(-rho), head(.SD, 1), .SDcols = setdiff(colnames(sig_coexp_pairs), "p_twotail")] |>
+    melt(id.vars = "gene_pairs")
