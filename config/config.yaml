@@ -16,6 +16,7 @@ output_dirs:
   wgcna_dir: "results/WGCNA"
   GWENA_dir: "results/GWENA"
   spearman_dir: "results/spearman_correlation"
+  network_features_dir: "results/network_features"
 raw_files:
   rawcount_file: "dataset/raw/RawCounts_noY_CPM1_head_hsctrl_onlyGEMMAsamples_Mar21.21.txt"
   rawmeta_file: "dataset/raw/Info_RawCounts_CPM1_head_hsctrl_Jul9.20.txt"
@@ -35,6 +36,9 @@ processed_files:
   vst_processed_files:
     - "dataset/processed/VST/VSTdataCtrl.txt"
     - "dataset/processed/VST/VSTdataHS.txt"
+spearman_correlation_files:
+  permutation_files:
+    - "results/spearman_correlation/permutation_test"
 input_files:
   subset_data:
     - file_A.csv

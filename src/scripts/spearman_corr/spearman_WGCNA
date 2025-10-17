@@ -131,13 +131,13 @@ plot(sft$fitIndices[,1],sft$fitIndices[,6],
      xlab="Soft Threshold (power)",
      ylab="Median Connectivity",type="n",
      main = "Median connectivity")
-text(sft$fitIndices[,1], sft$fitIndices[,6], labels=powers,cex=cex1,col="blue")
+text(sft$fitIndices[,1], sft$fitIndices[,6], labels=powers,cex=cex1,col="red")
 
 plot(sft$fitIndices[,1],sft$fitIndices[,7],
      xlab="Soft Threshold (power)",
      ylab="Max Connectivity",type="n",
      main = "Max connectivity")
-text(sft$fitIndices[,1], sft$fitIndices[,7], labels=powers,cex=cex1,col="blue")
+text(sft$fitIndices[,1], sft$fitIndices[,7], labels=powers,cex=cex1,col="red")
 dev.off()
 
 # For WGCNA, we can use the correlation matrix directly as adjacency
