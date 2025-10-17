@@ -1,0 +1,65 @@
+# !/usr/bin/env Rscript
+# ==============================================================================
+# Calculate network features with symmetrical matrix
+#
+# Script by Gabriel Thornes
+#
+# Last Updated: 17/10/2025
+#
+# This script::
+#   1. Takes wide correlation matrix following permutation testing as input
+#   2. Calculates network-level metrics
+#   3. Calculates gene-level metrics
+#   4. Outputs network metrics and gene metrics as summary statistics CSV file
+# ==============================================================================
+
+rm(list = ls())
+
+# ----- 1. Load required packages -----
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(WGCNA)
+library(yaml)
+
+# ----- 2. Set Input and Output Paths from config.yaml -----
+source("src/utils/utils_io.R")
+source("src/utils/utils_network_feats.R")
+config <- yaml::read_yaml("config/config.yaml")
+wide_matrix_dir <- config$spearman_correlation_files$permutation_files
+wide_matrix_file <- file.path(wide_matrix_dir, "sig_matrix_wide.csv")
+output_dir <- config$output_dirs$network_features_dir
+output_file <- file.path(output_dir, "network_metrics_summary.csv")
+
+corr.matrix <- fread(wide_matrix_file)
+cat("File read:", wide_matrix_file,"\n")
+
+# ----- 3. Calculate network-level summary statistics -----
+
+# Basic correlation statistics
+df.corr.m <- as.matrix(corr.matrix[,-1, with=FALSE])
+    rownames(df.corr.m) <- corr.matrix[[1]]
+cat("Correlation statistics:\n")
+cat("Mean absolute correlation:", mean(abs(df.corr.m[upper.tri(df.corr.m)]), na.rm = TRUE), "\n")
+cat("Median absolute correlation:", median(abs(df.corr.m[upper.tri(df.corr.m)]), na.rm = TRUE), "\n")
+
+# WGCNA
+
+# Assess soft-thresholding powers
+spearman_adj <- abs(df.corr.m) # adjacency matrix
+
+# Call the network topology analysis function
+sft <- pickSoftThreshold(df.corr.m, powerVector = c(1:20), verbose = 5)
+
+# Generate plots to decide soft-thresholding power
+output_plot <- file.path(output_dir, "soft_thresholding.pdf")
+sft_plot(sft,output_plot, c(1:20))
+
+# Write sft to file for analysis
+sft_file <- file.path(config$output_dirs$network_features_dir, "spearman_soft_threshold.csv")
+write.csv(sft$fitIndices, file = sft_file, row.names = FALSE)
+
+# Apply soft-thresholding power
+adjacency_power <- 3 # Choose based on scale-free topology results
+spearman_adjacency <- spearman_adj^adjacency_power
+cat("Mean adjacency after soft-thresholding:", mean(spearman_adjacency[upper.tri(spearman_adjacency)], na.rm = TRUE), "\n")
