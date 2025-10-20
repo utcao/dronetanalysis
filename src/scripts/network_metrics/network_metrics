@@ -43,23 +43,55 @@ cat("Correlation statistics:\n")
 cat("Mean absolute correlation:", mean(abs(df.corr.m[upper.tri(df.corr.m)]), na.rm = TRUE), "\n")
 cat("Median absolute correlation:", median(abs(df.corr.m[upper.tri(df.corr.m)]), na.rm = TRUE), "\n")
 
-# WGCNA
+# WGCNA - preserving signed correlations for global modifier detection
 
-# Assess soft-thresholding powers
+# Option 1: Signed network (preserves directionality)
+# Convert correlations to signed adjacency (keeps positive/negative relationships)
+# Values range from -1 to +1, then transformed to 0 to 1 as: (1 + cor) / 2
+signed_adjacency <- (1 + df.corr.m) / 2
+
+# Option 2: Traditional unsigned network (magnitude only)
 spearman_adj <- abs(df.corr.m) # adjacency matrix
 
-# Call the network topology analysis function
-sft <- pickSoftThreshold(df.corr.m, powerVector = c(1:20), verbose = 5)
+cat("Using SIGNED network analysis for global modifier detection\n")
+cat("Mean signed adjacency:", mean(signed_adjacency[upper.tri(signed_adjacency)], na.rm = TRUE), "\n")
+
+# Call the network topology analysis function for signed network
+sft_signed <- pickSoftThreshold(df.corr.m, powerVector = c(1:30), 
+                                networkType = "signed", verbose = 5)
 
 # Generate plots to decide soft-thresholding power
-output_plot <- file.path(output_dir, "soft_thresholding.pdf")
-sft_plot(sft,output_plot, c(1:20))
+output_plot <- file.path(output_dir, "soft_thresholding_signed.pdf")
+sft_plot(sft_signed, output_plot, c(1:30))
 
 # Write sft to file for analysis
-sft_file <- file.path(config$output_dirs$network_features_dir, "spearman_soft_threshold.csv")
-write.csv(sft$fitIndices, file = sft_file, row.names = FALSE)
+sft_file <- file.path(config$output_dirs$network_features_dir, "signed_soft_threshold.csv")
+write.csv(sft_signed$fitIndices, file = sft_file, row.names = FALSE)
 
-# Apply soft-thresholding power
-adjacency_power <- 3 # Choose based on scale-free topology results
-spearman_adjacency <- spearman_adj^adjacency_power
-cat("Mean adjacency after soft-thresholding:", mean(spearman_adjacency[upper.tri(spearman_adjacency)], na.rm = TRUE), "\n")
+# Apply soft-thresholding power (signed networks typically need higher powers)
+adjacency_power <- 12 # Signed networks typically require higher powers (6-15)
+spearman_adjacency <- signed_adjacency^adjacency_power
+cat("Mean adjacency after signed soft-thresholding:", mean(spearman_adjacency[upper.tri(spearman_adjacency)], na.rm = TRUE), "\n")
+
+# Calculate connectivity (weighted degree) and degree (discrete connections)
+
+# IMPORTANT DISTINCTION:
+# Connectivity = sum of ADJACENCY values (after soft-thresholding transformation)
+# Sum of correlations = sum of original correlation values (before transformation)
+
+# 1. Sum of original correlations (before transformation)
+sum_correlations <- rowSums(abs(df.corr.m), na.rm = TRUE)
+
+# 2. Connectivity = sum of adjacency values (after soft-thresholding)
+global_connectivity <- rowSums(spearman_adjacency, na.rm = TRUE)
+
+# True degree = count of connections above threshold (discrete measure)
+# Define threshold for considering an edge as "connected"
+connection_threshold <- 0.2
+global_degree <- rowSums(spearman_adjacency > connection_threshold, na.rm = TRUE)
+
+cat("Mean sum of correlations (original):", mean(sum_correlations, na.rm = TRUE), "\n")
+cat("Mean connectivity (after soft-thresholding):", mean(global_connectivity, na.rm = TRUE), "\n")
+cat("Mean degree (discrete count):", mean(global_degree, na.rm = TRUE), "\n")
+cat("Soft-thresholding power used:", adjacency_power, "\n")
+
