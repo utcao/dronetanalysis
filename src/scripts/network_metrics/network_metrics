@@ -32,8 +32,8 @@ spearman_input_file <- file.path(spearman_input_dir, "spearman_correlation_matri
 output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc")
 
 spearman <- read.csv(file.path(spearman_input_file))
-signed <- read.csv(file.path(sft_input_dir, "signed/signed_soft_thresholded_adjacency_matrix.csv"))
-unsigned <- read.csv(file.path(sft_input_dir, "unsigned/unsigned_soft_thresholded_adjacency_matrix.csv"))
+signed <- read.csv(file.path(sft_input_dir[1]))
+unsigned <- read.csv(file.path(sft_input_dir[2]))
 cat("Files read successfully:\n")
 cat("- Spearman correlation matrix:", nrow(spearman), "x", ncol(spearman), "\n")
 cat("- Signed adjacency matrix:", nrow(signed), "x", ncol(signed), "\n")
@@ -42,7 +42,7 @@ cat("- Unsigned adjacency matrix:", nrow(unsigned), "x", ncol(unsigned), "\n")
 
 # ----- 3. Calculate network-level summary statistics -----
 
-# Convert all matrices to proper format (remove gene ID column, set rownames)
+# Convert all matrices to proper format
 spearman_matrix <- as.matrix(spearman[,-1])
 rownames(spearman_matrix) <- spearman[[1]]
 
@@ -56,60 +56,6 @@ cat("Matrix conversion completed:\n")
 cat("- Spearman matrix dimensions:", dim(spearman_matrix), "\n")
 cat("- Signed matrix dimensions:", dim(signed_matrix), "\n")
 cat("- Unsigned matrix dimensions:", dim(unsigned_matrix), "\n")
-
-# Function to calculate network metrics for any matrix
-calculate_network_metrics <- function(matrix_data, matrix_name) {
-    cat("\n=== Network Metrics for", matrix_name, "===\n")
-    
-    # Basic statistics
-    upper_tri_values <- matrix_data[upper.tri(matrix_data)]
-    
-    # Network-level metrics
-    mean_abs_corr <- mean(abs(upper_tri_values), na.rm = TRUE)
-    median_abs_corr <- median(abs(upper_tri_values), na.rm = TRUE)
-    max_corr <- max(upper_tri_values, na.rm = TRUE)
-    min_corr <- min(upper_tri_values, na.rm = TRUE)
-    
-    # Node-level metrics
-    # Sum of correlations (connectivity measure)
-    sum_correlations <- rowSums(abs(matrix_data), na.rm = TRUE)
-    
-    # Weighted connectivity (sum of all edge weights)
-    weighted_connectivity <- rowSums(matrix_data, na.rm = TRUE)
-    
-    # Degree (discrete connections above threshold)
-    connection_threshold <- 0.1  # Adjust as needed
-    degree <- rowSums(matrix_data > connection_threshold, na.rm = TRUE)
-    
-    # Max connectivity measures
-    max_connectivity <- max(weighted_connectivity, na.rm = TRUE)
-    max_degree <- max(degree, na.rm = TRUE)
-    
-    # Print results
-    cat("Network-level metrics:\n")
-    cat("  Mean absolute correlation:", round(mean_abs_corr, 4), "\n")
-    cat("  Median absolute correlation:", round(median_abs_corr, 4), "\n")
-    cat("  Max correlation:", round(max_corr, 4), "\n")
-    cat("  Min correlation:", round(min_corr, 4), "\n")
-    
-    cat("Node-level metrics:\n")
-    cat("  Mean weighted connectivity:", round(mean(weighted_connectivity, na.rm = TRUE), 4), "\n")
-    cat("  Mean degree (threshold=", connection_threshold, "):", round(mean(degree, na.rm = TRUE), 2), "\n")
-    cat("  Max weighted connectivity:", round(max_connectivity, 4), "\n")
-    cat("  Max degree:", max_degree, "\n")
-    
-    # Return metrics as a list for potential further analysis
-    return(list(
-        matrix_name = matrix_name,
-        mean_abs_corr = mean_abs_corr,
-        median_abs_corr = median_abs_corr,
-        max_corr = max_corr,
-        min_corr = min_corr,
-        weighted_connectivity = weighted_connectivity,
-        degree = degree,
-        sum_correlations = sum_correlations
-    ))
-}
 
 # Calculate metrics for all three matrices
 spearman_metrics <- calculate_network_metrics(spearman_matrix, "Spearman Correlations")
@@ -154,4 +100,3 @@ write.csv(summary_stats, file = summary_file, row.names = FALSE)
 cat("\n=== Summary ===\n")
 print(summary_stats)
 cat("\nSummary statistics saved to:", summary_file, "\n")
-
