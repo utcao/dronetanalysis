@@ -60,3 +60,65 @@ sft_plot <- function(sft, output_file, powers = c(1:20)){
         text(sft$fitIndices[,1], sft$fitIndices[,7], labels=powers,cex=cex1,col="red")
         dev.off()
 }
+#' Calculate network metrics for a given matrix
+#'
+#' This function computes various network metrics for a provided gene-gene matrix,
+#' including network-level statistics (mean, median, max, min correlations) and 
+#' node-level statistics (connectivity measures). It uses 0.1 as the threshold for degree calculation,
+#' which is appropriate for global modifier identification.
+#' 
+#' @param matrix_data A numeric matrix (gene x gene) for which to calculate network metrics
+#' @param matrix_name A string name for the matrix (used in output messages)
+#' @return A list containing various network metrics
+#' @export
+#'
+#' 
+calculate_network_metrics <- function(matrix_data, matrix_name) {
+    cat("\n=== Network Metrics for", matrix_name, "===\n")
+    upper_tri_values <- matrix_data[upper.tri(matrix_data)]
+    
+    # Network-level metrics
+    mean_abs_corr <- mean(abs(upper_tri_values), na.rm = TRUE)
+    median_abs_corr <- median(abs(upper_tri_values), na.rm = TRUE)
+    max_corr <- max(upper_tri_values, na.rm = TRUE)
+    min_corr <- min(upper_tri_values, na.rm = TRUE)
+    
+    # Sum of correlations (connectivity measure)
+    sum_correlations <- rowSums(abs(matrix_data), na.rm = TRUE)
+    
+    # Weighted connectivity (sum of all edge weights)
+    weighted_connectivity <- rowSums(matrix_data, na.rm = TRUE)
+    
+    # Degree (discrete connections above threshold)
+    connection_threshold <- 0.3 ## needs adjusting to appropriate value depending on adjacency type
+    degree <- rowSums(matrix_data > connection_threshold, na.rm = TRUE)
+    
+    # Max connectivity measures
+    max_connectivity <- max(weighted_connectivity, na.rm = TRUE)
+    max_degree <- max(degree, na.rm = TRUE)
+    
+    # Print results
+    cat("Network-level metrics:\n")
+    cat("  Mean absolute correlation:", round(mean_abs_corr, 4), "\n")
+    cat("  Median absolute correlation:", round(median_abs_corr, 4), "\n")
+    cat("  Max correlation:", round(max_corr, 4), "\n")
+    cat("  Min correlation:", round(min_corr, 4), "\n")
+    
+    cat("Node-level metrics:\n")
+    cat("  Mean weighted connectivity:", round(mean(weighted_connectivity, na.rm = TRUE), 4), "\n")
+    cat("  Mean degree (threshold=", connection_threshold, "):", round(mean(degree, na.rm = TRUE), 2), "\n")
+    cat("  Max weighted connectivity:", round(max_connectivity, 4), "\n")
+    cat("  Max degree:", max_degree, "\n")
+    
+    # Return metrics as a list for potential further analysis
+    return(list(
+        matrix_name = matrix_name,
+        mean_abs_corr = mean_abs_corr,
+        median_abs_corr = median_abs_corr,
+        max_corr = max_corr,
+        min_corr = min_corr,
+        weighted_connectivity = weighted_connectivity,
+        degree = degree,
+        sum_correlations = sum_correlations
+    ))
+}
