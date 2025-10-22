@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 21/10/2025
+# Last Updated: 22/10/2025
 #
 # This script::
 #   1. Takes wide correlation matrix following soft thresholding as input
@@ -47,12 +47,15 @@ create_directories(output_dir)
 # Convert all matrices to proper format
 spearman_matrix <- as.matrix(spearman[,-1])
 rownames(spearman_matrix) <- spearman[[1]]
+colnames(spearman_matrix) <- spearman[[1]]
 
 signed_matrix <- as.matrix(signed[,-1])
 rownames(signed_matrix) <- signed[[1]]
+colnames(signed_matrix) <- signed[[1]]
 
 unsigned_matrix <- as.matrix(unsigned[,-1])
 rownames(unsigned_matrix) <- unsigned[[1]]
+colnames(unsigned_matrix) <- unsigned[[1]]
 
 cat("Matrix conversion completed:\n")
 cat("- Spearman matrix dimensions:", dim(spearman_matrix), "\n")
@@ -103,3 +106,23 @@ plot_threshold_analysis(signed_matrix, output_file = file.path(output_dir, "sign
 
 plot_threshold_analysis(unsigned_matrix, output_file = file.path(output_dir, "unsigned_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
                         matrix_name = "Unsigned Adjacency Matrix")
+
+# Create TOM matrices
+
+tom_signed <- TOMsimilarity(signed_matrix)
+tom_unsigned <- TOMsimilarity(unsigned_matrix)
+dimnames(tom_signed) <- list(rownames(signed_matrix), colnames(signed_matrix))
+dimnames(tom_unsigned) <- list(rownames(unsigned_matrix), colnames(unsigned_matrix))
+
+cat("TOM matrices created:\n")
+cat("- TOM Signed matrix dimensions:", dim(tom_signed), "\n")
+cat("- TOM Unsigned matrix dimensions:", dim(tom_unsigned), "\n")
+
+# Save the TOM matrices
+tom_signed_file <- file.path(output_dir, "tom_signed_matrix.csv")
+tom_unsigned_file <- file.path(output_dir, "tom_unsigned_matrix.csv")
+write.csv(tom_signed, file = tom_signed_file, row.names = TRUE)
+write.csv(tom_unsigned, file = tom_unsigned_file, row.names = TRUE)
+cat("TOM matrices saved:\n")
+cat("- TOM Signed matrix:", tom_signed_file, "\n")
+cat("- TOM Unsigned matrix:", tom_unsigned_file, "\n")
