@@ -59,11 +59,10 @@ plot_threshold_analysis <- function(matrix_data, output_file,
     # Add vertical lines for key thresholds
     abline(v = quantile(upper_tri_values, 0.95, na.rm = TRUE), col = "red", lwd = 2, lty = 2)
     abline(v = quantile(upper_tri_values, 0.90, na.rm = TRUE), col = "orange", lwd = 2, lty = 2)
-    abline(v = 0.5, col = "blue", lwd = 2, lty = 2)
     
-    legend("topright", legend = c("95th percentile", "90th percentile", "0.5 threshold"),
-           col = c("red", "orange", "blue"), lty = 2, lwd = 2, cex = 1.1)
-    
+    legend("topright", legend = c("95th percentile", "90th percentile"),
+           col = c("red", "orange"), lty = 2, lwd = 2, cex = 1.1)
+
     # Plot 2: Number of connections vs threshold
     plot(results$threshold, results$n_connections, type = "b", pch = 16,
          main = "Number of Connections vs Threshold", 
