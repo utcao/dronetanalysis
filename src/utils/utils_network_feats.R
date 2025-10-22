@@ -8,6 +8,130 @@ suppressPackageStartupMessages({
     library(futile.logger)
 })
 
+#' Generate diagnostic plots for choosing connectivity threshold
+#' 
+#' This function creates multiple plots to help decide on an appropriate
+#' connectivity threshold for network analysis. It shows how network properties
+#' change across different threshold values.
+#'
+#' @param matrix_data Symmetric matrix (correlation or adjacency)
+#' @param output_file Path to save the PDF plots
+#' @param threshold_range Vector of thresholds to test (default: seq(0.05, 0.95, 0.05))
+#' @param matrix_name Name for the matrix (used in plot titles)
+#' @return Invisible data.frame with threshold analysis results
+#' @export
+
+plot_threshold_analysis <- function(matrix_data, output_file, 
+                                   threshold_range = seq(0.05, 0.95, 0.05),
+                                   matrix_name = "Network") {
+    
+    # Extract upper triangle values
+    upper_tri_values <- matrix_data[upper.tri(matrix_data)]
+    upper_tri_values <- upper_tri_values[!is.na(upper_tri_values)]
+    
+    # Calculate network properties at each threshold
+    results <- data.frame(
+        threshold = threshold_range,
+        n_connections = sapply(threshold_range, function(t) sum(upper_tri_values > t)),
+        network_density = sapply(threshold_range, function(t) sum(upper_tri_values > t) / length(upper_tri_values)),
+        mean_degree = sapply(threshold_range, function(t) {
+            adj_binary <- matrix_data > t
+            mean(rowSums(adj_binary, na.rm = TRUE))
+        }),
+        max_degree = sapply(threshold_range, function(t) {
+            adj_binary <- matrix_data > t
+            max(rowSums(adj_binary, na.rm = TRUE))
+        }),
+        mean_edge_weight = sapply(threshold_range, function(t) {
+            surviving_edges <- upper_tri_values[upper_tri_values > t]
+            if(length(surviving_edges) > 0) mean(surviving_edges) else NA
+        })
+    )
+    
+    # Start PDF device
+    pdf(file = output_file, width = 16, height = 12)
+    par(mfrow = c(3, 2), mar = c(5, 5, 4, 2) + 0.1, cex.main = 1.3, cex.lab = 1.2)
+    
+    # Plot 1: Edge weight distribution with threshold lines
+    hist(upper_tri_values, breaks = 50, main = paste("Edge Weight Distribution -", matrix_name),
+         xlab = "Edge Weight", ylab = "Frequency", col = "lightblue", border = "white")
+    
+    # Add vertical lines for key thresholds
+    abline(v = quantile(upper_tri_values, 0.95, na.rm = TRUE), col = "red", lwd = 2, lty = 2)
+    abline(v = quantile(upper_tri_values, 0.90, na.rm = TRUE), col = "orange", lwd = 2, lty = 2)
+    abline(v = 0.5, col = "blue", lwd = 2, lty = 2)
+    
+    legend("topright", legend = c("95th percentile", "90th percentile", "0.5 threshold"),
+           col = c("red", "orange", "blue"), lty = 2, lwd = 2, cex = 1.1)
+    
+    # Plot 2: Number of connections vs threshold
+    plot(results$threshold, results$n_connections, type = "b", pch = 16,
+         main = "Number of Connections vs Threshold", 
+         xlab = "Threshold", ylab = "Number of Connections",
+         col = "darkblue", lwd = 2)
+    grid(col = "gray", lty = 3)
+    
+    # Plot 3: Network density vs threshold
+    plot(results$threshold, results$network_density, type = "b", pch = 16,
+         main = "Network Density vs Threshold",
+         xlab = "Threshold", ylab = "Network Density", 
+         col = "darkgreen", lwd = 2)
+    grid(col = "gray", lty = 3)
+    abline(h = c(0.01, 0.05, 0.10), col = "red", lty = 2, alpha = 0.5)
+    text(0.8, 0.01, "1% density", col = "red", cex = 0.9)
+    text(0.8, 0.05, "5% density", col = "red", cex = 0.9)
+    text(0.8, 0.10, "10% density", col = "red", cex = 0.9)
+    
+    # Plot 4: Mean degree vs threshold
+    plot(results$threshold, results$mean_degree, type = "b", pch = 16,
+         main = "Mean Node Degree vs Threshold",
+         xlab = "Threshold", ylab = "Mean Degree",
+         col = "purple", lwd = 2)
+    grid(col = "gray", lty = 3)
+    
+    # Plot 5: Mean edge weight of surviving edges
+    plot(results$threshold, results$mean_edge_weight, type = "b", pch = 16,
+         main = "Mean Weight of Surviving Edges vs Threshold",
+         xlab = "Threshold", ylab = "Mean Edge Weight",
+         col = "darkorange", lwd = 2)
+    grid(col = "gray", lty = 3)
+    
+    # Plot 6: Log-scale visualization for better resolution
+    plot(results$threshold, log10(results$n_connections + 1), type = "b", pch = 16,
+         main = "Log10(Connections) vs Threshold",
+         xlab = "Threshold", ylab = "Log10(Number of Connections + 1)",
+         col = "darkred", lwd = 2)
+    grid(col = "gray", lty = 3)
+    
+    dev.off()
+    
+    # Print summary statistics
+    cat("\n=== Threshold Analysis Results ===\n")
+    cat("Matrix:", matrix_name, "\n")
+    cat("Data range:", round(range(upper_tri_values, na.rm = TRUE), 3), "\n")
+    cat("Total possible connections:", length(upper_tri_values), "\n")
+    
+    # Suggest some thresholds
+    cat("\n=== Suggested Thresholds ===\n")
+    
+    # Find thresholds for different network densities
+    density_1pct <- results$threshold[which.min(abs(results$network_density - 0.01))]
+    density_5pct <- results$threshold[which.min(abs(results$network_density - 0.05))]
+    density_10pct <- results$threshold[which.min(abs(results$network_density - 0.10))]
+    
+    cat("For 1% network density: threshold ≈", round(density_1pct, 3), "\n")
+    cat("For 5% network density: threshold ≈", round(density_5pct, 3), "\n")
+    cat("For 10% network density: threshold ≈", round(density_10pct, 3), "\n")
+    
+    # Percentile-based suggestions
+    cat("95th percentile threshold:", round(quantile(upper_tri_values, 0.95, na.rm = TRUE), 3), "\n")
+    cat("90th percentile threshold:", round(quantile(upper_tri_values, 0.90, na.rm = TRUE), 3), "\n")
+    
+    cat("\nPlots saved to:", output_file, "\n")
+    
+    return(invisible(results))
+}
+
 #' Render plot for deciding soft-thresholding power for WGCNA
 #' 
 #' This function generates and saves a plot to help decide the appropriate soft-thresholding power
@@ -122,3 +246,4 @@ calculate_network_metrics <- function(matrix_data, matrix_name) {
         sum_correlations = sum_correlations
     ))
 }
+
