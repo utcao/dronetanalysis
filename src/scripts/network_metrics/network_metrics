@@ -39,6 +39,8 @@ cat("- Spearman correlation matrix:", nrow(spearman), "x", ncol(spearman), "\n")
 cat("- Signed adjacency matrix:", nrow(signed), "x", ncol(signed), "\n")
 cat("- Unsigned adjacency matrix:", nrow(unsigned), "x", ncol(unsigned), "\n")
 
+# Create output directory if it doesn't exist
+create_directories(output_dir)
 
 # ----- 3. Calculate network-level summary statistics -----
 
@@ -84,14 +86,6 @@ summary_stats <- data.frame(
                    mean(signed_metrics$degree, na.rm = TRUE),
                    mean(unsigned_metrics$degree, na.rm = TRUE))
 )
-
-# Create output directory if it doesn't exist
-if(!dir.exists(dirname(output_dir))) {
-    dir.create(dirname(output_dir), recursive = TRUE)
-}
-if(!dir.exists(output_dir)) {
-    dir.create(output_dir, recursive = TRUE)
-}
 
 # Save summary statistics
 summary_file <- file.path(output_dir, "network_metrics_summary.csv")
