@@ -100,3 +100,12 @@ write.csv(summary_stats, file = summary_file, row.names = FALSE)
 cat("\n=== Summary ===\n")
 print(summary_stats)
 cat("\nSummary statistics saved to:", summary_file, "\n")
+
+plot_threshold_analysis(spearman_matrix, output_file = file.path(output_dir, "spearman_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
+                        matrix_name = "Spearman Correlation Matrix")
+
+plot_threshold_analysis(signed_matrix, output_file = file.path(output_dir, "signed_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
+                        matrix_name = "Signed Adjacency Matrix")
+
+plot_threshold_analysis(unsigned_matrix, output_file = file.path(output_dir, "unsigned_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
+                        matrix_name = "Unsigned Adjacency Matrix")
