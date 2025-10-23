@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 22/10/2025
+# Last Updated: 23/10/2025
 #
 # This script::
 #   1. Takes wide correlation matrix following soft thresholding as input
@@ -107,6 +107,8 @@ plot_threshold_analysis(signed_matrix, output_file = file.path(output_dir, "sign
 plot_threshold_analysis(unsigned_matrix, output_file = file.path(output_dir, "unsigned_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
                         matrix_name = "Unsigned Adjacency Matrix")
 
+# ----- 4. Calculate gene-level network features via WGCNA -----
+
 # Create TOM matrices
 
 tom_signed <- TOMsimilarity(signed_matrix)
@@ -118,11 +120,132 @@ cat("TOM matrices created:\n")
 cat("- TOM Signed matrix dimensions:", dim(tom_signed), "\n")
 cat("- TOM Unsigned matrix dimensions:", dim(tom_unsigned), "\n")
 
+# TOM Dissimilarity matrices
+tomd_signed <- 1 - tom_signed
+tomd_unsigned <- 1 - tom_unsigned
+dimnames(tomd_signed) <- list(rownames(signed_matrix), colnames(signed_matrix))
+dimnames(tomd_unsigned) <- list(rownames(unsigned_matrix), colnames(unsigned_matrix))
+
 # Save the TOM matrices
 tom_signed_file <- file.path(output_dir, "tom_signed_matrix.csv")
 tom_unsigned_file <- file.path(output_dir, "tom_unsigned_matrix.csv")
+tomd_signed_file <- file.path(output_dir, "tomd_signed_matrix.csv")
+tomd_unsigned_file <- file.path(output_dir, "tomd_unsigned_matrix.csv")
+
 write.csv(tom_signed, file = tom_signed_file, row.names = TRUE)
 write.csv(tom_unsigned, file = tom_unsigned_file, row.names = TRUE)
+write.csv(tomd_signed, file = tomd_signed_file, row.names = TRUE)
+write.csv(tomd_unsigned, file = tomd_unsigned_file, row.names = TRUE)
 cat("TOM matrices saved:\n")
 cat("- TOM Signed matrix:", tom_signed_file, "\n")
 cat("- TOM Unsigned matrix:", tom_unsigned_file, "\n")
+cat("- TOMD Signed matrix:", tomd_signed_file, "\n")
+cat("- TOMD Unsigned matrix:", tomd_unsigned_file, "\n")
+
+# Hierarchical clustering
+
+signed_gene_tree <- hclust(as.dist(tomd_signed), method = "average")
+unsigned_gene_tree <- hclust(as.dist(tomd_unsigned), method = "average")
+
+# Minimum module size
+
+minModuleSize <- 30 # appropriate deafult for transcriptomic data
+
+# Module identification with dynmaic tree cut
+signed_dynamic_mods <- cutreeDynamic(dendro = signed_gene_tree, distM = tomd_signed,
+                            deepSplit = 2, pamRespectsDendro = FALSE,
+                            minClusterSize = minModuleSize)
+
+unsigned_dynamic_mods <- cutreeDynamic(dendro = unsigned_gene_tree, distM = tomd_unsigned,
+                            deepSplit = 2, pamRespectsDendro = FALSE,
+                            minClusterSize = minModuleSize)
+
+# Convert numeric labels into colours
+signed_module_colors <- labels2colors(signed_dynamic_mods)
+unsigned_module_colors <- labels2colors(unsigned_dynamic_mods)
+
+# Calculate eigengenes and dissimilarities for each module
+signed_MEs <- moduleEigengenes(signed_matrix, colors = signed_module_colors)$eigengenes
+unsigned_MEs <- moduleEigengenes(unsigned_matrix, colors = unsigned_module_colors)$eigengenes
+signed_MEDiss <- 1 - cor(signed_MEs)
+unsigned_MEDiss <- 1 - cor(unsigned_MEs)
+
+# Cluster module eigengenes
+signed_METree <- hclust(as.dist(signed_MEDiss), method = "average")
+unsigned_METree <- hclust(as.dist(unsigned_MEDiss), method = "average")
+
+# Plot module eigengene clustering
+
+par(mfrow = c(1,2))
+cex1 = 0.9
+pdf(file = file.path(output_dir, "module_eigengene_clustering.pdf"), width = 12, height = 8)
+
+# Signed plot
+
+plot(signed_METree, main = "Signed Module Eigengene Clustering", xlab="", sub="", cex = cex1)
+# Set merge threshold (height at which to cut the tree)
+MEDissThres <- 0.25
+abline(h = MEDissThres, col = "red")
+
+# Unsigned plot
+
+plot(unsigned_METree, main = "Unsigned Module Eigengene Clustering", xlab="", sub="", cex = cex1)
+# Set merge threshold (height at which to cut the tree)
+MEDissThres <- 0.25
+abline(h = MEDissThres, col = "red")
+
+dev.off()
+
+# Merge close modules based on eigengene similarity
+merge_signed <- mergeCloseModules(signed_matrix, signed_module_colors, cutHeight = MEDissThres, verbose = 3)
+merge_unsigned <- mergeCloseModules(unsigned_matrix, unsigned_module_colors, cutHeight = MEDissThres, verbose = 3)
+
+# Extract the merged module colors
+signed_merged_colors <- merge_signed$colors
+unsigned_merged_colors <- merge_unsigned$colors
+
+# Update module eigengenes with merged modules
+signed_merged_MEs <- merge_signed$newMEs
+unsigned_merged_MEs <- merge_unsigned$newMEs
+
+# Calculate module membership (correlation between genes and module eigengenes)
+signed_MM <- as.data.frame(cor(signed_matrix, signed_merged_MEs, use = "p"))
+unsigned_MM <- as.data.frame(cor(unsigned_matrix, unsigned_merged_MEs, use = "p"))
+
+# Add gene names
+signed_MM$gene <- rownames(signed_matrix)
+unsigned_MM$gene <- rownames(unsigned_matrix)
+
+# Calculate intramodular connectivity for each module
+signed_connectivity <- intramodularConnectivity(signed_matrix, signed_merged_colors)
+unsigned_connectivity <- intramodularConnectivity(unsigned_matrix, unsigned_merged_colors)
+
+# Add gene names and module assignments
+signed_connectivity$gene <- rownames(signed_matrix)
+signed_connectivity$module <- signed_merged_colors
+unsigned_connectivity$gene <- rownames(unsigned_matrix)
+unsigned_connectivity$module <- unsigned_merged_colors
+
+# Identify hub genes based on module membership and connectivity
+
+# Top 5 hub genes per module by connectivity
+top_n_hubs <- 5
+signed_top_hubs <- signed_connectivity %>%
+  group_by(module) %>%
+  arrange(desc(kWithin)) %>%
+  slice_head(n = top_n_hubs)
+
+unsigned_top_hubs <- unsigned_connectivity %>%
+  group_by(module) %>%
+  arrange(desc(kWithin)) %>%
+  slice_head(n = top_n_hubs)
+
+# Save hub gene identification results
+write.csv(signed_hub_genes, file.path(output_dir, "signed_single_hub_genes.csv"))
+write.csv(unsigned_hub_genes, file.path(output_dir, "unsigned_single_hub_genes.csv"))
+write.csv(signed_top_hubs, file.path(output_dir, "signed_top_hub_genes.csv"))
+write.csv(unsigned_top_hubs, file.path(output_dir, "unsigned_top_hub_genes.csv"))
+write.csv(signed_connectivity, file.path(output_dir, "signed_gene_connectivity.csv"))
+write.csv(unsigned_connectivity, file.path(output_dir, "unsigned_gene_connectivity.csv"))
+
+cat("Network features analysis complete. Results saved to:", output_dir, "\n")
