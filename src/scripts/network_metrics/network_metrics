@@ -29,7 +29,9 @@ config <- yaml::read_yaml("config/config.yaml")
 sft_input_dir <- config$network_feature_files$soft_threshold_files
 spearman_input_dir <- config$output_dirs$spearman_dir
 spearman_input_file <- file.path(spearman_input_dir, "spearman_correlation_matrix_subset.csv")
-output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc")
+signed_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc/signed")
+unsigned_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc/unsigned")
+sum_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc")
 
 spearman <- read.csv(file.path(spearman_input_file))
 signed <- read.csv(file.path(sft_input_dir[1]))
@@ -91,7 +93,7 @@ summary_stats <- data.frame(
 )
 
 # Save summary statistics
-summary_file <- file.path(output_dir, "network_metrics_summary.csv")
+summary_file <- file.path(sum_output_dir, "network_metrics_summary.csv")
 write.csv(summary_stats, file = summary_file, row.names = FALSE)
 
 cat("\n=== Summary ===\n")
@@ -127,10 +129,10 @@ dimnames(tomd_signed) <- list(rownames(signed_matrix), colnames(signed_matrix))
 dimnames(tomd_unsigned) <- list(rownames(unsigned_matrix), colnames(unsigned_matrix))
 
 # Save the TOM matrices
-tom_signed_file <- file.path(output_dir, "tom_signed_matrix.csv")
-tom_unsigned_file <- file.path(output_dir, "tom_unsigned_matrix.csv")
-tomd_signed_file <- file.path(output_dir, "tomd_signed_matrix.csv")
-tomd_unsigned_file <- file.path(output_dir, "tomd_unsigned_matrix.csv")
+tom_signed_file <- file.path(signed_output_dir, "tom_signed_matrix.csv")
+tom_unsigned_file <- file.path(unsigned_output_dir, "tom_unsigned_matrix.csv")
+tomd_signed_file <- file.path(signed_output_dir, "tomd_signed_matrix.csv")
+tomd_unsigned_file <- file.path(unsigned_output_dir, "tomd_unsigned_matrix.csv")
 
 write.csv(tom_signed, file = tom_signed_file, row.names = TRUE)
 write.csv(tom_unsigned, file = tom_unsigned_file, row.names = TRUE)
@@ -178,7 +180,7 @@ unsigned_METree <- hclust(as.dist(unsigned_MEDiss), method = "average")
 
 par(mfrow = c(1,2))
 cex1 = 0.9
-pdf(file = file.path(output_dir, "module_eigengene_clustering.pdf"), width = 12, height = 8)
+pdf(file = file.path(sum_output_dir, "module_eigengene_clustering.pdf"), width = 12, height = 8)
 
 # Signed plot
 
@@ -241,11 +243,11 @@ unsigned_top_hubs <- unsigned_connectivity %>%
   slice_head(n = top_n_hubs)
 
 # Save hub gene identification results
-write.csv(signed_hub_genes, file.path(output_dir, "signed_single_hub_genes.csv"))
-write.csv(unsigned_hub_genes, file.path(output_dir, "unsigned_single_hub_genes.csv"))
-write.csv(signed_top_hubs, file.path(output_dir, "signed_top_hub_genes.csv"))
-write.csv(unsigned_top_hubs, file.path(output_dir, "unsigned_top_hub_genes.csv"))
-write.csv(signed_connectivity, file.path(output_dir, "signed_gene_connectivity.csv"))
-write.csv(unsigned_connectivity, file.path(output_dir, "unsigned_gene_connectivity.csv"))
+write.csv(signed_hub_genes, file.path(signed_output_dir, "signed_single_hub_genes.csv"))
+write.csv(unsigned_hub_genes, file.path(unsigned_output_dir, "unsigned_single_hub_genes.csv"))
+write.csv(signed_top_hubs, file.path(signed_output_dir, "signed_top_hub_genes.csv"))
+write.csv(unsigned_top_hubs, file.path(unsigned_output_dir, "unsigned_top_hub_genes.csv"))
+write.csv(signed_connectivity, file.path(signed_output_dir, "signed_gene_connectivity.csv"))
+write.csv(unsigned_connectivity, file.path(unsigned_output_dir, "unsigned_gene_connectivity.csv"))
 
 cat("Network features analysis complete. Results saved to:", output_dir, "\n")
