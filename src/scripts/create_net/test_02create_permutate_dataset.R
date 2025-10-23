@@ -1,15 +1,34 @@
-# !/usr/bin/env Rscript
+#!/usr/bin/env Rscript
 # ==============================================================================
-# Trim unsignificant edge in permutation test before transcriptomic network analysis
+# Co-expression Network Filtering via Permutation Testing
 #
-# Script by Yu-tao Cao
+# Author: Yu-tao Cao
+# Last Updated: 23/10/2025
 #
-# Last Updated: 14/10/2025
+# Description:
+#   This script performs statistical filtering of co-expression networks using
+#   permutation testing to identify biologically significant gene-gene interactions.
+#   By comparing observed correlation patterns against null distributions generated
+#   through random gene label shuffling, it removes spurious correlations that
+#   may arise by chance, enhancing the biological relevance of the resulting network.
 #
-# This script::
-#   1. create permutation datasets
-#   2. trim connection accroding to the wilcox test
-#   3. write out result table
+# Key Functionality:
+#   1. Generates permutation datasets by shuffling gene identifiers
+#   2. Performs statistical testing (Wilcoxon test) to identify significant edges
+#   3. Filters co-expression network based on permutation p-values
+#   4. Outputs validated network edges and visualization plots
+#   5. Provides quality control through distribution visualization
+#
+# Input Requirements:
+#   - Spearman correlation matrix (genes x genes)
+#   - Configuration file (config.yaml) with analysis parameters
+#
+# Output Products:
+#   - Filtered co-expression network edges (CSV format)
+#   - Permutation test results and statistics
+#   - Distribution plots for selected gene pairs
+#
+# Dependencies: purrr, data.table, glue, stringr, ggplot2, tibble, futile.logger, yaml
 # ==============================================================================
 
 rm(list = ls())
@@ -33,37 +52,54 @@ source("src/utils/utils_io.R")  # e.g., create_directories()
 source("src/utils/utils_permutation_net.R")
 
 # ----- 2. Extract Key Settings from config.yaml -----
-expcor_tab_dir <- "results/spearman_correlation/"
+expcor_tab_dir <- "results/spearman_correlation"
 
 expcor_tab_file <- file.path(expcor_tab_dir, "spearman_correlation_matrix.csv")
 
 # ----- 3. Load data -----
-coexp_expr_tab <- fread(expcor_tab_file)[1:3000, 1:3001]
+coexp_expr_tab <- fread(expcor_tab_file)[1:30, 1:31]
 
 # ----- 4. create permutation datasets by shuffle gene_id -----
 sig_edge_tab_file <- "sig_edges_coexpr_net.csv"
 
+setnames(coexp_expr_tab, "V1", "gene_id")
+sig_coexp_pairs <- permutation_test_stat_tab(
+                    coexp_expr_tab = coexp_expr_tab,
+                    sig_edge_tab_file = sig_edge_tab_file,
+                    tab_output_dir = expcor_tab_dir,
+                    obs_col = "rho",
+                    pair_id_col = pair_id_col,
+                    permu_cols_pattern = "seed",
+                    permu_n = 30,
+                    alpha = 0.05)
 
-# sig_coexp_pairs <- permutation_test_stat_tab(coexp_expr_tab[1:300, 1:301],
-#                         sig_edge_tab_file,
-#                         expcor_tab_dir,
-#                         obs_col = "rho",
-#                         permut_cols_pattern = "seed",
-#                         permutation_num = 100,
-#                         alpha = 1)
+sig_coexp_pairs <- permutation_test_stat_tab(
+                    coexp_expr_tab = coexp_expr_tab,
+                    sig_edge_tab_file = sig_edge_tab_file,
+                    tab_output_dir = expcor_tab_dir,
+                    obs_col = "rho",
+                    pair_id_col = "gene_pairs",
+                    permu_cols_pattern = "seed",
+                    permu_n = 30,
+                    alpha = 0.05, keep_permu = TRUE)
+
+id_col <- "gene_pairs"
+permu_cols_pat <- "seed"
+obs_col <- "rho"
+
+# plot
+sig_coexp_pairs_ltab <- sig_coexp_pairs[, .SD, .SDcols = patterns(glue("{id_col}|{permu_cols_pat}|{obs_col}"))] |>
+                melt(id.vars = id_col, value.name = obs_col, variable.name = "datasets")
+
+coexpr_pairs <- coexp_pairs_ltab[, unique(get(id_col))]
+chose_pair <- sample(coexpr_pairs, choose_paris_n)
+
+map(chose_pairs, plot_permu_distr,
+            coexp_pairs_ltab = sig_coexp_pairs_ltab,
+            id_col = "gene_pairs",
+            choose_paris_n = 1,
+            val_col = "rho", var_col = "datasets",
+            plot_output_dir = NULL, prefix = NULL)
 
 # # Check if observed correlations look reasonable
 # summary(sig_coexp_pairs$rho)
-
-
-# plot
-sig_coexp_pairs <- permutation_test_plot(coexp_expr_tab[1:30, 1:31],
-                        sig_edge_tab_file,
-                        expcor_tab_dir,
-                        obs_col = "rho",
-                        permut_cols_pattern = "seed",
-                        permutation_num = 30,
-                        alpha = 1)
-
-sig_coexp_pairs[order(-rho), head(.SD, 1), .SDcols = setdiff(colnames(sig_coexp_pairs), "p_twotail")] |>
-    melt(id.vars = "gene_pairs")
