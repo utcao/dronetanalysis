@@ -70,6 +70,7 @@ permutate_col <- function(dat_tab, shuffle_col = "sample_name", permu_n = 30,
                         glue("{prefix}seed{seed}{tag}.csv"))
         set.seed(seed)
         dat_tab[ , (shuffle_col):=(sample(get(shuffle_col), nrow(dat_tab)))]
+        setnames(dat_tab, c(shuffle_col, dat_tab[, get(shuffle_col)]))
         fwrite(dat_tab, permutation_file)
         permutation_file
     })
@@ -120,27 +121,32 @@ permutate_col <- function(dat_tab, shuffle_col = "sample_name", permu_n = 30,
 #' @importFrom tibble column_to_rownames
 #' @importFrom reshape2 melt
 #' @export
-get_lower_pair_coexp <- function(coexp_file, value_name_melt = "coexpr",
+get_lower_pair_coexp <- function(coexp_file,
+                                id_col = "gene_id",
+                                value_name_melt = "coexpr",
                                 pair_id_col = "gene_pairs"){
     flog.info("The input matrix must be symmetric")
-    coexp_reduncols <- c("gene_id", "gene_pair")
+    coexp_reduncols <- c(id_col, "gene_pair")
     if(is.character(coexp_file)){
         coexp_tab <- fread(coexp_file) |>
-                tibble::column_to_rownames("gene_id") |>
+                tibble::column_to_rownames(id_col) |>
                 as.matrix()
     }else{
         coexp_tab <- coexp_file |>
-                tibble::column_to_rownames("gene_id") |>
+                tibble::column_to_rownames(id_col) |>
                 as.matrix()
     }
-    colnames(coexp_tab) <- row.names(coexp_tab)
     coexp_tab[lower.tri(coexp_tab, diag = TRUE)] <- NA
     coexp_upper_l <- coexp_tab |>
-                as.data.table(keep.rownames = "gene_id") |>
-                melt(id.vars = "gene_id", variable.name = "gene_pair",
-                    value.name = value_name_melt, na.rm = TRUE)
-    coexp_upper_l[, (pair_id_col):= paste0(gene_id, "_", gene_pair)]
+                as.data.table(keep.rownames = id_col) |>
+                melt(id.vars = id_col, variable.name = "gene_pair",
+                    value.name = value_name_melt, na.rm = TRUE,
+                    variable.factor = FALSE)
+    coexp_upper_l[, (pair_id_col) := fifelse(get(id_col) < gene_pair,
+                                    paste0(get(id_col), "_", gene_pair),
+                                    paste0(gene_pair, "_", get(id_col)))]
     coexp_upper_l[, (coexp_reduncols):=NULL]
+    setcolorder(coexp_upper_l, c(pair_id_col, setdiff(colnames(coexp_upper_l), pair_id_col)))
     coexp_upper_l
 }
 
