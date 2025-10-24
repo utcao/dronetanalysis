@@ -143,8 +143,8 @@ permutation_test_stat <- function(coexp_expr_tab,
 
     raw_edges_n <- nrow(permute_coexp_tab)
     valid_edges_n <- nrow(sig_coexp_pairs)
-    vaild_perc <- signif(valid_edges_n/raw_edges_n, 3)
-    flog.info(glue(" {vaild_perc}% ( {valid_edges_n} out of {raw_edges_n}) edges survived from permutation test"))
+    vaild_perc <- signif(valid_edges_n/raw_edges_n, 3)*100
+    flog.info(glue(" {vaild_perc}% ( {valid_edges_n} out of {raw_edges_n}) edges survived from {permu_n} times of permutation test"))
 
     return(sig_coexp_pairs[])
 }
