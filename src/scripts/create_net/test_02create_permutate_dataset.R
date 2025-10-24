@@ -68,16 +68,6 @@ sig_coexp_pairs <- permutation_test_stat(
                     sig_edge_tab_file = sig_edge_tab_file,
                     tab_output_dir = expcor_tab_dir,
                     obs_col = "rho",
-                    pair_id_col = pair_id_col,
-                    permu_cols_pattern = "seed",
-                    permu_n = 30,
-                    alpha = 0.05)
-
-sig_coexp_pairs <- permutation_test_stat(
-                    coexp_expr_tab = coexp_expr_tab,
-                    sig_edge_tab_file = sig_edge_tab_file,
-                    tab_output_dir = expcor_tab_dir,
-                    obs_col = "rho",
                     pair_id_col = "gene_pairs",
                     permu_cols_pattern = "seed",
                     permu_n = 30,
@@ -86,20 +76,23 @@ sig_coexp_pairs <- permutation_test_stat(
 id_col <- "gene_pairs"
 permu_cols_pat <- "seed"
 obs_col <- "rho"
+plot_output_dir <- file.path("results/spearman_correlation/permutation_test/plots")
 
 # plot
 sig_coexp_pairs_ltab <- sig_coexp_pairs[, .SD, .SDcols = patterns(glue("{id_col}|{permu_cols_pat}|{obs_col}"))] |>
                 melt(id.vars = id_col, value.name = obs_col, variable.name = "datasets")
 
-coexpr_pairs <- coexp_pairs_ltab[, unique(get(id_col))]
-chose_pair <- sample(coexpr_pairs, choose_paris_n)
+coexpr_pairs <- sig_coexp_pairs_ltab[, unique(get(id_col))]
+choose_pairs_n <- 5  # Number of pairs to plot
+choose_pairs <- sample(coexpr_pairs, choose_pairs_n)
 
-map(chose_pairs, plot_permu_distr,
+map(choose_pairs, plot_permu_distr,
             coexp_pairs_ltab = sig_coexp_pairs_ltab,
             id_col = "gene_pairs",
-            choose_paris_n = 1,
+            choose_pairs_n = 1,
             val_col = "rho", var_col = "datasets",
-            plot_output_dir = NULL, prefix = NULL)
+            plot_output_dir = plot_output_dir, prefix = 1)
 
 # # Check if observed correlations look reasonable
-# summary(sig_coexp_pairs$rho)
+cat("Summary of observed correlation coefficients (rho):\n")
+print(summary(sig_coexp_pairs$rho))

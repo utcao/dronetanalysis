@@ -76,7 +76,7 @@ plot_threshold_analysis <- function(matrix_data, output_file,
          xlab = "Threshold", ylab = "Network Density", 
          col = "darkgreen", lwd = 2)
     grid(col = "gray", lty = 3)
-    abline(h = c(0.01, 0.05, 0.10), col = "red", lty = 2, alpha = 0.5)
+    abline(h = c(0.01, 0.05, 0.10), col = "pink", lty = 2)
     text(0.8, 0.01, "1% density", col = "red", cex = 0.9)
     text(0.8, 0.05, "5% density", col = "red", cex = 0.9)
     text(0.8, 0.10, "10% density", col = "red", cex = 0.9)
@@ -246,3 +246,253 @@ calculate_network_metrics <- function(matrix_data, matrix_name) {
     ))
 }
 
+#' Create modules using WGCNA pipeline
+#'
+#' This function performs the complete WGCNA module detection pipeline including
+#' TOM calculation, hierarchical clustering, dynamic tree cutting, and module merging.
+#'
+#' @param adjacency_matrix A numeric matrix (gene x gene) adjacency matrix
+#' @param network_type Character: "signed" or "unsigned" for TOM calculation
+#' @param min_module_size Integer: minimum module size (default: 30)
+#' @param merge_threshold Numeric: height threshold for merging similar modules (default: 0.25)
+#' @param deep_split Integer: sensitivity of module detection (0-4, default: 2)
+#' @param output_dir Character: directory to save plots and results
+#' @param save_plots Logical: whether to save diagnostic plots (default: TRUE)
+#' @return List containing module assignments, eigengenes, and other results
+#' @export
+create_modules <- function(adjacency_matrix, 
+                          network_type = "signed",
+                          min_module_size = 30,
+                          merge_threshold = 0.25,
+                          deep_split = 2,
+                          output_dir = NULL,
+                          save_plots = TRUE) {
+    
+    # Validate inputs
+    if (!network_type %in% c("signed", "unsigned")) {
+        stop("network_type must be 'signed' or 'unsigned'")
+    }
+    
+    if (!is.matrix(adjacency_matrix)) {
+        stop("adjacency_matrix must be a matrix")
+    }
+    
+    cat("=== WGCNA Module Creation for", network_type, "network ===\n")
+    cat("Matrix dimensions:", dim(adjacency_matrix), "\n")
+    
+    # Step 1: Calculate TOM and TOM dissimilarity
+    cat("Step 1: Calculating TOM similarity matrix...\n")
+    tom_matrix <- TOMsimilarity(adjacency_matrix, TOMType = network_type)
+    dimnames(tom_matrix) <- list(rownames(adjacency_matrix), colnames(adjacency_matrix))
+    
+    tomd_matrix <- 1 - tom_matrix
+    dimnames(tomd_matrix) <- list(rownames(adjacency_matrix), colnames(adjacency_matrix))
+    
+    # Step 2: Hierarchical clustering
+    cat("Step 2: Performing hierarchical clustering...\n")
+    gene_tree <- hclust(as.dist(tomd_matrix), method = "average")
+    
+    # Step 3: Dynamic tree cutting for initial modules
+    cat("Step 3: Dynamic tree cutting (min module size:", min_module_size, ")...\n")
+    dynamic_modules <- cutreeDynamic(dendro = gene_tree, 
+                                   distM = tomd_matrix,
+                                   deepSplit = deep_split, 
+                                   pamRespectsDendro = FALSE,
+                                   minClusterSize = min_module_size)
+    
+    # Convert to colours
+    module_colours <- labels2colors(dynamic_modules)
+    
+    cat("Initial modules detected:", length(unique(dynamic_modules)), "\n")
+    cat("Genes in grey module (unassigned):", sum(module_colours == "grey"), "\n")
+    
+    # Step 4: Calculate module eigengenes
+    cat("Step 4: Calculating module eigengenes...\n")
+    MEs <- moduleEigengenes(adjacency_matrix, colors = module_colours)$eigengenes
+
+    # Step 5: Calculate module eigengene dissimilarity
+    MEDiss <- 1 - cor(MEs)
+    METree <- hclust(as.dist(MEDiss), method = "average")
+    
+    # Step 6: Plot module eigengene clustering if requested
+    if (save_plots && !is.null(output_dir)) {
+        cat("Step 5: Saving module eigengene clustering plot...\n")
+        pdf(file = file.path(output_dir, paste0(network_type, "_module_eigengene_clustering.pdf")), 
+            width = 10, height = 6)
+        plot(METree, main = paste(stringr::str_to_title(network_type), "Module Eigengene Clustering"), 
+             xlab = "", sub = "", cex = 0.9)
+        abline(h = merge_threshold, col = "red", lwd = 2)
+        text(x = par("usr")[1] + 0.1 * (par("usr")[2] - par("usr")[1]), 
+             y = merge_threshold + 0.02, 
+             labels = paste("Merge threshold =", merge_threshold), 
+             col = "red", cex = 0.8)
+        dev.off()
+    }
+    
+    # Step 7: Merge close modules
+    cat("Step 6: Merging similar modules (threshold:", merge_threshold, ")...\n")
+    merge_result <- mergeCloseModules(adjacency_matrix, 
+                                    module_colours, 
+                                    cutHeight = merge_threshold, 
+                                    verbose = 1)
+    
+    # Extract final results
+    final_colours <- merge_result$colours
+    final_MEs <- merge_result$newMEs
+
+    cat("Final modules after merging:", length(unique(final_colours[final_colours != "grey"])), "\n")
+    cat("Genes in grey module (unassigned):", sum(final_colours == "grey"), "\n")
+
+    # Return comprehensive results
+    results <- list(
+        network_type = network_type,
+        adjacency_matrix = adjacency_matrix,
+        tom_matrix = tom_matrix,
+        tomd_matrix = tomd_matrix,
+        gene_tree = gene_tree,
+        initial_modules = dynamic_modules,
+        initial_colours = module_colours,
+        initial_MEs = MEs,
+        final_colours = final_colours,
+        final_MEs = final_MEs,
+        merge_result = merge_result,
+        parameters = list(
+            min_module_size = min_module_size,
+            merge_threshold = merge_threshold,
+            deep_split = deep_split
+        )
+    )
+    
+    cat("Module creation complete!\n\n")
+    return(results)
+}
+
+#' Identify hub genes from WGCNA modules
+#'
+#' This function identifies hub genes using multiple approaches: single top hub per module,
+#' top N hubs per module by connectivity, and comprehensive connectivity statistics.
+#'
+#' @param module_results List: output from create_modules() function
+#' @param top_n_hubs Integer: number of top hub genes per module (default: 5)
+#' @param output_dir Character: directory to save results (optional)
+#' @param save_files Logical: whether to save results to CSV files (default: TRUE)
+#' @return List containing various hub gene identification results
+#' @export
+identify_hubs <- function(module_results, 
+                         top_n_hubs = 5,
+                         output_dir = NULL,
+                         save_files = TRUE) {
+    
+    # Extract necessary components
+    adjacency_matrix <- module_results$adjacency_matrix
+    final_colours <- module_results$final_colours
+    final_MEs <- module_results$final_MEs
+    network_type <- module_results$network_type
+    
+    cat("=== Hub Gene Identification for", network_type, "network ===\n")
+    
+    # Step 1: Calculate intramodular connectivity
+    cat("Step 1: Calculating intramodular connectivity...\n")
+    connectivity <- intramodularConnectivity(adjacency_matrix, final_colours)
+    connectivity$gene <- rownames(adjacency_matrix)
+    connectivity$module <- final_colours
+    
+    # Step 2: Calculate module membership (kME)
+    cat("Step 2: Calculating module membership (kME)...\n")
+    MM <- as.data.frame(cor(adjacency_matrix, final_MEs, use = "p"))
+    MM$gene <- rownames(adjacency_matrix)
+    
+    # Step 3: Single top hub per module
+    cat("Step 3: Identifying single top hub per module...\n")
+    single_hubs <- chooseTopHubInEachModule(adjacency_matrix, final_colours)
+    single_hubs_df <- data.frame(
+        module = names(single_hubs),
+        hub_gene = single_hubs,
+        stringsAsFactors = FALSE
+    )
+    
+    # Step 4: Top N hubs per module by connectivity
+    cat("Step 4: Identifying top", top_n_hubs, "hubs per module...\n")
+    
+    # Remove grey module for hub analysis (unassigned genes)
+    connectivity_no_grey <- connectivity[connectivity$module != "grey", ]
+    
+    if (nrow(connectivity_no_grey) > 0) {
+        top_hubs <- connectivity_no_grey %>%
+            group_by(module) %>%
+            arrange(desc(kWithin)) %>%
+            slice_head(n = top_n_hubs) %>%
+            ungroup()
+    } else {
+        top_hubs <- data.frame()
+        cat("Warning: No genes assigned to modules (all genes in grey module)\n")
+    }
+    
+    # Step 5: Module summary statistics
+    cat("Step 5: Calculating module summary statistics...\n")
+    module_summary <- connectivity %>%
+        filter(module != "grey") %>%
+        group_by(module) %>%
+        summarise(
+            module_size = n(),
+            mean_kWithin = mean(kWithin, na.rm = TRUE),
+            max_kWithin = max(kWithin, na.rm = TRUE),
+            mean_kOut = mean(kOut, na.rm = TRUE),
+            mean_kDiff = mean(kDiff, na.rm = TRUE),
+            .groups = 'drop'
+        )
+    
+    # Print summary
+    cat("\n=== Hub Gene Summary ===\n")
+    cat("Total modules (excluding grey):", nrow(module_summary), "\n")
+    cat("Single hubs identified:", nrow(single_hubs_df), "\n")
+    cat("Top hubs identified:", nrow(top_hubs), "\n")
+    
+    if (nrow(module_summary) > 0) {
+        cat("Module size range:", min(module_summary$module_size), "-", max(module_summary$module_size), "\n")
+        print(module_summary)
+    }
+    
+    # Step 6: Save results if requested
+    if (save_files && !is.null(output_dir)) {
+        cat("\nStep 6: Saving results to files...\n")
+        
+        write.csv(single_hubs_df, 
+                 file.path(output_dir, paste0(network_type, "_single_hub_genes.csv")), 
+                 row.names = FALSE)
+        
+        write.csv(top_hubs, 
+                 file.path(output_dir, paste0(network_type, "_top_hub_genes.csv")), 
+                 row.names = FALSE)
+        
+        write.csv(connectivity, 
+                 file.path(output_dir, paste0(network_type, "_gene_connectivity.csv")), 
+                 row.names = FALSE)
+        
+        write.csv(MM, 
+                 file.path(output_dir, paste0(network_type, "_module_membership.csv")), 
+                 row.names = FALSE)
+        
+        write.csv(module_summary, 
+                 file.path(output_dir, paste0(network_type, "_module_summary.csv")), 
+                 row.names = FALSE)
+        
+        cat("Results saved to:", output_dir, "\n")
+    }
+    
+    # Return comprehensive results
+    results <- list(
+        network_type = network_type,
+        connectivity = connectivity,
+        module_membership = MM,
+        single_hubs = single_hubs_df,
+        top_hubs = top_hubs,
+        module_summary = module_summary,
+        parameters = list(
+            top_n_hubs = top_n_hubs
+        )
+    )
+    
+    cat("Hub gene identification complete!\n\n")
+    return(results)
+}
