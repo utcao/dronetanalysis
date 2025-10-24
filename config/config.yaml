@@ -39,9 +39,7 @@ processed_files:
 spearman_correlation_files:
   permutation_files:
     - "results/spearman_correlation/permutation_test"
-input_files:
-  subset_data:
-    - file_A.csv
-    - file_B.csv
-analysis_params:
-down_sample_inputs:
+network_feature_files:
+  soft_threshold_files:
+    - "results/network_features/soft_threshold/signed/signed_soft_thresholded_adjacency_matrix.csv"
+    - "results/network_features/soft_threshold/unsigned/unsigned_soft_thresholded_adjacency_matrix.csv"
