@@ -82,6 +82,12 @@ permutation_test_stat <- function(coexp_expr_tab,
         is.data.table(coexp_expr_tab)
         id_col %in% colnames(coexp_expr_tab)
     })
+    col_feats <- setdiff(colnames(coexp_expr_tab), id_col)
+    row_feats <- coexp_expr_tab[, get(id_col)]
+    stopifnot({
+        all(col_feats == row_feats)
+    })
+
     permutate_dir <- file.path(tab_output_dir, "shuffle")
     permutate_res_tab_dir <- file.path(tab_output_dir, "permutation_test")
 
