@@ -57,7 +57,7 @@ expcor_tab_dir <- "results/spearman_correlation"
 expcor_tab_file <- file.path(expcor_tab_dir, "spearman_correlation_matrix.csv")
 
 # ----- 3. Load data -----
-coexp_expr_tab <- fread(expcor_tab_file)[1:1000, 1:1001]
+coexp_expr_tab <- fread(expcor_tab_file)[1:2000,1:2001]
 
 # ----- 4. create permutation datasets by shuffle gene_id -----
 sig_edge_tab_file <- "sig_edges_coexpr_net.csv"
@@ -83,15 +83,15 @@ sig_coexp_pairs_ltab <- sig_coexp_pairs[, .SD, .SDcols = patterns(glue("{id_col}
                 melt(id.vars = id_col, value.name = obs_col, variable.name = "datasets")
 
 coexpr_pairs <- sig_coexp_pairs_ltab[, unique(get(id_col))]
-choose_pairs_n <- 5  # Number of pairs to plot
+choose_pairs_n <- 3  # Number of pairs to plot
 choose_pairs <- sample(coexpr_pairs, choose_pairs_n)
 
-map(choose_pairs, plot_permu_distr,
+map(choose_pairs, ~ plot_permu_distr(
             coexp_pairs_ltab = sig_coexp_pairs_ltab,
             id_col = "gene_pairs",
-            choose_pairs_n = 1,
+            chose_pair = .x,
             val_col = "rho", var_col = "datasets",
-            plot_output_dir = plot_output_dir, prefix = 1)
+            plot_output_dir = plot_output_dir, prefix = 1))
 
 # # Check if observed correlations look reasonable
 cat("Summary of observed correlation coefficients (rho):\n")
