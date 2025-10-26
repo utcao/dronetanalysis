@@ -13,5 +13,4 @@ src/test.r
 
 # yu-tao
 results/spearman_correlation/shuffle/
-results/spearman_correlation/permutation_test/
 
