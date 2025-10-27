@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 21/10/2025
+# Last Updated: 27/10/2025
 #
 # This script::
 #   1. Takes adjacency matrices as input
@@ -45,7 +45,7 @@ cat("File read:", u_soft_threshold_file,"\n")
 ## Signed network ##
 ####################
 
-soft_power_signed <- 12  # Example power, adjust based on plot analysis
+soft_power_signed <- 10  ### Example power, adjust based on plot analysis ###
 soft_signed_adj <- sft_signed^soft_power_signed
 signed_output_file <- file.path(output_dir, "soft_threshold/signed/signed_soft_thresholded_adjacency_matrix.csv")
 write.csv(soft_signed_adj, signed_output_file, row.names = TRUE)
