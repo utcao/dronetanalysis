@@ -3,6 +3,12 @@
 # Centralized configuration
 # ------------------------------------------------------------------------------
 timestamp_fmt: "%Y%m%d_%H%M%S"
+analysis_params:
+  permutation_repeats: 100
+  use_filtered_network: true
+  root: "results"
+  feature_steps: ["closeness", "degree", "centrality", "betweenness"]
+
 project_dirs:
   rawdata_dir: "dataset/raw"
   processed_data_dir: "dataset/processed"
