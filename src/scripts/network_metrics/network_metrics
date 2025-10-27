@@ -116,7 +116,7 @@ create_directories(signed_output_dir)
 create_directories(unsigned_output_dir) 
 create_directories(sum_output_dir)
 
-# ----- 4. WGCNA Module Detection and Hub Gene Identification -----
+# WGCNA Module Detection and Hub Gene Identification
 
 # Create modules for signed network
 cat("\n=== Processing Signed Network ===\n")

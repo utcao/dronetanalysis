@@ -7,7 +7,11 @@ manuscript/
 planning/
 results/logs
 archives
+
 # gthornes
+results/network_features/features_calc/
+results/network_features/soft_threshold/
+
 # files
 src/test.r
 
