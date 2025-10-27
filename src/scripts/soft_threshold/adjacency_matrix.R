@@ -4,10 +4,10 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 21/10/2025
+# Last Updated: 27/10/2025
 #
 # This script::
-#   1. Takes wide correlation matrix following permutation testing as input
+#   1. Takes spearman correlation matrix as input
 #   2. Calculates adjacency matrices
 #   3. Generates plots to decide soft-thresholding power
 #   4. Outputs adjacency matrices, plots and fit indices as CSV files in appropriate folder
@@ -26,14 +26,14 @@ library(yaml)
 source("src/utils/utils_io.R")
 source("src/utils/utils_network_feats.R")
 config <- yaml::read_yaml("config/config.yaml")
-wide_matrix_dir <- config$spearman_correlation_files$permutation_files
-wide_matrix_file <- file.path(wide_matrix_dir, "sig_matrix_wide.csv")
+matrix_dir <- config$output_dirs$spearman_dir
+matrix_file <- file.path(matrix_dir, "spearman_correlation_matrix.csv")
 output_dir <- config$output_dirs$network_features_dir
 signed_output_file <- file.path(output_dir, "soft_threshold/signed/signed_adjacency_matrix.csv")
 unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned/unsigned_adjacency_matrix.csv")
 
-corr_matrix <- fread(wide_matrix_file)
-cat("File read:", wide_matrix_file,"\n")
+corr_matrix <- fread(matrix_file)
+cat("File read:", matrix_file,"\n")
 df.corr.m <- as.matrix(corr_matrix[,-1, with=FALSE])
     rownames(df.corr.m) <- corr_matrix[[1]]
 

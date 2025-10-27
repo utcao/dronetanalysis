@@ -161,7 +161,7 @@ sft_plot <- function(sft, output_file, powers = c(1:20)){
         type="n", main = "Scale independence")
         text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
             labels=powers, cex=cex1, col="red")
-        abline(h=0.9, col="red")
+        abline(h=0.9, col="red", ylim=c(0,1))
 
         # Mean connectivity as a function of the soft-thresholding power
         plot(sft$fitIndices[,1], sft$fitIndices[,5],
@@ -192,11 +192,11 @@ sft_plot <- function(sft, output_file, powers = c(1:20)){
 #' 
 #' @param matrix_data A numeric matrix (gene x gene) for which to calculate network metrics
 #' @param matrix_name A string name for the matrix (used in output messages)
+#' @param connection_threshold A numeric value specifying the threshold for connection (default: 0.1)
 #' @return A list containing various network metrics
 #' @export
 #'
-#' 
-calculate_network_metrics <- function(matrix_data, matrix_name) {
+calculate_network_metrics <- function(matrix_data, matrix_name, connection_threshold = 0.1) {
     cat("\n=== Network Metrics for", matrix_name, "===\n")
     upper_tri_values <- matrix_data[upper.tri(matrix_data)]
     
@@ -213,7 +213,6 @@ calculate_network_metrics <- function(matrix_data, matrix_name) {
     weighted_connectivity <- rowSums(matrix_data, na.rm = TRUE)
     
     # Degree (discrete connections above threshold)
-    connection_threshold <- 0.3 ## needs adjusting to appropriate value depending on adjacency type
     degree <- rowSums(matrix_data > connection_threshold, na.rm = TRUE)
     
     # Max connectivity measures
