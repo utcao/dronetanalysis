@@ -1,0 +1,143 @@
+configfile: "config/config.yaml"
+
+import os
+from datetime import datetime
+
+# Load timestamp format
+from yaml import safe_load
+with open(configfile) as f:
+    config_data = safe_load(f)
+timestamp_fmt = config_data["timestamp_format"]
+
+# Generate current tag using specified format
+current_tag = datetime.now().strftime(timestamp_fmt)
+# assign to config so {config_data[tag]} can be used
+config_data["tag"] = current_tag
+
+rule all:
+    input:
+        expand("results/diff_network/{{prefix}}/{{prefix}}_{{tag}}.csv", prefix=config_data["prefixes"], tag=config_data["tags"])
+
+rule create_network:
+    input:
+        "data/{prefix}.csv"
+    output:
+        "results/network_construct/raw/{prefix}_{tag}.csv"
+    params:
+        script="scripts/create_network.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule shuffle_network:
+    input:
+        rules.create_network.output
+    output:
+        "results/network_construct/shuffle/{prefix}/seed{seed}_{tag}.csv"
+    params:
+        script="scripts/shuffle_network.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule permutation_test:
+    input:
+        raw="results/network_construct/raw/{prefix}_{tag}.csv",
+        shuffle="results/network_construct/shuffle/{prefix}/seed{seed}_{tag}.csv"
+    output:
+        "results/network_construct/permutation_test/{prefix}/{prefix}_{tag}.csv"
+    params:
+        script="scripts/permutation_test.R"
+    shell:
+        "Rscript {params.script} {input.raw} {input.shuffle} {output}"
+
+rule reconstruct_network:
+    input:
+        "results/network_construct/permutation_test/{prefix}/{prefix}_{tag}.csv"
+    output:
+        "results/network_construct/{prefix}_{tag}.csv"
+    params:
+        script="scripts/reconstruct_network.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule calc_feature:
+    input:
+        "results/network_construct/{prefix}_{tag}.csv"
+    output:
+        "results/network_features/{prefix}/{prefix}_{description}_{tag}.csv"
+    params:
+        script="scripts/calc_{description}.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule merge_features:
+    input:
+        expand("results/network_features/{{prefix}}/{{prefix}}_{{desc}}_{{tag}}.csv", desc=config_data["feature_steps"])
+    output:
+        "results/network_features/{prefix}/{prefix}_network_features_summary_{tag}.csv"
+    params:
+        script="scripts/merge_features.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule identify_modules:
+    input:
+        "results/network_construct/{prefix}_{tag}.csv"
+    output:
+        "results/network_modules/{prefix}/membership/{prefix}_module{module}_{tag}.csv"
+    params:
+        script="scripts/identify_modules.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule reconstruct_subnet:
+    input:
+        net="results/network_construct/{prefix}_{tag}.csv",
+        mod="results/network_modules/{prefix}/membership/{prefix}_module{module}_{tag}.csv"
+    output:
+        "results/network_modules/{prefix}/subnetwork/{prefix}_module{module}_{tag}.csv"
+    params:
+        script="scripts/reconstruct_subnet.R"
+    shell:
+        "Rscript {params.script} {input.net} {input.mod} {output}"
+
+rule calc_module_feature:
+    input:
+        "results/network_modules/{prefix}/subnetwork/{prefix}_module{module}_{tag}.csv"
+    output:
+        "results/network_modules/{prefix}/subnetwork_features/{prefix}_module{module}_{description}_{tag}.csv"
+    params:
+        script="scripts/calc_{description}.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule merge_module_features:
+    input:
+        expand("results/network_modules/{{prefix}}/subnetwork_features/{{prefix}}_module{{module}}_{{desc}}_{{tag}}.csv", desc=config_data["feature_steps"])
+    output:
+        "results/network_modules/{prefix}/{prefix}_network_features_summary_{tag}.csv"
+    params:
+        script="scripts/merge_module_features.R"
+    shell:
+        "Rscript {params.script} {input} {output}"
+
+rule diff_network_features:
+    input:
+        a="results/network_features/{prefix_a}/{prefix_a}_network_features_summary_{tag}.csv",
+        b="results/network_features/{prefix_b}/{prefix_b}_network_features_summary_{tag}.csv"
+    output:
+        "results/diff_network_features/{prefix_a}_vs_{prefix_b}/{prefix_a}_{prefix_b}_{tag}.csv"
+    params:
+        script="scripts/diff_network_features.R"
+    shell:
+        "Rscript {params.script} {input.a} {input.b} {output}"
+
+rule diff_network:
+    input:
+        a="results/network_construct/{prefix_a}_{tag}.csv",
+        b="results/network_construct/{prefix_b}_{tag}.csv"
+    output:
+        "results/diff_network/{prefix_a}_{prefix_b}_{tag}.csv"
+    params:
+        script="scripts/diff_network.R"
+    shell:
+        "Rscript {params.script} {input.a} {input.b} {output}"
