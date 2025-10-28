@@ -57,7 +57,7 @@ expcor_tab_dir <- "results/spearman_correlation"
 expcor_tab_file <- file.path(expcor_tab_dir, "spearman_correlation_matrix.csv")
 
 # ----- 3. Load data -----
-coexp_expr_tab <- fread(expcor_tab_file)[1:2000,1:2001]
+coexp_expr_tab <- fread(expcor_tab_file)[1:1000,1:1001]
 
 # ----- 4. create permutation datasets by shuffle gene_id -----
 sig_edge_tab_file <- "sig_edges_coexpr_net.csv"
@@ -70,7 +70,7 @@ sig_coexp_pairs <- permutation_test_stat(
                     obs_col = "rho",
                     pair_id_col = "gene_pairs",
                     permu_cols_pattern = "seed",
-                    permu_n = 30,
+                    permu_n = 300,
                     alpha = 0.05, keep_permu = TRUE)
 
 id_col <- "gene_pairs"
