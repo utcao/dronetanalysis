@@ -71,7 +71,7 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
     } else {
         # For adjacency matrices, use raw values
         graph_matrix <- matrix_data
-        # For adjacency matrices, diagonal should already be 0, but this ensures it
+        # For adjacency matrices, ensure diagonal is 0
         diag(graph_matrix) <- 0
         # Apply threshold
         graph_matrix[graph_matrix <= threshold] <- 0
