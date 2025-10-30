@@ -16,6 +16,13 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
     
     cat("Calculating metrics for", matrix_name, "(threshold =", threshold, ")\n")
     
+    # Diagnostic information
+    cat("  Matrix diagnostics:\n")
+    cat("    Matrix dimensions:", dim(matrix_data), "\n")
+    cat("    Matrix range:", range(matrix_data, na.rm = TRUE), "\n")
+    cat("    Diagonal values (first 5):", diag(matrix_data)[1:5], "\n")
+    cat("    Off-diagonal range:", range(matrix_data[upper.tri(matrix_data)], na.rm = TRUE), "\n")
+    
     gene_names <- rownames(matrix_data)
     n_genes <- nrow(matrix_data)
     
@@ -46,16 +53,33 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
     
     results$degree <- rowSums(binary_matrix, na.rm = TRUE)
     
+    # Threshold diagnostics
+    cat("  Threshold diagnostics:\n")
+    cat("    Threshold:", threshold, "\n")
+    cat("    Connections above threshold:", sum(binary_matrix), "\n")
+    cat("    Percentage above threshold:", round(100 * mean(binary_matrix, na.rm = TRUE), 2), "%\n")
+    cat("    Mean degree:", round(mean(results$degree), 2), "\n")
+    
     # 3. Create igraph object for centrality measures
     # Use absolute values and remove self-loops
     if (matrix_type == "correlation") {
         graph_matrix <- abs(matrix_data)
+        # For correlation matrices, diagonal should be 1, but we set to 0 for network analysis
+        diag(graph_matrix) <- 0
+        # Apply threshold
+        graph_matrix[graph_matrix <= threshold] <- 0
     } else {
+        # For adjacency matrices, use raw values
         graph_matrix <- matrix_data
+        # For adjacency matrices, diagonal should already be 0, but this ensures it
+        diag(graph_matrix) <- 0
+        # Apply threshold
+        graph_matrix[graph_matrix <= threshold] <- 0
     }
     
-    # Set diagonal to 0 (remove self-loops)
-    diag(graph_matrix) <- 0
+    cat("  After thresholding:\n")
+    cat("    Non-zero edges:", sum(graph_matrix > 0), "\n")
+    cat("    Network density:", round(sum(graph_matrix > 0) / (n_genes * (n_genes - 1)), 4), "\n")
     
     # Create weighted graph
     g <- graph_from_adjacency_matrix(graph_matrix, 
@@ -65,6 +89,15 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
     
     # Ensure vertex names are preserved
     V(g)$name <- gene_names
+    
+    # Graph diagnostics
+    cat("  Graph diagnostics:\n")
+    cat("    Vertices:", vcount(g), "\n")
+    cat("    Edges:", ecount(g), "\n")
+    cat("    Density:", edge_density(g), "\n")
+    if (ecount(g) > 0) {
+        cat("    Edge weight range:", range(E(g)$weight, na.rm = TRUE), "\n")
+    }
     
     # 4. Betweenness centrality
     cat("  Calculating betweenness centrality...\n")
@@ -92,9 +125,9 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
     hub_auth <- hub_score(g, weights = E(g)$weight)
     results$hub_score <- hub_auth$vector
     
-    # 10. Mean edge weight (average weight of connections)
+    # 10. Mean edge weight (average weight of connections above threshold)
     results$mean_edge_weight <- sapply(1:n_genes, function(i) {
-        connected_weights <- matrix_data[i, matrix_data[i,] > threshold]
+        connected_weights <- graph_matrix[i, graph_matrix[i,] > 0]  # Use cleaned matrix
         if (length(connected_weights) > 0) {
             mean(connected_weights, na.rm = TRUE)
         } else {
@@ -126,10 +159,10 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
         if (n_pairs > 0) efficiency_sum / n_pairs else 0
     })
     
-    # 12. Add some basic statistics
-    results$max_edge_weight <- apply(matrix_data, 1, max, na.rm = TRUE)
-    results$min_edge_weight <- apply(matrix_data, 1, min, na.rm = TRUE)
-    results$std_edge_weight <- apply(matrix_data, 1, sd, na.rm = TRUE)
+    # 12. Add some basic statistics (use cleaned graph matrix, not original)
+    results$max_edge_weight <- apply(graph_matrix, 1, max, na.rm = TRUE)
+    results$min_edge_weight <- apply(graph_matrix, 1, min, na.rm = TRUE)
+    results$std_edge_weight <- apply(graph_matrix, 1, sd, na.rm = TRUE)
     
     # Handle any NAs or infinite values
     results[is.na(results)] <- 0
