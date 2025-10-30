@@ -27,8 +27,6 @@ library(yaml)
 # ----- 2. Source utilities -----
 source("src/utils/utils_io.R")
 source("src/utils/utils_network_feats.R")
-
-# Add new function for comprehensive gene metrics
 source("src/utils/utils_gene_metrics.R")
 
 # ----- 3. Set paths -----
@@ -49,6 +47,9 @@ cat("Loading matrices...\n")
 spearman <- read.csv(spearman_input_file)
 signed_adj <- read.csv(signed_adj_file)
 unsigned_adj <- read.csv(unsigned_adj_file)
+
+signed_adj<- signed_adj[1:1000,1:1001]
+unsigned_adj<- unsigned_adj[1:1000,1:1001]
 
 # Convert to proper matrix format
 spearman_matrix <- as.matrix(spearman[,-1])
@@ -74,21 +75,21 @@ cat("\n=== Calculating Basic Network Metrics ===\n")
 spearman_gene_metrics <- calculate_gene_level_metrics(
     matrix_data = spearman_matrix,
     matrix_name = "Spearman_Correlation",
-    threshold = 0.5,
+    threshold   = 0.5,
     matrix_type = "correlation"
 )
 
 signed_gene_metrics <- calculate_gene_level_metrics(
     matrix_data = signed_matrix, 
     matrix_name = "Signed_Adjacency",
-    threshold = 0.1,
+    threshold   = 0.1,
     matrix_type = "adjacency"
 )
 
 unsigned_gene_metrics <- calculate_gene_level_metrics(
     matrix_data = unsigned_matrix,
     matrix_name = "Unsigned_Adjacency", 
-    threshold = 0.2,
+    threshold   = 0.2,
     matrix_type = "adjacency"
 )
 
@@ -159,22 +160,8 @@ cat("- all_gene_metrics.RData\n")
 # ----- 8. Generate summary statistics -----
 cat("\n=== Summary Statistics ===\n")
 
-print_gene_metrics_summary <- function(metrics, name) {
-    cat("\n", name, ":\n")
-    cat("  Mean degree:", round(mean(metrics$degree, na.rm = TRUE), 2), "\n")
-    cat("  Mean weighted connectivity:", round(mean(metrics$weighted_connectivity, na.rm = TRUE), 4), "\n")
-    cat("  Mean betweenness centrality:", round(mean(metrics$betweenness_centrality, na.rm = TRUE), 4), "\n")
-    cat("  Mean clustering coefficient:", round(mean(metrics$clustering_coefficient, na.rm = TRUE), 4), "\n")
-    
-    if ("module" %in% colnames(metrics)) {
-        n_modules <- length(unique(metrics$module[metrics$module != "grey"]))
-        cat("  Number of modules:", n_modules, "\n")
-        cat("  Genes in grey module:", sum(metrics$module == "grey", na.rm = TRUE), "\n")
-    }
-}
-
-print_gene_metrics_summary(spearman_gene_metrics, "Spearman Correlation Network")
-print_gene_metrics_summary(signed_gene_metrics, "Signed Adjacency Network") 
-print_gene_metrics_summary(unsigned_gene_metrics, "Unsigned Adjacency Network")
+summarize_gene_metrics(spearman_gene_metrics, "Spearman Correlation Network")
+summarize_gene_metrics(signed_gene_metrics, "Signed Adjacency Network") 
+summarize_gene_metrics(unsigned_gene_metrics, "Unsigned Adjacency Network")
 
 cat("\nAnalysis complete.\n")

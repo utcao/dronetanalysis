@@ -47,10 +47,6 @@ square_correlation_matrix <- long_to_square_dcast(pval_tab, gene_pairs_col = "ge
 # Create matrix from FDR-filtered edges
 square_correlation_matrix_fdr <- long_to_square_dcast(pval_tab_fdr, gene_pairs_col = "gene_pairs", value_col = "rho")
 
-# Set zeros to NA for both matrices
-square_correlation_matrix[square_correlation_matrix == 0] <- NA
-square_correlation_matrix_fdr[square_correlation_matrix_fdr == 0] <- NA
-
 # Save both matrices
 write.csv(square_correlation_matrix, out_file, row.names = TRUE)
 write.csv(square_correlation_matrix_fdr, out_file_fdr, row.names = TRUE)
