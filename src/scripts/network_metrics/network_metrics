@@ -32,7 +32,7 @@ adjacency_output_dir <- file.path(config$output_dirs$network_features_dir, "/fea
 sum_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc")
 
 spearman <- read.csv(file.path(spearman_input_file))
-adjacency <- read.csv(file.path(sft_input_dir[2]))
+adjacency <- read.csv(file.path(sft_input_dir))
 cat("Files read successfully:\n")
 cat("- Spearman correlation matrix:", nrow(spearman), "x", ncol(spearman), "\n")
 cat("- Adjacency matrix:", nrow(adjacency), "x", ncol(adjacency), "\n")

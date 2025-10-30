@@ -122,7 +122,7 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
     
     # 9. Hub and authority scores (for directed interpretation)
     cat("  Calculating hub/authority scores...\n")
-    hub_auth <- hub_score(g, weights = E(g)$weight)
+    hub_auth <- hits_scores(g, weights = E(g)$weight)
     results$hub_score <- hub_auth$vector
     
     # 10. Mean edge weight (average weight of connections above threshold)
