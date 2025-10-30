@@ -251,7 +251,6 @@ calculate_network_metrics <- function(matrix_data, matrix_name, connection_thres
 #' TOM calculation, hierarchical clustering, dynamic tree cutting, and module merging.
 #'
 #' @param adjacency_matrix A numeric matrix (gene x gene) adjacency matrix
-#' @param network_type Character: "signed" or "unsigned" for TOM calculation
 #' @param min_module_size Integer: minimum module size (default: 30)
 #' @param merge_threshold Numeric: height threshold for merging similar modules (default: 0.25)
 #' @param deep_split Integer: sensitivity of module detection (0-4, default: 2)
@@ -260,17 +259,11 @@ calculate_network_metrics <- function(matrix_data, matrix_name, connection_thres
 #' @return List containing module assignments, eigengenes, and other results
 #' @export
 create_modules <- function(adjacency_matrix, 
-                          network_type = "signed",
                           min_module_size = 30,
                           merge_threshold = 0.25,
                           deep_split = 2,
                           output_dir = NULL,
                           save_plots = TRUE) {
-    
-    # Validate inputs
-    if (!network_type %in% c("signed", "unsigned")) {
-        stop("network_type must be 'signed' or 'unsigned'")
-    }
     
     if (!is.matrix(adjacency_matrix)) {
         stop("adjacency_matrix must be a matrix")
@@ -293,13 +286,13 @@ create_modules <- function(adjacency_matrix,
         adjacency_matrix <- (adjacency_matrix + t(adjacency_matrix)) / 2
     }
     
-    cat("=== WGCNA Module Creation for", network_type, "network ===\n")
+    cat("=== WGCNA Module Creation ===\n")
     cat("Matrix dimensions:", dim(adjacency_matrix), "\n")
     cat("Matrix range:", range(adjacency_matrix, na.rm = TRUE), "\n")
     
     # Step 1: Calculate TOM and TOM dissimilarity
     cat("Step 1: Calculating TOM similarity matrix...\n")
-    tom_matrix <- TOMsimilarity(adjacency_matrix, TOMType = network_type)
+    tom_matrix <- TOMsimilarity(adjacency_matrix, TOMType = "unsigned")
     dimnames(tom_matrix) <- list(rownames(adjacency_matrix), colnames(adjacency_matrix))
     
     tomd_matrix <- 1 - tom_matrix
@@ -368,9 +361,9 @@ create_modules <- function(adjacency_matrix,
     # Step 6: Plot module eigengene clustering if requested
     if (save_plots && !is.null(output_dir) && !is.null(METree)) {
         cat("Step 5: Saving module eigengene clustering plot...\n")
-        pdf(file = file.path(output_dir, paste0(network_type, "_module_eigengene_clustering.pdf")), 
+        pdf(file = file.path(output_dir, "module_eigengene_clustering.pdf"), 
             width = 10, height = 6)
-        plot(METree, main = paste(stringr::str_to_title(network_type), "Module Eigengene Clustering"), 
+        plot(METree, main = "Module Eigengene Clustering", 
              xlab = "", sub = "", cex = 0.9)
         abline(h = merge_threshold, col = "red", lwd = 2)
         text(x = par("usr")[1] + 0.1 * (par("usr")[2] - par("usr")[1]), 
@@ -432,7 +425,6 @@ create_modules <- function(adjacency_matrix,
 
     # Return comprehensive results
     results <- list(
-        network_type = network_type,
         adjacency_matrix = adjacency_matrix,
         tom_matrix = tom_matrix,
         tomd_matrix = tomd_matrix,
@@ -475,9 +467,8 @@ identify_hubs <- function(module_results,
     adjacency_matrix <- module_results$adjacency_matrix
     final_colours <- module_results$final_colours
     final_MEs <- module_results$final_MEs
-    network_type <- module_results$network_type
     
-    cat("=== Hub Gene Identification for", network_type, "network ===\n")
+    cat("=== Hub Gene Identification ===\n")
     
     # Step 1: Calculate intramodular connectivity
     cat("Step 1: Calculating intramodular connectivity...\n")
@@ -557,23 +548,23 @@ identify_hubs <- function(module_results,
         cat("\nStep 6: Saving results to files...\n")
         
         write.csv(single_hubs_df, 
-                 file.path(output_dir, paste0(network_type, "_single_hub_genes.csv")), 
+                 file.path(output_dir, "single_hub_genes.csv"), 
                  row.names = FALSE)
         
         write.csv(top_hubs, 
-                 file.path(output_dir, paste0(network_type, "_top_hub_genes.csv")), 
+                 file.path(output_dir, "top_hub_genes.csv"), 
                  row.names = FALSE)
         
         write.csv(connectivity, 
-                 file.path(output_dir, paste0(network_type, "_gene_connectivity.csv")), 
+                 file.path(output_dir, "gene_connectivity.csv"), 
                  row.names = FALSE)
         
         write.csv(MM, 
-                 file.path(output_dir, paste0(network_type, "_module_membership.csv")), 
+                 file.path(output_dir, "module_membership.csv"), 
                  row.names = FALSE)
         
         write.csv(module_summary, 
-                 file.path(output_dir, paste0(network_type, "_module_summary.csv")), 
+                 file.path(output_dir, "module_summary.csv"), 
                  row.names = FALSE)
         
         cat("Results saved to:", output_dir, "\n")
@@ -581,7 +572,6 @@ identify_hubs <- function(module_results,
     
     # Return comprehensive results
     results <- list(
-        network_type = network_type,
         connectivity = connectivity,
         module_membership = MM,
         single_hubs = single_hubs_df,
@@ -594,4 +584,54 @@ identify_hubs <- function(module_results,
     
     cat("Hub gene identification complete!\n\n")
     return(results)
+}
+#' Create Binary Sign Matrix from Correlation Matrix
+#'
+#' This function extracts the sign information from a correlation matrix and creates
+#' a binary matrix indicating positive (+1) and negative (-1) correlations. This preserves
+#' important biological information about anti-correlated gene pairs that gets lost
+#' when using adjacency matrices.
+#'
+#' @param correlation_matrix Numeric matrix of correlation coefficients
+#' @param output_file Optional path to save the sign matrix as CSV
+#' @return Binary matrix with +1 for positive, -1 for negative, 0 for non-significant correlations
+#' @export
+create_correlation_sign_matrix <- function(correlation_matrix, output_file = NULL) {
+    
+    cat("Creating correlation sign matrix...\n")
+    cat("  Matrix dimensions:", dim(correlation_matrix), "\n")
+    
+    # Initialize sign matrix
+    sign_matrix <- matrix(0, nrow = nrow(correlation_matrix), ncol = ncol(correlation_matrix))
+    rownames(sign_matrix) <- rownames(correlation_matrix)
+    colnames(sign_matrix) <- colnames(correlation_matrix)
+    
+    # Create binary sign matrix
+    # +1 for positive correlations
+    # -1 for negative correlations
+    sign_matrix[correlation_matrix > 0] <- 1
+    sign_matrix[correlation_matrix < 0] <- -1
+    sign_matrix[correlation_matrix == 0] <- 0
+    
+    # Set diagonal to 0 (genes don't correlate with themselves in network analysis)
+    diag(sign_matrix) <- 0
+    
+    # Summary statistics
+    n_positive <- sum(sign_matrix == 1)
+    n_negative <- sum(sign_matrix == -1)
+    n_nonsig <- sum(sign_matrix == 0) - nrow(sign_matrix)  # Exclude diagonal
+    
+    cat("  Sign matrix summary:\n")
+    cat("    Positive correlations:", n_positive, "\n")
+    cat("    Negative correlations:", n_negative, "\n")
+    
+    # Save if requested
+    if (!is.null(output_file)) {
+        # Convert to data frame with gene names
+        sign_df <- as.data.frame(sign_matrix)
+        sign_df <- cbind(gene = rownames(sign_matrix), sign_df)
+        write.csv(sign_df, output_file, row.names = FALSE)
+        cat("  Sign matrix saved to:", output_file, "\n")
+    }
+    return(sign_matrix)
 }
