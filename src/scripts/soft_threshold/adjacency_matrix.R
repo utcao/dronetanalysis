@@ -17,12 +17,13 @@
 rm(list = ls())
 
 # ----- 1. Load required packages -----
+suppressPackageStartupMessages({
 library(data.table)
 library(dplyr)
 library(tidyr)
 library(WGCNA)
 library(yaml)
-
+})
 # ----- 2. Set Input and Output Paths from config.yaml -----
 source("src/utils/utils_io.R")
 source("src/utils/utils_network_feats.R")
@@ -39,22 +40,23 @@ df.corr.m <- as.matrix(corr_matrix[,-1, with=FALSE])
     rownames(df.corr.m) <- corr_matrix[[1]]
 
 # ----- 3. Create binary matrix to preserve negative correlations -----
+create_directories(file.path(output_dir, "binary_matrix/"))
 binary_matrix <- create_correlation_sign_matrix(df.corr.m, output_file = signed_output_file)
 cat("Binary sign matrix created.\n")
 
 # ----- 4. Calculate adjacency matrices and generate soft thresholding plots -----
-unsigned_adjacency <- abs(df.corr.m) # adjacency matrix
+adjacency <- abs(df.corr.m) # adjacency matrix
 
 # Save the adjacency matrices
-write.csv(unsigned_adjacency, unsigned_output_file, row.names = TRUE)
-cat("Unsigned adjacency matrix saved to:", unsigned_output_file, "\n")
+write.csv(adjacency, unsigned_output_file, row.names = TRUE)
+cat("Adjacency matrix saved to:", unsigned_output_file, "\n")
 
 # ----- 5. Generate soft thresholding plots to decide on appropriate power -----
 
 # Generate soft-thresholded matrices and plots
 
 # Call the network topology analysis function for unsigned network
-sft_unsigned <- pickSoftThreshold(unsigned_adjacency, powerVector = c(1:20),
+sft_unsigned <- pickSoftThreshold(adjacency, powerVector = c(1:20),
                                   networkType = "unsigned", verbose = 5)
 
 # Generate plots to decide soft-thresholding power
