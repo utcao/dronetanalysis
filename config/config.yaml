@@ -47,5 +47,4 @@ spearman_correlation_files:
     - "results/spearman_correlation/permutation_test"
 network_feature_files:
   soft_threshold_files:
-    - "results/network_features/soft_threshold/signed/signed_soft_thresholded_adjacency_matrix.csv"
     - "results/network_features/soft_threshold/unsigned/unsigned_soft_thresholded_adjacency_matrix.csv"

@@ -251,7 +251,6 @@ calculate_network_metrics <- function(matrix_data, matrix_name, connection_thres
 #' TOM calculation, hierarchical clustering, dynamic tree cutting, and module merging.
 #'
 #' @param adjacency_matrix A numeric matrix (gene x gene) adjacency matrix
-#' @param network_type Character: "signed" or "unsigned" for TOM calculation
 #' @param min_module_size Integer: minimum module size (default: 30)
 #' @param merge_threshold Numeric: height threshold for merging similar modules (default: 0.25)
 #' @param deep_split Integer: sensitivity of module detection (0-4, default: 2)
@@ -260,28 +259,40 @@ calculate_network_metrics <- function(matrix_data, matrix_name, connection_thres
 #' @return List containing module assignments, eigengenes, and other results
 #' @export
 create_modules <- function(adjacency_matrix, 
-                          network_type = "signed",
                           min_module_size = 30,
                           merge_threshold = 0.25,
                           deep_split = 2,
                           output_dir = NULL,
                           save_plots = TRUE) {
     
-    # Validate inputs
-    if (!network_type %in% c("signed", "unsigned")) {
-        stop("network_type must be 'signed' or 'unsigned'")
-    }
-    
     if (!is.matrix(adjacency_matrix)) {
         stop("adjacency_matrix must be a matrix")
     }
     
-    cat("=== WGCNA Module Creation for", network_type, "network ===\n")
+    # Check for valid matrix properties
+    if (any(is.na(adjacency_matrix))) {
+        cat("Warning: Adjacency matrix contains NA values. Replacing with 0.\n")
+        adjacency_matrix[is.na(adjacency_matrix)] <- 0
+    }
+    
+    if (any(is.infinite(adjacency_matrix))) {
+        cat("Warning: Adjacency matrix contains infinite values. Replacing with 0.\n")
+        adjacency_matrix[is.infinite(adjacency_matrix)] <- 0
+    }
+    
+    # Ensure the matrix is symmetric
+    if (!isSymmetric(adjacency_matrix)) {
+        cat("Warning: Matrix is not symmetric. Making it symmetric by averaging.\n")
+        adjacency_matrix <- (adjacency_matrix + t(adjacency_matrix)) / 2
+    }
+    
+    cat("=== WGCNA Module Creation ===\n")
     cat("Matrix dimensions:", dim(adjacency_matrix), "\n")
+    cat("Matrix range:", range(adjacency_matrix, na.rm = TRUE), "\n")
     
     # Step 1: Calculate TOM and TOM dissimilarity
     cat("Step 1: Calculating TOM similarity matrix...\n")
-    tom_matrix <- TOMsimilarity(adjacency_matrix, TOMType = network_type)
+    tom_matrix <- TOMsimilarity(adjacency_matrix, TOMType = "unsigned")
     dimnames(tom_matrix) <- list(rownames(adjacency_matrix), colnames(adjacency_matrix))
     
     tomd_matrix <- 1 - tom_matrix
@@ -299,26 +310,60 @@ create_modules <- function(adjacency_matrix,
                                    pamRespectsDendro = FALSE,
                                    minClusterSize = min_module_size)
     
+    # Ensure dimensions match
+    cat("Genes in tree:", length(gene_tree$labels), "\n")
+    cat("Dynamic modules length:", length(dynamic_modules), "\n")
+    cat("Adjacency matrix genes:", nrow(adjacency_matrix), "\n")
+    
     # Convert to colours
     module_colours <- labels2colors(dynamic_modules)
+    
+    # Verify colour assignments match matrix dimensions
+    if (length(module_colours) != nrow(adjacency_matrix)) {
+        stop("Dimension mismatch after module assignment: ", 
+             length(module_colours), " module colors vs ", 
+             nrow(adjacency_matrix), " genes in adjacency matrix")
+    }
     
     cat("Initial modules detected:", length(unique(dynamic_modules)), "\n")
     cat("Genes in grey module (unassigned):", sum(module_colours == "grey"), "\n")
     
     # Step 4: Calculate module eigengenes
     cat("Step 4: Calculating module eigengenes...\n")
-    MEs <- moduleEigengenes(adjacency_matrix, colors = module_colours)$eigengenes
-
-    # Step 5: Calculate module eigengene dissimilarity
-    MEDiss <- 1 - cor(MEs)
-    METree <- hclust(as.dist(MEDiss), method = "average")
+    
+    # Check if we have any non-grey modules
+    non_grey_modules <- sum(module_colours != "grey")
+    unique_modules <- unique(module_colours)
+    cat("Unique modules found:", paste(unique_modules, collapse = ", "), "\n")
+    cat("Genes assigned to modules (non-grey):", non_grey_modules, "\n")
+    
+    if (non_grey_modules == 0 || length(unique_modules) == 1) {
+        cat("Warning: All genes assigned to grey module or only one module. Creating dummy eigengenes.\n")
+        MEs <- data.frame(MEgrey = rep(0, nrow(adjacency_matrix)))
+        METree <- NULL
+    } else {
+        tryCatch({
+            ME_result <- moduleEigengenes(adjacency_matrix, colors = module_colours)
+            MEs <- ME_result$eigengenes
+            
+            # Step 5: Calculate module eigengene dissimilarity
+            MEDiss <- 1 - cor(MEs)
+            METree <- hclust(as.dist(MEDiss), method = "average")
+            cat("Module eigengenes calculated successfully.\n")
+        }, error = function(e) {
+            cat("Error in moduleEigengenes calculation:", e$message, "\n")
+            cat("Creating dummy eigengenes.\n")
+            MEs <- data.frame(MEgrey = rep(0, nrow(adjacency_matrix)))
+            METree <- NULL
+        })
+    }
     
     # Step 6: Plot module eigengene clustering if requested
-    if (save_plots && !is.null(output_dir)) {
+    if (save_plots && !is.null(output_dir) && !is.null(METree)) {
         cat("Step 5: Saving module eigengene clustering plot...\n")
-        pdf(file = file.path(output_dir, paste0(network_type, "_module_eigengene_clustering.pdf")), 
+        pdf(file = file.path(output_dir, "module_eigengene_clustering.pdf"), 
             width = 10, height = 6)
-        plot(METree, main = paste(stringr::str_to_title(network_type), "Module Eigengene Clustering"), 
+        plot(METree, main = "Module Eigengene Clustering", 
              xlab = "", sub = "", cex = 0.9)
         abline(h = merge_threshold, col = "red", lwd = 2)
         text(x = par("usr")[1] + 0.1 * (par("usr")[2] - par("usr")[1]), 
@@ -326,25 +371,60 @@ create_modules <- function(adjacency_matrix,
              labels = paste("Merge threshold =", merge_threshold), 
              col = "red", cex = 0.8)
         dev.off()
+    } else if (is.null(METree)) {
+        cat("Skipping module eigengene clustering plot (no modules detected).\n")
     }
     
     # Step 7: Merge close modules
     cat("Step 6: Merging similar modules (threshold:", merge_threshold, ")...\n")
-    merge_result <- mergeCloseModules(adjacency_matrix, 
-                                    module_colours, 
-                                    cutHeight = merge_threshold, 
-                                    verbose = 1)
     
-    # Extract final results
-    final_colours <- merge_result$colours
-    final_MEs <- merge_result$newMEs
+    # Check if we have modules to merge
+    if (length(unique(module_colours)) <= 1) {
+        cat("Warning: Only", length(unique(module_colours)), "unique module(s) found. Skipping merge step.\n")
+        final_colours <- module_colours
+        final_MEs <- MEs
+        merge_result <- NULL
+    } else {
+        tryCatch({
+            merge_result <- mergeCloseModules(adjacency_matrix, 
+                                            module_colours, 
+                                            cutHeight = merge_threshold, 
+                                            verbose = 1)
+            
+            # Extract final results
+            final_colours <- merge_result$colours
+            final_MEs <- merge_result$newMEs
+            
+            # Check if merge result is valid
+            if (is.null(final_colours) || length(final_colours) == 0) {
+                cat("Warning: Module merging returned empty results. Using pre-merge modules.\n")
+                final_colours <- module_colours
+                final_MEs <- MEs
+            }
+            cat("Module merging completed successfully.\n")
+        }, error = function(e) {
+            cat("Error in module merging:", e$message, "\n")
+            cat("Using pre-merge modules.\n")
+            final_colours <- module_colours
+            final_MEs <- MEs
+            merge_result <- NULL
+        })
+    }
+    
+    # Final dimension check
+    cat("Final colors length:", length(final_colours), "\n")
+    cat("Adjacency matrix dimensions (final):", dim(adjacency_matrix), "\n")
+    
+    if (length(final_colours) != nrow(adjacency_matrix)) {
+        stop("Final dimension mismatch: ", length(final_colours), 
+             " final colors vs ", nrow(adjacency_matrix), " genes")
+    }
 
     cat("Final modules after merging:", length(unique(final_colours[final_colours != "grey"])), "\n")
     cat("Genes in grey module (unassigned):", sum(final_colours == "grey"), "\n")
 
     # Return comprehensive results
     results <- list(
-        network_type = network_type,
         adjacency_matrix = adjacency_matrix,
         tom_matrix = tom_matrix,
         tomd_matrix = tomd_matrix,
@@ -354,7 +434,8 @@ create_modules <- function(adjacency_matrix,
         initial_MEs = MEs,
         final_colours = final_colours,
         final_MEs = final_MEs,
-        merge_result = merge_result,
+        merge_result = if(exists("merge_result")) merge_result else NULL,
+        METree = METree,
         parameters = list(
             min_module_size = min_module_size,
             merge_threshold = merge_threshold,
@@ -386,12 +467,22 @@ identify_hubs <- function(module_results,
     adjacency_matrix <- module_results$adjacency_matrix
     final_colours <- module_results$final_colours
     final_MEs <- module_results$final_MEs
-    network_type <- module_results$network_type
     
-    cat("=== Hub Gene Identification for", network_type, "network ===\n")
+    cat("=== Hub Gene Identification ===\n")
     
     # Step 1: Calculate intramodular connectivity
     cat("Step 1: Calculating intramodular connectivity...\n")
+    
+    # Ensure dimensions match
+    cat("Adjacency matrix dimensions:", dim(adjacency_matrix), "\n")
+    cat("Colors vector length:", length(final_colours), "\n")
+    
+    # Check if dimensions match
+    if (nrow(adjacency_matrix) != length(final_colours)) {
+        stop("Dimension mismatch: adjacency matrix has ", nrow(adjacency_matrix), 
+             " genes but colors vector has ", length(final_colours), " entries")
+    }
+    
     connectivity <- intramodularConnectivity(adjacency_matrix, final_colours)
     connectivity$gene <- rownames(adjacency_matrix)
     connectivity$module <- final_colours
@@ -457,23 +548,23 @@ identify_hubs <- function(module_results,
         cat("\nStep 6: Saving results to files...\n")
         
         write.csv(single_hubs_df, 
-                 file.path(output_dir, paste0(network_type, "_single_hub_genes.csv")), 
+                 file.path(output_dir, "single_hub_genes.csv"), 
                  row.names = FALSE)
         
         write.csv(top_hubs, 
-                 file.path(output_dir, paste0(network_type, "_top_hub_genes.csv")), 
+                 file.path(output_dir, "top_hub_genes.csv"), 
                  row.names = FALSE)
         
         write.csv(connectivity, 
-                 file.path(output_dir, paste0(network_type, "_gene_connectivity.csv")), 
+                 file.path(output_dir, "gene_connectivity.csv"), 
                  row.names = FALSE)
         
         write.csv(MM, 
-                 file.path(output_dir, paste0(network_type, "_module_membership.csv")), 
+                 file.path(output_dir, "module_membership.csv"), 
                  row.names = FALSE)
         
         write.csv(module_summary, 
-                 file.path(output_dir, paste0(network_type, "_module_summary.csv")), 
+                 file.path(output_dir, "module_summary.csv"), 
                  row.names = FALSE)
         
         cat("Results saved to:", output_dir, "\n")
@@ -481,7 +572,6 @@ identify_hubs <- function(module_results,
     
     # Return comprehensive results
     results <- list(
-        network_type = network_type,
         connectivity = connectivity,
         module_membership = MM,
         single_hubs = single_hubs_df,
@@ -494,4 +584,54 @@ identify_hubs <- function(module_results,
     
     cat("Hub gene identification complete!\n\n")
     return(results)
+}
+#' Create Binary Sign Matrix from Correlation Matrix
+#'
+#' This function extracts the sign information from a correlation matrix and creates
+#' a binary matrix indicating positive (+1) and negative (-1) correlations. This preserves
+#' important biological information about anti-correlated gene pairs that gets lost
+#' when using adjacency matrices.
+#'
+#' @param correlation_matrix Numeric matrix of correlation coefficients
+#' @param output_file Optional path to save the sign matrix as CSV
+#' @return Binary matrix with +1 for positive, -1 for negative, 0 for non-significant correlations
+#' @export
+create_correlation_sign_matrix <- function(correlation_matrix, output_file = NULL) {
+    
+    cat("Creating correlation sign matrix...\n")
+    cat("  Matrix dimensions:", dim(correlation_matrix), "\n")
+    
+    # Initialize sign matrix
+    sign_matrix <- matrix(0, nrow = nrow(correlation_matrix), ncol = ncol(correlation_matrix))
+    rownames(sign_matrix) <- rownames(correlation_matrix)
+    colnames(sign_matrix) <- colnames(correlation_matrix)
+    
+    # Create binary sign matrix
+    # +1 for positive correlations
+    # -1 for negative correlations
+    sign_matrix[correlation_matrix > 0] <- 1
+    sign_matrix[correlation_matrix < 0] <- -1
+    sign_matrix[correlation_matrix == 0] <- 0
+    
+    # Set diagonal to 0 (genes don't correlate with themselves in network analysis)
+    diag(sign_matrix) <- 0
+    
+    # Summary statistics
+    n_positive <- sum(sign_matrix == 1)
+    n_negative <- sum(sign_matrix == -1)
+    n_nonsig <- sum(sign_matrix == 0) - nrow(sign_matrix)  # Exclude diagonal
+    
+    cat("  Sign matrix summary:\n")
+    cat("    Positive correlations:", n_positive, "\n")
+    cat("    Negative correlations:", n_negative, "\n")
+    
+    # Save if requested
+    if (!is.null(output_file)) {
+        # Convert to data frame with gene names
+        sign_df <- as.data.frame(sign_matrix)
+        sign_df <- cbind(gene = rownames(sign_matrix), sign_df)
+        write.csv(sign_df, output_file, row.names = FALSE)
+        cat("  Sign matrix saved to:", output_file, "\n")
+    }
+    return(sign_matrix)
 }

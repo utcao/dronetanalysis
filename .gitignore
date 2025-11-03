@@ -7,7 +7,14 @@ manuscript/
 planning/
 results/logs
 archives
+
 # gthornes
+results/network_features/features_calc/
+results/network_features/soft_threshold/
+results/network_features/gene_metrics/
+results/spearman_correlation/spearman_matrices/
+results/network_features/.nfs00000009018d5a2d0101aabc
+
 # files
 src/test.r
 

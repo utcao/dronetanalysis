@@ -4,13 +4,12 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 27/10/2025
+# Last Updated: 30/10/2025
 #
 # This script::
 #   1. Takes wide correlation matrix following soft thresholding as input
 #   2. Calculates network-level metrics
-#   3. Calculates gene-level metrics
-#   4. Outputs network metrics and gene metrics as summary statistics CSV file
+#   3. Outputs network metrics and gene metrics as summary statistics CSV file
 # ==============================================================================
 
 rm(list = ls())
@@ -29,67 +28,52 @@ config <- yaml::read_yaml("config/config.yaml")
 sft_input_dir <- config$network_feature_files$soft_threshold_files
 spearman_input_dir <- config$spearman_correlation_files$permutation_files
 spearman_input_file <- file.path(spearman_input_dir, "sig_matrix_wide.csv")
-signed_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc/signed")
-unsigned_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc/unsigned")
+adjacency_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc/adjacency")
 sum_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc")
 
 spearman <- read.csv(file.path(spearman_input_file))
-signed <- read.csv(file.path(sft_input_dir[1]))
-unsigned <- read.csv(file.path(sft_input_dir[2]))
+adjacency <- read.csv(file.path(sft_input_dir))
 cat("Files read successfully:\n")
 cat("- Spearman correlation matrix:", nrow(spearman), "x", ncol(spearman), "\n")
-cat("- Signed adjacency matrix:", nrow(signed), "x", ncol(signed), "\n")
-cat("- Unsigned adjacency matrix:", nrow(unsigned), "x", ncol(unsigned), "\n")
+cat("- Adjacency matrix:", nrow(adjacency), "x", ncol(adjacency), "\n")
 
 # Create output directory if it doesn't exist
 create_directories(sum_output_dir)
 
 # ----- 3. Calculate network-level summary statistics -----
 
-# Convert all matrices to proper format
+# Convert matrices to proper format
 spearman_matrix <- as.matrix(spearman[,-1])
 rownames(spearman_matrix) <- spearman[[1]]
 colnames(spearman_matrix) <- spearman[[1]]
 
-signed_matrix <- as.matrix(signed[,-1])
-rownames(signed_matrix) <- signed[[1]]
-colnames(signed_matrix) <- signed[[1]]
-
-unsigned_matrix <- as.matrix(unsigned[,-1])
-rownames(unsigned_matrix) <- unsigned[[1]]
-colnames(unsigned_matrix) <- unsigned[[1]]
+adjacency_matrix <- as.matrix(adjacency[,-1])
+rownames(adjacency_matrix) <- adjacency[[1]]
+colnames(adjacency_matrix) <- adjacency[[1]]
 
 cat("Matrix conversion completed:\n")
 cat("- Spearman matrix dimensions:", dim(spearman_matrix), "\n")
-cat("- Signed matrix dimensions:", dim(signed_matrix), "\n")
-cat("- Unsigned matrix dimensions:", dim(unsigned_matrix), "\n")
+cat("- Adjacency matrix dimensions:", dim(adjacency_matrix), "\n")
 
-# Calculate metrics for all three matrices
+# Calculate metrics for matrices
 spearman_metrics <- calculate_network_metrics(spearman_matrix, "Spearman Correlations", connection_threshold = 0.5)
-signed_metrics <- calculate_network_metrics(signed_matrix, "Signed Soft-Thresholded Adjacency", connection_threshold = 0.1)
-unsigned_metrics <- calculate_network_metrics(unsigned_matrix, "Unsigned Soft-Thresholded Adjacency", connection_threshold = 0.2)
+adjacency_metrics <- calculate_network_metrics(adjacency_matrix, "Soft-Thresholded Adjacency", connection_threshold = 0.2)
 
 # Create summary data frame for export
 summary_stats <- data.frame(
-    Matrix_Type = c("Spearman", "Signed_Adjacency", "Unsigned_Adjacency"),
+    Matrix_Type = c("Spearman", "Adjacency"),
     Mean_Abs_Correlation = c(spearman_metrics$mean_abs_corr, 
-                            signed_metrics$mean_abs_corr, 
-                            unsigned_metrics$mean_abs_corr),
+                            adjacency_metrics$mean_abs_corr),
     Median_Abs_Correlation = c(spearman_metrics$median_abs_corr, 
-                              signed_metrics$median_abs_corr, 
-                              unsigned_metrics$median_abs_corr),
+                              adjacency_metrics$median_abs_corr),
     Max_Correlation = c(spearman_metrics$max_corr, 
-                       signed_metrics$max_corr, 
-                       unsigned_metrics$max_corr),
+                       adjacency_metrics$max_corr),
     Min_Correlation = c(spearman_metrics$min_corr, 
-                       signed_metrics$min_corr, 
-                       unsigned_metrics$min_corr),
+                       adjacency_metrics$min_corr),
     Mean_Connectivity = c(mean(spearman_metrics$weighted_connectivity, na.rm = TRUE),
-                         mean(signed_metrics$weighted_connectivity, na.rm = TRUE),
-                         mean(unsigned_metrics$weighted_connectivity, na.rm = TRUE)),
+                         mean(adjacency_metrics$weighted_connectivity, na.rm = TRUE)),
     Mean_Degree = c(mean(spearman_metrics$degree, na.rm = TRUE),
-                   mean(signed_metrics$degree, na.rm = TRUE),
-                   mean(unsigned_metrics$degree, na.rm = TRUE))
+                   mean(adjacency_metrics$degree, na.rm = TRUE))
 )
 
 # Save summary statistics
@@ -103,78 +87,46 @@ cat("\nSummary statistics saved to:", summary_file, "\n")
 plot_threshold_analysis(spearman_matrix, output_file = file.path(sum_output_dir, "spearman_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
                         matrix_name = "Spearman Correlation Matrix")
 
-plot_threshold_analysis(signed_matrix, output_file = file.path(sum_output_dir, "signed_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
-                        matrix_name = "Signed Adjacency Matrix")
-
-plot_threshold_analysis(unsigned_matrix, output_file = file.path(sum_output_dir, "unsigned_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
-                        matrix_name = "Unsigned Adjacency Matrix")
+plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "adjacency_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
+                        matrix_name = "Adjacency Matrix")
 
 # ----- 4. Calculate gene-level network features via WGCNA -----
 
 # Create output directories
-create_directories(signed_output_dir)
-create_directories(unsigned_output_dir) 
+create_directories(adjacency_output_dir) 
 create_directories(sum_output_dir)
 
-# ----- 4. WGCNA Module Detection and Hub Gene Identification -----
+# WGCNA Module Detection and Hub Gene Identification
 
-# Create modules for signed network
-cat("\n=== Processing Signed Network ===\n")
-signed_modules <- create_modules(
-    adjacency_matrix = signed_matrix,
-    network_type = "signed",
+# Create modules for adjacency network
+cat("\n=== Processing Adjacency Network ===\n")
+adjacency_modules <- create_modules(
+    adjacency_matrix = adjacency_matrix,
     min_module_size = 30,
     merge_threshold = 0.25,
     deep_split = 2,
-    output_dir = signed_output_dir,
+    output_dir = adjacency_output_dir,
     save_plots = TRUE
 )
 
-# Create modules for unsigned network  
-cat("\n=== Processing Unsigned Network ===\n")
-unsigned_modules <- create_modules(
-    adjacency_matrix = unsigned_matrix,
-    network_type = "unsigned", 
-    min_module_size = 30,
-    merge_threshold = 0.25,
-    deep_split = 2,
-    output_dir = unsigned_output_dir,
-    save_plots = TRUE
-)
-
-# Identify hub genes for signed network
-cat("\n=== Identifying Hub Genes - Signed Network ===\n")
-signed_hubs <- identify_hubs(
-    module_results = signed_modules,
+# Identify hub genes for adjacency network
+cat("\n=== Identifying Hub Genes - Adjacency Network ===\n")
+adjacency_hubs <- identify_hubs(
+    module_results = adjacency_modules,
     top_n_hubs = 5,
-    output_dir = signed_output_dir,
-    save_files = TRUE
-)
-
-# Identify hub genes for unsigned network
-cat("\n=== Identifying Hub Genes - Unsigned Network ===\n") 
-unsigned_hubs <- identify_hubs(
-    module_results = unsigned_modules,
-    top_n_hubs = 5,
-    output_dir = unsigned_output_dir,
+    output_dir = adjacency_output_dir,
     save_files = TRUE
 )
 
 # Save TOM matrices (from the module results)
-tom_signed_file <- file.path(signed_output_dir, "tom_signed_matrix.csv")
-tom_unsigned_file <- file.path(unsigned_output_dir, "tom_unsigned_matrix.csv")
-tomd_signed_file <- file.path(signed_output_dir, "tomd_signed_matrix.csv")
-tomd_unsigned_file <- file.path(unsigned_output_dir, "tomd_unsigned_matrix.csv")
+tom_adjacency_file <- file.path(adjacency_output_dir, "tom_adjacency_matrix.csv")
+tomd_adjacency_file <- file.path(adjacency_output_dir, "tomd_adjacency_matrix.csv")
 
-write.csv(signed_modules$tom_matrix, file = tom_signed_file, row.names = TRUE)
-write.csv(unsigned_modules$tom_matrix, file = tom_unsigned_file, row.names = TRUE)
-write.csv(signed_modules$tomd_matrix, file = tomd_signed_file, row.names = TRUE)
-write.csv(unsigned_modules$tomd_matrix, file = tomd_unsigned_file, row.names = TRUE)
+write.csv(adjacency_modules$tom_matrix, file = tom_adjacency_file, row.names = TRUE)
+write.csv(adjacency_modules$tomd_matrix, file = tomd_adjacency_file, row.names = TRUE)
 
 cat("TOM matrices saved:\n")
-cat("- TOM Signed matrix:", tom_signed_file, "\n")
-cat("- TOM Unsigned matrix:", tom_unsigned_file, "\n")
-cat("- TOMD Signed matrix:", tomd_signed_file, "\n")
-cat("- TOMD Unsigned matrix:", tomd_unsigned_file, "\n")
+cat("- TOM Adjacency matrix:", tom_adjacency_file, "\n")
+cat("- TOMD Adjacency matrix:", tomd_adjacency_file, "\n")
 
 cat("Network features analysis complete. Results saved to:", sum_output_dir, "\n")
