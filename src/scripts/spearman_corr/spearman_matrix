@@ -1,0 +1,83 @@
+# !/usr/bin/env Rscript
+# ==============================================================================
+# Spearman-based WGCNA for drosophila transcriptomic data
+#
+# Script by Gabriel Thornes
+#
+# Last Updated: 30/10/2025
+#
+# This script::
+#   1. Takes subset datasets as input
+#   2. Calculates Spearman rank correlations
+#   4. Saves matrix outputs
+# ==============================================================================
+
+#################################
+##### Packages and Setup ########
+#################################
+
+source("src/utils/utils_io.R")
+
+# Load required packages
+library(WGCNA)
+library(yaml)
+
+# Allow multi-threading 
+enableWGCNAThreads()
+
+# Load configuration
+config <- yaml::read_yaml("config/config.yaml")
+
+# Options for the analysis
+options(stringsAsFactors = FALSE)
+
+# Create output directories if they don't exist  
+dir.create(file.path(config$output_dirs$spearman_dir, "spearman_matrices"), recursive = TRUE, showWarnings = FALSE)
+
+###############################
+##### Data Loading ############
+###############################
+
+# Load subset data for VST control
+data_file <- file.path(config$project_dirs$subset_data_dir, "VSTdataCtrl_subset.txt")
+data <- read.table(data_file, header=TRUE, sep="\t", row.names=1)
+
+# Transpose data for WGCNA format (samples as rows)
+datExpr <- as.data.frame(t(data))
+
+# Store original gene names before any filtering
+original_gene_names <- colnames(datExpr)
+
+# Check for genes and samples with too many missing values
+gsg <- goodSamplesGenes(datExpr, verbose = 3)
+if (!gsg$allOK) {
+  # Remove the offending genes and samples
+  datExpr <- datExpr[gsg$goodSamples, gsg$goodGenes]
+  # Update the gene names list to match filtered data
+  original_gene_names <- original_gene_names[gsg$goodGenes]
+}
+
+cat("Working with", nrow(datExpr), "samples and", ncol(datExpr), "genes\n")
+
+#################################
+##### Spearman Correlation ######
+#################################
+
+cat("\n=== SPEARMAN CORRELATION CALCULATION ===\n")
+
+# Calculate Spearman correlation matrix
+cat("Calculating Spearman correlation matrix...\n")
+spearman_cor <- cor(datExpr, method = "spearman", use = "complete.obs")
+
+# Save the correlation matrix
+spearman_file <- file.path(config$output_dirs$spearman_dir, "spearman_matrices/spearman_correlation_matrix.csv")
+write.csv(spearman_cor, file = spearman_file)
+subset_spearman_file <- file.path(config$output_dirs$spearman_dir, "spearman_matrices/spearman_correlation_matrix_subset.csv")
+write.csv(spearman_cor[1:1000, 1:1000], file = subset_spearman_file) # choose subset matrix size
+cat("Spearman correlation matrix saved to:", spearman_file, "\n")
+cat("Subset of Spearman correlation matrix (1000x1000) saved to:", subset_spearman_file, "\n")
+
+# Basic correlation statistics
+cat("Correlation statistics:\n")
+cat("Mean absolute correlation:", mean(abs(spearman_cor[upper.tri(spearman_cor)])), "\n")
+cat("Median absolute correlation:", median(abs(spearman_cor[upper.tri(spearman_cor)])), "\n")
