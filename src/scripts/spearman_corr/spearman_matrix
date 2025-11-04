@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 30/10/2025
+# Last Updated: 04/11/2025
 #
 # This script::
 #   1. Takes subset datasets as input
@@ -15,15 +15,32 @@
 #################################
 ##### Packages and Setup ########
 #################################
+suppressPackageStartupMessages({
+    library(argparse)
+    library(WGCNA)
+    library(yaml)
+})
+# ----- Parse command line arguments -----
+parser <- ArgumentParser(description = 'Convert gene pairs to correlation matrix')
+parser$add_argument('--input', type="character", 
+                   default="/tmp/global2/gthornes/dronetanalysis/dataset/processed/VOOM/voomdataCtrl.txt",
+                   help='Input file path (e.g. VOOM or VST processed data)')
+parser$add_argument('--output', type="character",
+                   default="/tmp/global2/gthornes/dronetanalysis/results/spearman_correlation/spearman_matrices", 
+                   help='Output file path for Spearman correlation matrices')
+parser$add_argument('--method', type="character", default="spearman",
+                   help='Correlation method')
+parser$add_argument('--use', type="character", default="complete.obs",
+                   help='Value column name')
+
+args <- parser$parse_args()
+
+data_file <- args$input
+out_file <- args$output
+method <- args$method
+use <- args$use
 
 source("src/utils/utils_io.R")
-
-# Load required packages
-library(WGCNA)
-library(yaml)
-
-# Allow multi-threading 
-enableWGCNAThreads()
 
 # Load configuration
 config <- yaml::read_yaml("config/config.yaml")
@@ -39,7 +56,6 @@ dir.create(file.path(config$output_dirs$spearman_dir, "spearman_matrices"), recu
 ###############################
 
 # Load subset data for VST control
-data_file <- file.path(config$project_dirs$subset_data_dir, "VSTdataCtrl_subset.txt")
 data <- read.table(data_file, header=TRUE, sep="\t", row.names=1)
 
 # Transpose data for WGCNA format (samples as rows)
@@ -67,15 +83,15 @@ cat("\n=== SPEARMAN CORRELATION CALCULATION ===\n")
 
 # Calculate Spearman correlation matrix
 cat("Calculating Spearman correlation matrix...\n")
-spearman_cor <- cor(datExpr, method = "spearman", use = "complete.obs")
+spearman_cor <- cor(datExpr, method = method, use = use)
 
 # Save the correlation matrix
-spearman_file <- file.path(config$output_dirs$spearman_dir, "spearman_matrices/spearman_correlation_matrix.csv")
+spearman_file <- file.path(out_file, "/spearman_correlation_matrix.csv")
 write.csv(spearman_cor, file = spearman_file)
-subset_spearman_file <- file.path(config$output_dirs$spearman_dir, "spearman_matrices/spearman_correlation_matrix_subset.csv")
-write.csv(spearman_cor[1:1000, 1:1000], file = subset_spearman_file) # choose subset matrix size
+subset_spearman_file <- file.path(out_file, "/spearman_correlation_matrix_subset.csv")
+write.csv(spearman_cor[1:500, 1:500], file = subset_spearman_file) # choose subset matrix size
 cat("Spearman correlation matrix saved to:", spearman_file, "\n")
-cat("Subset of Spearman correlation matrix (1000x1000) saved to:", subset_spearman_file, "\n")
+cat("Subset of Spearman correlation matrix (500x500) saved to:", subset_spearman_file, "\n")
 
 # Basic correlation statistics
 cat("Correlation statistics:\n")
