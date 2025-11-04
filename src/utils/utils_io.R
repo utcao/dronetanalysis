@@ -90,24 +90,3 @@ create_multiple_subsets <- function(data_list, subset_configs, seed = 1234) {
     
     return(result_list)
 }
-
-#################################
-##### WGCNA Functions ###########
-#################################
-
-# Hub gene identification
-hubGenes <- function(datExpr, moduleColors, module) {
-  # Select genes in the specified module
-  moduleGenes <- (moduleColors == module)
-  if (sum(moduleGenes) == 0) {
-    return(NULL)
-  }
-  moduleExpr <- datExpr[, moduleGenes]
-  # Calculate module eigengene
-  ME <- moduleEigengenes(datExpr, colors = moduleColors)$eigengenes[, paste0("ME", module) ]
-  # Calculate module membership (correlation with module eigengene)
-  MM <- cor(moduleExpr, ME, use = "p")
-  # Identify the gene with the highest module membership
-  hubGene <- rownames(moduleExpr)[which.max(MM)]
-  return(hubGene)
-}

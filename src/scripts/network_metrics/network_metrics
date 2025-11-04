@@ -46,6 +46,7 @@ create_directories(sum_output_dir)
 spearman_matrix <- as.matrix(spearman[,-1])
 rownames(spearman_matrix) <- spearman[[1]]
 colnames(spearman_matrix) <- spearman[[1]]
+spearman_matrix[spearman_matrix == 0] <- NA  # Set zero correlations to NA for summary stats
 
 adjacency_matrix <- as.matrix(adjacency[,-1])
 rownames(adjacency_matrix) <- adjacency[[1]]
