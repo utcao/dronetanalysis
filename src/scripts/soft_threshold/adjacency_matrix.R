@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 30/10/2025
+# Last Updated: 04/11/2025
 #
 # This script::
 #   1. Takes spearman correlation matrix as input
@@ -18,6 +18,7 @@ rm(list = ls())
 
 # ----- 1. Load required packages -----
 suppressPackageStartupMessages({
+library(argparse)
 library(data.table)
 library(dplyr)
 library(tidyr)
@@ -25,13 +26,43 @@ library(WGCNA)
 library(yaml)
 })
 
-# ----- 2. Set Input and Output Paths from config.yaml -----
+# ----- Parse command line arguments -----
+parser <- ArgumentParser(description = 'Create adjacency matrices from correlation matrix')
+parser$add_argument('--input', type="character", 
+                   default="results/spearman_correlation/spearman_matrices/spearman_correlation_matrix.csv",
+                   help='Input correlation matrix file path')
+parser$add_argument('--output-dir', type="character",
+                   default="results/network_features", 
+                   help='Output directory for adjacency matrices and plots')
+parser$add_argument('--power-range', type="character", default="1:20",
+                   help='Power range for soft thresholding (e.g. "1:20")')
+parser$add_argument('--network-type', type="character", default="unsigned",
+                   help='Network type (unsigned or signed)')
+
+args <- parser$parse_args()
+
+# Parse power range
+power_range <- eval(parse(text = args$power_range))
+
+# ----- 2. Set Input and Output Paths -----
 source("src/utils/utils_io.R")
 source("src/utils/utils_network_feats.R")
-config <- yaml::read_yaml("config/config.yaml")
-matrix_dir <- config$output_dirs$spearman_dir
-matrix_file <- file.path(matrix_dir, "spearman_matrices/spearman_correlation_matrix.csv")
-output_dir <- config$output_dirs$network_features_dir
+
+# Use command line arguments if provided, otherwise fall back to config
+if (!is.null(args$input) && args$input != "results/spearman_correlation/spearman_matrices/spearman_correlation_matrix.csv") {
+    matrix_file <- args$input
+    output_dir <- args$output_dir
+} else {
+    # Fall back to config file
+    config <- yaml::read_yaml("config/config.yaml")
+    matrix_dir <- config$output_dirs$spearman_dir
+    matrix_file <- file.path(matrix_dir, "spearman_matrices/spearman_correlation_matrix.csv")
+    output_dir <- config$output_dirs$network_features_dir
+}
+
+cat("Input file:", matrix_file, "\n")
+cat("Output directory:", output_dir, "\n")
+
 signed_output_file <- file.path(output_dir, "binary_signed_matrix.csv")
 unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned/unsigned_adjacency_matrix.csv")
 
@@ -57,12 +88,12 @@ cat("Adjacency matrix saved to:", unsigned_output_file, "\n")
 # Generate soft-thresholded matrices and plots
 
 # Call the network topology analysis function for unsigned network
-sft_unsigned <- pickSoftThreshold(adjacency, powerVector = c(1:20),
-                                  networkType = "unsigned", verbose = 5)
+sft_unsigned <- pickSoftThreshold(adjacency, powerVector = power_range,
+                                  networkType = args$network_type, verbose = 5)
 
 # Generate plots to decide soft-thresholding power
 u_output_plot <- file.path(output_dir, "soft_threshold/unsigned/soft_thresholding_unsigned.pdf")
-sft_plot(sft_unsigned, u_output_plot, c(1:20))
+sft_plot(sft_unsigned, u_output_plot, power_range)
 
 # Write sft to file for analysis
 unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned/unsigned_soft_threshold.csv")
