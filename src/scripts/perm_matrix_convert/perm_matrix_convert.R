@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 04/11/2025
+# Last Updated: 05/11/2025
 #
 # This script::
 #   1. Takes p values of gene pairs matrix datasets as input
@@ -18,10 +18,12 @@ source("src/utils/utils_io.R")
 source("src/utils/utils_permutation_net.R")
 
 # Load required packages
-library(data.table)
-library(dplyr)
-library(tidyr)
-library(argparse)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(dplyr)
+  library(tidyr)
+  library(argparse)
+})
 
 # ----- 1. Add simple command line argument parsing -----
 parser <- ArgumentParser(description = 'Convert gene pairs to correlation matrix')

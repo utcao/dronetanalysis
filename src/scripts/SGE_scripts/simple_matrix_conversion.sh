@@ -8,9 +8,8 @@
 # SGE directives (the #$ lines tell SGE what resources you need)
 #$ -A dronetanalysis              # Your account/project
 #$ -pe parallel 1                # Number of CPU cores (1 is fine for this)
-#$ -l h_vmem=4G                  # Memory per core (4GB should be plenty)
-#$ -l h_rt=0:1:0                # Time limit
-#$ -q standard.q                 # Queue to use (available: standard.q, long.q, test.q, cryo-em.q)
+#$ -l h_vmem=16G                  # Memory per core (4GB should be plenty)
+#$ -l h_rt=0:2:0                # Time limit
 #$ -N matrix_convert              # Job name (shows up in qstat)
 #$ -j y                          # Merge stdout and stderr into one file
 #$ -m eas                        # Email when job ends, aborts, or starts
@@ -31,17 +30,21 @@ echo "Working directory: $(pwd)"
 echo "Started at: $(date)"
 echo "=========================="
 
-# Create logs directory if it doesn't exist
-mkdir -p logs
-
 # ==============================================================================
-# Load required modules (modify based on your cluster)
+# Activate conda environment
 # ==============================================================================
 
-# Environment should be inherited from submission environment
-echo "Using inherited conda environment"
+echo "Activating conda environment..."
+
+# Option 1: Source the corrected .bashrc to get conda initialization
+source ~/.bashrc
+
+# Activate the dronetanalysis environment
+conda activate dronetanalysis
+
+# Verify environment activation
+echo "Current conda environment: $CONDA_DEFAULT_ENV"
 echo "R location: $(which R)"
-echo "R version: $(R --version | head -1)"
 
 # ==============================================================================
 # Run the R script with command line arguments
@@ -50,7 +53,6 @@ echo "R version: $(R --version | head -1)"
 # Change to the project directory so relative paths work
 cd /tmp/global2/gthornes/dronetanalysis
 echo "Changed to directory: $(pwd)"
-echo "About to run R script..."
 
 # Use your existing script with minimal command line args
 # Rscript src/scripts/perm_matrix_convert/perm_matrix_convert.R \
@@ -59,9 +61,9 @@ echo "About to run R script..."
 #     --gene-pairs-col gene_pairs \
 #     --value-col rho
 
-# Alternative: use defaults (no arguments needed)
-echo "Starting Rscript with full conda path..."
-/tmp/global2/gthornes/miniforge3/envs/dronetanalysis/bin/Rscript src/scripts/perm_matrix_convert/perm_matrix_convert.R
+echo "Now trying the matrix conversion script..."
+timeout 120 Rscript src/scripts/perm_matrix_convert/perm_matrix_convert.R
+echo "Matrix conversion completed with exit code: $?"
 
 # ==============================================================================
 # Print completion information
