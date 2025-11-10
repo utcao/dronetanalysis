@@ -63,8 +63,8 @@ if (!is.null(args$input) && args$input != "results/spearman_correlation/spearman
 cat("Input file:", matrix_file, "\n")
 cat("Output directory:", output_dir, "\n")
 
-signed_output_file <- file.path(output_dir, "binary_signed_matrix.csv")
-unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned/unsigned_adjacency_matrix.csv")
+binary_output_file <- file.path(output_dir, "binary_matrix/binary_signed_matrix.csv")
+unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned_adjacency_matrix.csv")
 
 corr_matrix <- fread(matrix_file)
 cat("File read:", matrix_file,"\n")
@@ -73,7 +73,7 @@ df.corr.m <- as.matrix(corr_matrix[,-1, with=FALSE])
 
 # ----- 3. Create binary matrix to preserve negative correlations -----
 create_directories(file.path(output_dir, "binary_matrix/"))
-binary_matrix <- create_correlation_sign_matrix(df.corr.m, output_file = signed_output_file)
+binary_matrix <- create_correlation_sign_matrix(df.corr.m, output_file = binary_output_file)
 cat("Binary sign matrix created.\n")
 
 # ----- 4. Calculate adjacency matrices and generate soft thresholding plots -----
@@ -92,11 +92,11 @@ sft_unsigned <- pickSoftThreshold(adjacency, powerVector = power_range,
                                   networkType = args$network_type, verbose = 5)
 
 # Generate plots to decide soft-thresholding power
-u_output_plot <- file.path(output_dir, "soft_threshold/unsigned/soft_thresholding_unsigned.pdf")
+u_output_plot <- file.path(output_dir, "soft_threshold/soft_thresholding.pdf")
 sft_plot(sft_unsigned, u_output_plot, power_range)
 
 # Write sft to file for analysis
-unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned/unsigned_soft_threshold.csv")
+unsigned_output_file <- file.path(output_dir, "soft_threshold/soft_threshold.csv")
 write.csv(sft_unsigned$fitIndices, file = unsigned_output_file, row.names = FALSE)
 
 ############################################################################################

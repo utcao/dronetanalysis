@@ -56,26 +56,33 @@ cat("Matrix conversion completed:\n")
 cat("- Spearman matrix dimensions:", dim(spearman_matrix), "\n")
 cat("- Adjacency matrix dimensions:", dim(adjacency_matrix), "\n")
 
-# Calculate metrics for matrices
-spearman_metrics <- calculate_network_metrics(spearman_matrix, "Spearman Correlations", connection_threshold = 0.5)
-adjacency_metrics <- calculate_network_metrics(adjacency_matrix, "Soft-Thresholded Adjacency", connection_threshold = 0.2)
+plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "adjacency_threshold_analysis.pdf"), 
+                        threshold_range = seq(0.001, 0.1, by=0.001),  # finer grain for small thresholds
+                        matrix_name = "Adjacency Matrix")
+
+# Calculate metrics for matrices - both weighted and binary views
+# 1. Weighted metrics (no threshold) - this is what WGCNA uses for module detection
+adjacency_metrics <- calculate_network_metrics(adjacency_matrix, "Soft-Thresholded Adjacency (Weighted)", 
+                                            connection_threshold = NULL)
+
+# 2. Binary metrics (with small threshold) - for counting discrete strong connections
+binary_threshold <- 0.001  # keeps ~1-2% strongest edges
+adjacency_metrics_binary <- calculate_network_metrics(adjacency_matrix, 
+                                                    "Soft-Thresholded Adjacency (Binary)", 
+                                                    connection_threshold = binary_threshold)
 
 # Create summary data frame for export
 summary_stats <- data.frame(
-    Matrix_Type = c("Spearman", "Adjacency"),
-    Mean_Abs_Correlation = c(spearman_metrics$mean_abs_corr, 
-                            adjacency_metrics$mean_abs_corr),
-    Median_Abs_Correlation = c(spearman_metrics$median_abs_corr, 
-                              adjacency_metrics$median_abs_corr),
-    Max_Correlation = c(spearman_metrics$max_corr, 
-                       adjacency_metrics$max_corr),
-    Min_Correlation = c(spearman_metrics$min_corr, 
-                       adjacency_metrics$min_corr),
-    Mean_Connectivity = c(mean(spearman_metrics$weighted_connectivity, na.rm = TRUE),
-                         mean(adjacency_metrics$weighted_connectivity, na.rm = TRUE)),
-    Mean_Degree = c(mean(spearman_metrics$degree, na.rm = TRUE),
-                   mean(adjacency_metrics$degree, na.rm = TRUE))
-)
+    Matrix_Type = c("Weighted", "Binary"),
+    Mean_Abs_Value = c(adjacency_metrics$mean_abs_corr, adjacency_metrics_binary$mean_abs_corr),
+    Median_Abs_Value = c(adjacency_metrics$median_abs_corr, adjacency_metrics_binary$median_abs_corr),
+    Max_Value = c(adjacency_metrics$max_corr, adjacency_metrics_binary$max_corr),
+    Min_Value = c(adjacency_metrics$min_corr, adjacency_metrics_binary$min_corr),
+    Mean_Connectivity = c(mean(adjacency_metrics$weighted_connectivity, na.rm = TRUE),
+                        mean(adjacency_metrics_binary$weighted_connectivity, na.rm = TRUE)),
+    Mean_Binary_Degree = c(NA,  # no threshold for weighted version
+                          mean(adjacency_metrics_binary$degree, na.rm = TRUE))
+    )
 
 # Save summary statistics
 summary_file <- file.path(sum_output_dir, "network_metrics_summary.csv")
@@ -84,12 +91,6 @@ write.csv(summary_stats, file = summary_file, row.names = FALSE)
 cat("\n=== Summary ===\n")
 print(summary_stats)
 cat("\nSummary statistics saved to:", summary_file, "\n")
-
-plot_threshold_analysis(spearman_matrix, output_file = file.path(sum_output_dir, "spearman_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
-                        matrix_name = "Spearman Correlation Matrix")
-
-plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "adjacency_threshold_analysis.pdf"), threshold_range = seq(0.05, 0.95, by=0.05),
-                        matrix_name = "Adjacency Matrix")
 
 # ----- 4. Calculate gene-level network features via WGCNA -----
 
