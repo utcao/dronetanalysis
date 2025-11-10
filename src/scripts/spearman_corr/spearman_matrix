@@ -55,7 +55,7 @@ dir.create(file.path(config$output_dirs$spearman_dir, "spearman_matrices"), recu
 ##### Data Loading ############
 ###############################
 
-# Load subset data for VST control
+# Load data
 data <- read.table(data_file, header=TRUE, sep="\t", row.names=1)
 
 # Transpose data for WGCNA format (samples as rows)
