@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 30/10/2025
+# Last Updated: 10/11/2025
 #
 # This script::
 #   1. Takes wide correlation matrix following soft thresholding as input
@@ -56,32 +56,22 @@ cat("Matrix conversion completed:\n")
 cat("- Spearman matrix dimensions:", dim(spearman_matrix), "\n")
 cat("- Adjacency matrix dimensions:", dim(adjacency_matrix), "\n")
 
-plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "adjacency_threshold_analysis.pdf"), 
-                        threshold_range = seq(0.001, 0.1, by=0.001),  # finer grain for small thresholds
+plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "adjacency_threshold_analysis.pdf"), threshold_range = seq(0.02, 0.4, by=0.02),
                         matrix_name = "Adjacency Matrix")
 
-# Calculate metrics for matrices - both weighted and binary views
-# 1. Weighted metrics (no threshold) - this is what WGCNA uses for module detection
-adjacency_metrics <- calculate_network_metrics(adjacency_matrix, "Soft-Thresholded Adjacency (Weighted)", 
-                                            connection_threshold = NULL)
 
-# 2. Binary metrics (with small threshold) - for counting discrete strong connections
-binary_threshold <- 0.001  # keeps ~1-2% strongest edges
-adjacency_metrics_binary <- calculate_network_metrics(adjacency_matrix, 
-                                                    "Soft-Thresholded Adjacency (Binary)", 
-                                                    connection_threshold = binary_threshold)
+# Calculate metrics for matrices
+adjacency_metrics <- calculate_network_metrics(adjacency_matrix, "Soft-Thresholded Adjacency", connection_threshold = 0.01) # decide threshold based on plot
 
 # Create summary data frame for export
 summary_stats <- data.frame(
-    Matrix_Type = c("Weighted", "Binary"),
-    Mean_Abs_Value = c(adjacency_metrics$mean_abs_corr, adjacency_metrics_binary$mean_abs_corr),
-    Median_Abs_Value = c(adjacency_metrics$median_abs_corr, adjacency_metrics_binary$median_abs_corr),
-    Max_Value = c(adjacency_metrics$max_corr, adjacency_metrics_binary$max_corr),
-    Min_Value = c(adjacency_metrics$min_corr, adjacency_metrics_binary$min_corr),
-    Mean_Connectivity = c(mean(adjacency_metrics$weighted_connectivity, na.rm = TRUE),
-                        mean(adjacency_metrics_binary$weighted_connectivity, na.rm = TRUE)),
-    Mean_Binary_Degree = c(NA,  # no threshold for weighted version
-                          mean(adjacency_metrics_binary$degree, na.rm = TRUE))
+    Matrix_Type = c("Adjacency"),
+    Mean_Abs_Correlation = c(adjacency_metrics$mean_abs_corr),
+    Median_Abs_Correlation = c(adjacency_metrics$median_abs_corr),
+    Max_Correlation = c(adjacency_metrics$max_corr),
+    Min_Correlation = c(adjacency_metrics$min_corr),
+    Mean_Connectivity = c(mean(adjacency_metrics$weighted_connectivity, na.rm = TRUE)),
+    Mean_Degree = c(mean(adjacency_metrics$degree, na.rm = TRUE))
     )
 
 # Save summary statistics
