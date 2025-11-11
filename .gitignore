@@ -10,9 +10,7 @@ archives
 logs
 
 # gthornes
-results/network_features/features_calc/
-results/network_features/soft_threshold/
-results/network_features/gene_metrics/
+results/network_features/
 results/spearman_correlation/spearman_matrices/
 results/spearman_correlation/perm/
 

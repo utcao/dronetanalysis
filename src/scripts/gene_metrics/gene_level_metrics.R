@@ -47,7 +47,7 @@ adjacency_file <- args$adjacency_file
 output_dir <- args$output_dir
 matrix_type <- tolower(args$matrix_type)
 threshold <- args$threshold
-adjacency_results_dir <- file.path("results/network_features/features_calc/adjacency")
+adjacency_results_dir <- file.path("results/network_features/features_calc/HS_adjacency")
 
 create_directories(output_dir)
 
@@ -98,15 +98,15 @@ if (file.exists(adjacency_connectivity_file)) {
 cat("\n=== Saving Results ===\n")
 
 write.csv(adjacency_gene_metrics, 
-          file.path(output_dir, "adjacency_gene_metrics.csv"),
+          file.path(output_dir, "HS_adjacency_gene_metrics.csv"),
           row.names = FALSE)
-
-save(adjacency_gene_metrics, file = file.path(output_dir, "gene_metrics.RData"))
+    
+save(adjacency_gene_metrics, file = file.path(output_dir, "HS_gene_metrics.RData"))
 
 cat("Gene-level metrics saved to:", output_dir, "\n")
 cat("Files created:\n")
-cat("- adjacency_gene_metrics.csv\n")
-cat("- gene_metrics.RData\n")
+cat("- HS_adjacency_gene_metrics.csv\n")
+cat("- HS_gene_metrics.RData\n")
 
 # ----- 8. Generate summary statistics -----
 cat("\n=== Summary Statistics ===\n")
