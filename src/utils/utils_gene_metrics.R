@@ -135,28 +135,43 @@ calculate_gene_level_metrics <- function(matrix_data, matrix_name, threshold, ma
         }
     })
     
-    # 11. Network efficiency (inverse of average shortest path)
+    # 11. Local efficiency: average inverse path length in neighborhood
+    # Local efficiency measures how well-connected a node's neighbors are to each other
     cat("  Calculating local efficiency...\n")
-    results$local_efficiency <- sapply(1:n_genes, function(i) {
-        neighbors <- which(binary_matrix[i,])
-        if (length(neighbors) < 2) return(0)
+    results$local_efficiency <- sapply(1:vcount(g), function(i) {
+        # Get neighbors of node i from the actual graph object (not binary_matrix)
+        neighbors <- neighbors(g, v = i)
         
-        subgraph_nodes <- c(i, neighbors)
-        subgraph <- induced_subgraph(g, subgraph_nodes)
+        if (length(neighbors) < 2) return(0)  # Need at least 2 neighbors for local efficiency
         
-        if (vcount(subgraph) < 2) return(0)
+        # Create subgraph of neighbors only (not including node i)
+        subgraph <- induced_subgraph(g, neighbors)
         
-        distances <- distances(subgraph, weights = E(subgraph)$weight)
-        distances[distances == Inf] <- 0
-        distances[distances == 0] <- Inf
-        diag(distances) <- 0
+        if (ecount(subgraph) == 0) return(0)  # If no edges between neighbors, efficiency = 0
         
-        if (all(is.infinite(distances))) return(0)
+        # Compute shortest path distances in the subgraph
+        dist_matrix <- distances(subgraph, weights = E(subgraph)$weight)
         
-        efficiency_sum <- sum(1/distances[distances != Inf], na.rm = TRUE)
-        n_pairs <- length(neighbors) * (length(neighbors) - 1)
+        # Convert distances to efficiencies (1/distance)
+        # Inf or missing paths should be treated as 0 efficiency
+        efficiency_matrix <- matrix(0, nrow = nrow(dist_matrix), ncol = ncol(dist_matrix))
+        for (r in 1:nrow(dist_matrix)) {
+            for (c in 1:ncol(dist_matrix)) {
+                if (r != c && dist_matrix[r,c] > 0 && !is.infinite(dist_matrix[r,c])) {
+                    efficiency_matrix[r,c] <- 1 / dist_matrix[r,c]
+                }
+            }
+        }
         
-        if (n_pairs > 0) efficiency_sum / n_pairs else 0
+        # Local efficiency = mean pairwise efficiency among neighbors
+        n_neighbors <- length(neighbors)
+        n_pairs <- n_neighbors * (n_neighbors - 1) / 2  # number of neighbor pairs
+        
+        if (n_pairs > 0) {
+            sum(efficiency_matrix[upper.tri(efficiency_matrix)]) / n_pairs
+        } else {
+            0
+        }
     })
     
     # 12. Add some basic statistics (use cleaned graph matrix, not original)
