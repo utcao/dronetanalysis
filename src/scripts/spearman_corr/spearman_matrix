@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 04/11/2025
+# Last Updated: 11/11/2025
 #
 # This script::
 #   1. Takes subset datasets as input
@@ -23,7 +23,7 @@ suppressPackageStartupMessages({
 # ----- Parse command line arguments -----
 parser <- ArgumentParser(description = 'Convert gene pairs to correlation matrix')
 parser$add_argument('--input', type="character", 
-                   default="/tmp/global2/gthornes/dronetanalysis/dataset/processed/VOOM/voomdataCtrl.txt",
+                   default="/tmp/global2/gthornes/dronetanalysis/dataset/processed/VOOM/voomdataHS.txt",
                    help='Input file path (e.g. VOOM or VST processed data)')
 parser$add_argument('--output', type="character",
                    default="/tmp/global2/gthornes/dronetanalysis/results/spearman_correlation/spearman_matrices", 
@@ -86,9 +86,9 @@ cat("Calculating Spearman correlation matrix...\n")
 spearman_cor <- cor(datExpr, method = method, use = use)
 
 # Save the correlation matrix
-spearman_file <- file.path(out_file, "/spearman_correlation_matrix.csv")
+spearman_file <- file.path(out_file, "/HS_spearman_correlation_matrix.csv")
 write.csv(spearman_cor, file = spearman_file)
-subset_spearman_file <- file.path(out_file, "/spearman_correlation_matrix_subset.csv")
+subset_spearman_file <- file.path(out_file, "/HS_spearman_correlation_matrix_subset.csv")
 write.csv(spearman_cor[1:500, 1:500], file = subset_spearman_file) # choose subset matrix size
 cat("Spearman correlation matrix saved to:", spearman_file, "\n")
 cat("Subset of Spearman correlation matrix (500x500) saved to:", subset_spearman_file, "\n")
