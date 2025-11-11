@@ -28,8 +28,8 @@ config <- yaml::read_yaml("config/config.yaml")
 sft_input_dir <- config$network_feature_files$soft_threshold_files
 spearman_input_dir <- config$spearman_correlation_files$permutation_files
 spearman_input_file <- file.path(spearman_input_dir, "sig_matrix_wide.csv")
-adjacency_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc/adjacency")
-sum_output_dir <- file.path(config$output_dirs$network_features_dir, "/features_calc")
+adjacency_output_dir <- file.path(config$output_dirs$network_features_dir, "features_calc/HS_adjacency")
+sum_output_dir <- file.path(config$output_dirs$network_features_dir, "features_calc")
 
 spearman <- read.csv(file.path(spearman_input_file))
 adjacency <- read.csv(file.path(sft_input_dir))
@@ -56,7 +56,7 @@ cat("Matrix conversion completed:\n")
 cat("- Spearman matrix dimensions:", dim(spearman_matrix), "\n")
 cat("- Adjacency matrix dimensions:", dim(adjacency_matrix), "\n")
 
-plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "adjacency_threshold_analysis.pdf"), threshold_range = seq(0.02, 0.4, by=0.02),
+plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "HS_adjacency_threshold_analysis.pdf"), threshold_range = seq(0.02, 0.4, by=0.02),
                         matrix_name = "Adjacency Matrix")
 
 
@@ -75,7 +75,7 @@ summary_stats <- data.frame(
     )
 
 # Save summary statistics
-summary_file <- file.path(sum_output_dir, "network_metrics_summary.csv")
+summary_file <- file.path(sum_output_dir, "HS_network_metrics_summary.csv")
 write.csv(summary_stats, file = summary_file, row.names = FALSE)
 
 cat("\n=== Summary ===\n")
@@ -100,7 +100,7 @@ adjacency_modules <- create_modules(
     output_dir = adjacency_output_dir,
     save_plots = TRUE
 )
-
+ 
 # Identify hub genes for adjacency network
 cat("\n=== Identifying Hub Genes - Adjacency Network ===\n")
 adjacency_hubs <- identify_hubs(
@@ -111,8 +111,8 @@ adjacency_hubs <- identify_hubs(
 )
 
 # Save TOM matrices (from the module results)
-tom_adjacency_file <- file.path(adjacency_output_dir, "tom_adjacency_matrix.csv")
-tomd_adjacency_file <- file.path(adjacency_output_dir, "tomd_adjacency_matrix.csv")
+tom_adjacency_file <- file.path(adjacency_output_dir, "HS_tom_adjacency_matrix.csv")
+tomd_adjacency_file <- file.path(adjacency_output_dir, "HS_tomd_adjacency_matrix.csv")
 
 write.csv(adjacency_modules$tom_matrix, file = tom_adjacency_file, row.names = TRUE)
 write.csv(adjacency_modules$tomd_matrix, file = tomd_adjacency_file, row.names = TRUE)

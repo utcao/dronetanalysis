@@ -26,11 +26,11 @@ suppressPackageStartupMessages({
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Add expression statistics to gene metrics')
 parser$add_argument('--gene-metrics-file', help = 'Path to gene metrics CSV file', 
-                   required = TRUE)
+                   default = 'results/network_features/gene_metrics/HS_adjacency_gene_metrics.csv')
 parser$add_argument('--expression-files', nargs = '+', help = 'Path(s) to expression data files (space-separated)', 
-                   required = TRUE)
+                   default = 'dataset/processed/VOOM/voomdataHS.txt')
 parser$add_argument('--output-file', help = 'Path to write enriched gene metrics CSV', 
-                   required = TRUE)
+                   default = 'results/network_features/gene_metrics/HS_adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--expression-type', help = "Type of expression data ('VOOM' or 'VST')", 
                    default = 'VOOM')
 args <- parser$parse_args()

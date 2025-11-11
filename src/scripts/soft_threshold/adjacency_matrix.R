@@ -29,7 +29,7 @@ library(yaml)
 # ----- Parse command line arguments -----
 parser <- ArgumentParser(description = 'Create adjacency matrices from correlation matrix')
 parser$add_argument('--input', type="character", 
-                   default="results/spearman_correlation/spearman_matrices/spearman_correlation_matrix.csv",
+                   default="results/spearman_correlation/spearman_matrices/HS_spearman_correlation_matrix.csv",
                    help='Input correlation matrix file path')
 parser$add_argument('--output-dir', type="character",
                    default="results/network_features", 
@@ -49,22 +49,22 @@ source("src/utils/utils_io.R")
 source("src/utils/utils_network_feats.R")
 
 # Use command line arguments if provided, otherwise fall back to config
-if (!is.null(args$input) && args$input != "results/spearman_correlation/spearman_matrices/spearman_correlation_matrix.csv") {
+if (!is.null(args$input) && args$input != "results/spearman_correlation/spearman_matrices/HS_spearman_correlation_matrix.csv") {
     matrix_file <- args$input
     output_dir <- args$output_dir
 } else {
     # Fall back to config file
     config <- yaml::read_yaml("config/config.yaml")
     matrix_dir <- config$output_dirs$spearman_dir
-    matrix_file <- file.path(matrix_dir, "spearman_matrices/spearman_correlation_matrix.csv")
+    matrix_file <- file.path(matrix_dir, "spearman_matrices/HS_spearman_correlation_matrix.csv")
     output_dir <- config$output_dirs$network_features_dir
 }
 
 cat("Input file:", matrix_file, "\n")
 cat("Output directory:", output_dir, "\n")
 
-binary_output_file <- file.path(output_dir, "binary_matrix/binary_signed_matrix.csv")
-unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned_adjacency_matrix.csv")
+binary_output_file <- file.path(output_dir, "binary_matrix/HS_binary_signed_matrix.csv")
+unsigned_output_file <- file.path(output_dir, "soft_threshold/HS_unsigned_adjacency_matrix.csv")
 
 corr_matrix <- fread(matrix_file)
 cat("File read:", matrix_file,"\n")
@@ -92,11 +92,11 @@ sft_unsigned <- pickSoftThreshold(adjacency, powerVector = power_range,
                                   networkType = args$network_type, verbose = 5)
 
 # Generate plots to decide soft-thresholding power
-u_output_plot <- file.path(output_dir, "soft_threshold/soft_thresholding.pdf")
+u_output_plot <- file.path(output_dir, "soft_threshold/HS_soft_thresholding.pdf")
 sft_plot(sft_unsigned, u_output_plot, power_range)
 
 # Write sft to file for analysis
-unsigned_output_file <- file.path(output_dir, "soft_threshold/soft_threshold.csv")
+unsigned_output_file <- file.path(output_dir, "soft_threshold/HS_soft_threshold.csv")
 write.csv(sft_unsigned$fitIndices, file = unsigned_output_file, row.names = FALSE)
 
 ############################################################################################
