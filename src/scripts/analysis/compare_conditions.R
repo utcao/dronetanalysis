@@ -354,7 +354,8 @@ diff_metrics <- combined %>%
     delta_betweenness = betweenness_centrality_treat - betweenness_centrality_ctrl,
     delta_expression = mean_expression_treat - mean_expression_ctrl,
     delta_variance = variance_expression_treat - variance_expression_ctrl,
-    fold_change_expression = mean_expression_treat / mean_expression_ctrl  # Fold change
+    # Since expression values are log2-transformed by VOOM, fold change is 2^(delta_expression)
+    fold_change_expression = 2^(delta_expression)
   ) %>%
   select(gene, module_ctrl, module_treat, starts_with("delta_"), fold_change_expression)
 
