@@ -372,7 +372,7 @@ top_decreased_conn <- diff_metrics %>%
   slice_head(n = 20)
 
 # Top genes with fold change in expression
-top_expr_ratio_up <- diff_metrics %>%
+top_expr_fold_change <- diff_metrics %>%
   filter(!is.na(fold_change_expression)) %>%
   arrange(desc(fold_change_expression)) %>%
   slice_head(n = 20)
@@ -392,7 +392,7 @@ top_expr_var_up <- diff_metrics %>%
 # Write summary tables
 write.csv(top_increased_conn, file.path(output_dir, "top_increased_connectivity.csv"), row.names = FALSE)
 write.csv(top_decreased_conn, file.path(output_dir, "top_decreased_connectivity.csv"), row.names = FALSE)
-write.csv(top_expr_ratio_up, file.path(output_dir, "top_expression_fold_changes.csv"), row.names = FALSE)
+write.csv(top_expr_fold_change, file.path(output_dir, "top_expression_fold_changes.csv"), row.names = FALSE)
 write.csv(top_expr_var_up, file.path(output_dir, "top_variance_expression_changes.csv"), row.names = FALSE)
 write.csv(top_expr_up, file.path(output_dir, "top_expression_changes.csv"), row.names = FALSE)
 
@@ -440,7 +440,7 @@ volcano_plots <- list(
 
 )
 
-p_volcano <- do.call(gridExtra::grid.arrange, c(volcano_plots, ncol = 3))
+p_volcano <- do.call(gridExtra::grid.arrange, c(volcano_plots, ncol = 1))
 ggsave(file.path(output_dir, "06_condition_changes.pdf"), p_volcano, width = 12, height = 20)
 cat("  Saved: 06_condition_changes.pdf\n")
 
