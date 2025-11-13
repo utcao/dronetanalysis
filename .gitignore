@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Rproj.user
+*.Rout
 # project folds
 manuscript/
 planning/
@@ -22,7 +23,3 @@ src/test.r
 # yu-tao
 results/spearman_correlation/shuffle/
 results/spearman_correlation/permutation_test/
-Rplots.pdf
-*.Rout
-.Rhistory
-.RData
