@@ -14,6 +14,7 @@ results/network_features/
 results/spearman_correlation/spearman_matrices/
 results/spearman_correlation/perm/
 results/analysis
+Rplots.pdf
 
 # files
 src/test.r
