@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 12/11/2025
+# Last Updated: 13/11/2025
 #
 # This script:
 #   1. Loads gene metrics and module assignments
@@ -31,16 +31,16 @@ suppressPackageStartupMessages({
 
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Perform enrichment analysis on WGCNA modules (Drosophila)')
-parser$add_argument('--gene-metrics-file', help = 'Path to gene metrics CSV file with module assignments', 
+parser$add_argument('--gene-metrics-file', help = 'Path to gene metrics CSV file with module assignments',
                    default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--output-dir', help = 'Directory to save enrichment results', 
                    default = 'results/analysis/enrichment')
 parser$add_argument('--pvalue-cutoff', help = 'P-value cutoff for enrichment significance', 
                    default = 0.05, type = 'double')
 parser$add_argument('--qvalue-cutoff', help = 'Q-value (adjusted p-value) cutoff', 
-                   default = 0.2, type = 'double')
+                   default = 0.1, type = 'double')
 parser$add_argument('--min-genesetsize', help = 'Minimum gene set size for enrichment', 
-                   default = 2, type = 'integer')
+                   default = 10, type = 'integer')
 parser$add_argument('--max-genesetsize', help = 'Maximum gene set size for enrichment', 
                    default = 500, type = 'integer')
 args <- parser$parse_args()
@@ -116,7 +116,20 @@ gene2entrez <- mapIds(org_db,
                       keytype = keytype_to_use,
                       multiVals = "first")
 
-cat("  Successfully mapped:", sum(!is.na(gene2entrez)), "/", length(gene2entrez), "genes\n\n")
+cat("  Successfully mapped:", sum(!is.na(gene2entrez)), "/", length(gene2entrez), "genes\n")
+
+# DIAGNOSTIC: Check a few successful and failed mappings
+cat("\n  DIAGNOSTIC - Sample mappings:\n")
+sample_genes <- head(gene_metrics$gene, 10)
+for (g in sample_genes) {
+  entrez <- gene2entrez[names(gene2entrez) == g]
+  if (is.na(entrez)) {
+    cat("    ", g, "-> FAILED\n")
+  } else {
+    cat("    ", g, "->", entrez, "\n")
+  }
+}
+cat("\n")
 
 # ----- 7. Perform enrichment for each module -----
 cat("Performing enrichment analysis for each module...\n\n")
@@ -124,12 +137,12 @@ cat("Performing enrichment analysis for each module...\n\n")
 enrichment_results <- list()
 all_enrichments <- list()
 
-for (module in modules) {
-  cat("Processing module:", module, "\n")
+for (current_module in modules) {
+  cat("Processing module:", current_module, "\n")
   
   # Get genes in this module
   module_genes <- gene_metrics %>%
-    filter(module == module) %>%
+    filter(module == current_module) %>%
     pull(gene)
   
   cat("  Genes in module:", length(module_genes), "\n")
@@ -145,7 +158,8 @@ for (module in modules) {
     next
   }
   
-  cat("  Sample Entrez IDs:", paste(head(module_entrez, 3), collapse = ", "), "\n\n")
+  cat("  Sample Entrez IDs:", paste(head(module_entrez, 3), collapse = ", "), "\n")
+  cat("  Mapping rate:", round(100 * length(module_entrez) / length(module_genes), 1), "%\n\n")
   
   # ----- GO Enrichment (Biological Process) -----
   cat("  Running GO enrichment (BP)...\n")
@@ -158,6 +172,33 @@ for (module in modules) {
                       minGSSize = args$min_genesetsize,
                       maxGSSize = args$max_genesetsize,
                       readable = TRUE)
+    if (is.null(go_bp) || nrow(go_bp) == 0) {
+      cat("    No BP results - trying with relaxed cutoffs (p<0.2, q<1.0)...\n")
+      go_bp <- enrichGO(gene = as.character(module_entrez),
+                        OrgDb = org_db,
+                        ont = "BP",
+                        pvalueCutoff = 0.2,
+                        qvalueCutoff = 1.0,
+                        minGSSize = args$min_genesetsize,
+                        maxGSSize = args$max_genesetsize,
+                        readable = TRUE)
+    }
+    if (is.null(go_bp) || nrow(go_bp) == 0) {
+      cat("    Still no BP results - trying with NO cutoffs (p<1.0, q<1.0)...\n")
+      go_bp <- enrichGO(gene = as.character(module_entrez),
+                        OrgDb = org_db,
+                        ont = "BP",
+                        pvalueCutoff = 1.0,
+                        qvalueCutoff = 1.0,
+                        minGSSize = args$min_genesetsize,
+                        maxGSSize = args$max_genesetsize,
+                        readable = TRUE)
+    }
+    # Simplify BP results to remove redundancy
+    if (!is.null(go_bp) && nrow(go_bp) > 0) {
+      go_bp_simplified <- clusterProfiler::simplify(go_bp, cutoff = 0.7, by = "p.adjust", select_fun = min)
+      cat("    Simplified from", nrow(go_bp), "to", nrow(go_bp_simplified), "terms\n")
+    }
   }, error = function(e) {
     cat("    WARNING: GO BP enrichment failed -", e$message, "\n")
     go_bp <<- NULL
@@ -178,6 +219,33 @@ for (module in modules) {
                       minGSSize = args$min_genesetsize,
                       maxGSSize = args$max_genesetsize,
                       readable = TRUE)
+    if (is.null(go_mf) || nrow(go_mf) == 0) {
+      cat("    No MF results - trying with relaxed cutoffs (p<0.2, q<1.0)...\n")
+      go_mf <- enrichGO(gene = as.character(module_entrez),
+                        OrgDb = org_db,
+                        ont = "MF",
+                        pvalueCutoff = 0.2,
+                        qvalueCutoff = 1.0,
+                        minGSSize = args$min_genesetsize,
+                        maxGSSize = args$max_genesetsize,
+                        readable = TRUE)
+    }
+    if (is.null(go_mf) || nrow(go_mf) == 0) {
+      cat("    Still no MF results - trying with NO cutoffs (p<1.0, q<1.0)...\n")
+      go_mf <- enrichGO(gene = as.character(module_entrez),
+                        OrgDb = org_db,
+                        ont = "MF",
+                        pvalueCutoff = 1.0,
+                        qvalueCutoff = 1.0,
+                        minGSSize = args$min_genesetsize,
+                        maxGSSize = args$max_genesetsize,
+                        readable = TRUE)
+    }
+    # Simplify MF results
+    if (!is.null(go_mf) && nrow(go_mf) > 0) {
+      go_mf_simplified <- clusterProfiler::simplify(go_mf, cutoff = 0.7, by = "p.adjust", select_fun = min)
+      cat("    Simplified from", nrow(go_mf), "to", nrow(go_mf_simplified), "terms\n")
+    }
   }, error = function(e) {
     cat("    WARNING: GO MF enrichment failed -", e$message, "\n")
     go_mf <<- NULL
@@ -198,6 +266,33 @@ for (module in modules) {
                       minGSSize = args$min_genesetsize,
                       maxGSSize = args$max_genesetsize,
                       readable = TRUE)
+    if (is.null(go_cc) || nrow(go_cc) == 0) {
+      cat("    No CC results - trying with relaxed cutoffs (p<0.2, q<1.0)...\n")
+      go_cc <- enrichGO(gene = as.character(module_entrez),
+                        OrgDb = org_db,
+                        ont = "CC",
+                        pvalueCutoff = 0.2,
+                        qvalueCutoff = 1.0,
+                        minGSSize = args$min_genesetsize,
+                        maxGSSize = args$max_genesetsize,
+                        readable = TRUE)
+    }
+    if (is.null(go_cc) || nrow(go_cc) == 0) {
+      cat("    Still no CC results - trying with NO cutoffs (p<1.0, q<1.0)...\n")
+      go_cc <- enrichGO(gene = as.character(module_entrez),
+                        OrgDb = org_db,
+                        ont = "CC",
+                        pvalueCutoff = 1.0,
+                        qvalueCutoff = 1.0,
+                        minGSSize = args$min_genesetsize,
+                        maxGSSize = args$max_genesetsize,
+                        readable = TRUE)
+    }
+    # Simplify CC results
+    if (!is.null(go_cc) && nrow(go_cc) > 0) {
+      go_cc_simplified <- clusterProfiler::simplify(go_cc, cutoff = 0.7, by = "p.adjust", select_fun = min)
+      cat("    Simplified from", nrow(go_cc), "to", nrow(go_cc_simplified), "terms\n")
+    }
   }, error = function(e) {
     cat("    WARNING: GO CC enrichment failed -", e$message, "\n")
     go_cc <<- NULL
@@ -208,29 +303,32 @@ for (module in modules) {
   }
   
   # Store results
-  enrichment_results[[module]] <- list(
+  enrichment_results[[current_module]] <- list(
     genes = module_genes,
     n_genes = length(module_genes),
     n_mapped = length(module_entrez),
     go_bp = go_bp,
     go_mf = go_mf,
-    go_cc = go_cc
+    go_cc = go_cc,
+    go_bp_simplified = if (exists("go_bp_simplified")) go_bp_simplified else data.frame(),
+    go_mf_simplified = if (exists("go_mf_simplified")) go_mf_simplified else data.frame(),
+    go_cc_simplified = if (exists("go_cc_simplified")) go_cc_simplified else data.frame()
   )
   
   # Combine all GO results for summary
   if (nrow(go_bp) > 0) {
-    go_bp_df <- as.data.frame(go_bp) %>% mutate(module = module, ontology = "BP")
-    all_enrichments[[paste(module, "GO_BP", sep = "_")]] <- go_bp_df
+    go_bp_df <- as.data.frame(go_bp) %>% mutate(module = current_module, ontology = "BP")
+    all_enrichments[[paste(current_module, "GO_BP", sep = "_")]] <- go_bp_df
   }
   
   if (nrow(go_mf) > 0) {
-    go_mf_df <- as.data.frame(go_mf) %>% mutate(module = module, ontology = "MF")
-    all_enrichments[[paste(module, "GO_MF", sep = "_")]] <- go_mf_df
+    go_mf_df <- as.data.frame(go_mf) %>% mutate(module = current_module, ontology = "MF")
+    all_enrichments[[paste(current_module, "GO_MF", sep = "_")]] <- go_mf_df
   }
   
   if (nrow(go_cc) > 0) {
-    go_cc_df <- as.data.frame(go_cc) %>% mutate(module = module, ontology = "CC")
-    all_enrichments[[paste(module, "GO_CC", sep = "_")]] <- go_cc_df
+    go_cc_df <- as.data.frame(go_cc) %>% mutate(module = current_module, ontology = "CC")
+    all_enrichments[[paste(current_module, "GO_CC", sep = "_")]] <- go_cc_df
   }
   
   cat("  Enrichments found:\n")
@@ -253,13 +351,20 @@ cat("Generating summary tables...\n")
 # Combine all enrichments into one table
 if (length(all_enrichments) > 0) {
   all_enrich_df <- do.call(rbind, all_enrichments) %>%
-    arrange(module, pvalue) %>%
+    dplyr::arrange(module, pvalue)
+  
+  # Convert geneID to character to preserve gene list
+  all_enrich_df$geneID <- as.character(all_enrich_df$geneID)
+  
+  # Select and reorder columns
+  all_enrich_df <- all_enrich_df %>%
     dplyr::select(module, ontology, ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID)
   
   write.csv(all_enrich_df, 
             file.path(output_dir, "all_module_enrichments.csv"), 
             row.names = FALSE)
   cat("  Saved: all_module_enrichments.csv\n")
+  cat("    Total enrichments:", nrow(all_enrich_df), "\n")
 } else {
   cat("  No enrichments found across all modules\n")
 }
@@ -267,16 +372,16 @@ if (length(all_enrichments) > 0) {
 # ----- 9. Generate per-module enrichment reports -----
 cat("Generating per-module enrichment reports...\n")
 
-for (module in names(enrichment_results)) {
-  results <- enrichment_results[[module]]
+for (current_module in names(enrichment_results)) {
+  results <- enrichment_results[[current_module]]
   
   # Create report file
-  report_file <- file.path(output_dir, paste0("enrichment_", module, ".txt"))
+  report_file <- file.path(output_dir, paste0("enrichment_", current_module, ".txt"))
   
-  cat("Writing enrichment report for module:", module, "...\n", file = report_file, append = FALSE)
+  cat("Writing enrichment report for module:", current_module, "...\n", file = report_file, append = FALSE)
   
   # Write header
-  cat("\n=== ENRICHMENT ANALYSIS FOR MODULE:", module, "===\n\n", 
+  cat("\n=== ENRICHMENT ANALYSIS FOR MODULE:", current_module, "===\n\n", 
       file = report_file, append = TRUE)
   cat("Genes in module:", results$n_genes, "\n",
       file = report_file, append = TRUE)
@@ -286,10 +391,12 @@ for (module in names(enrichment_results)) {
   # Write GO BP results
   cat("--- BIOLOGICAL PROCESS (GO BP) ---\n",
       file = report_file, append = TRUE)
-  if (!is.null(results$go_bp) && is.data.frame(results$go_bp) && nrow(results$go_bp) > 0) {
-    go_bp_df <- results$go_bp %>%
-      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust) %>%
-      arrange(pvalue)
+  if (!is.null(results$go_bp) && nrow(results$go_bp) > 0) {
+    go_bp_df <- as.data.frame(results$go_bp) %>%
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID) %>%
+      dplyr::arrange(pvalue)
+    # Convert geneID to character
+    go_bp_df$geneID <- as.character(go_bp_df$geneID)
     write.table(go_bp_df, file = report_file, append = TRUE, quote = FALSE, 
                 sep = "\t", col.names = TRUE, row.names = FALSE)
   } else {
@@ -298,10 +405,12 @@ for (module in names(enrichment_results)) {
   
   cat("\n--- MOLECULAR FUNCTION (GO MF) ---\n",
       file = report_file, append = TRUE)
-  if (!is.null(results$go_mf) && is.data.frame(results$go_mf) && nrow(results$go_mf) > 0) {
-    go_mf_df <- results$go_mf %>%
-      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust) %>%
-      arrange(pvalue)
+  if (!is.null(results$go_mf) && nrow(results$go_mf) > 0) {
+    go_mf_df <- as.data.frame(results$go_mf) %>%
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID) %>%
+      dplyr::arrange(pvalue)
+    # Convert geneID to character
+    go_mf_df$geneID <- as.character(go_mf_df$geneID)
     write.table(go_mf_df, file = report_file, append = TRUE, quote = FALSE,
                 sep = "\t", col.names = TRUE, row.names = FALSE)
   } else {
@@ -310,10 +419,12 @@ for (module in names(enrichment_results)) {
   
   cat("\n--- CELLULAR COMPONENT (GO CC) ---\n",
       file = report_file, append = TRUE)
-  if (!is.null(results$go_cc) && is.data.frame(results$go_cc) && nrow(results$go_cc) > 0) {
-    go_cc_df <- results$go_cc %>%
-      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust) %>%
-      arrange(pvalue)
+  if (!is.null(results$go_cc) && nrow(results$go_cc) > 0) {
+    go_cc_df <- as.data.frame(results$go_cc) %>%
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID) %>%
+      dplyr::arrange(pvalue)
+    # Convert geneID to character
+    go_cc_df$geneID <- as.character(go_cc_df$geneID)
     write.table(go_cc_df, file = report_file, append = TRUE, quote = FALSE,
                 sep = "\t", col.names = TRUE, row.names = FALSE)
   } else {
@@ -326,16 +437,17 @@ cat("Generating enrichment plots...\n")
 
 pdf(file.path(output_dir, "enrichment_plots.pdf"), width = 14, height = 10)
 
-for (module in names(enrichment_results)) {
-  results <- enrichment_results[[module]]
+for (current_module in names(enrichment_results)) {
+  results <- enrichment_results[[current_module]]
   
   plots_to_draw <- list()
   
   # GO BP dotplot
-  if (nrow(results$go_bp) > 0 && nrow(results$go_bp) <= 30) {
+  if (nrow(results$go_bp) > 0) {
     tryCatch({
-      p_bp <- dotplot(results$go_bp, showCategory = min(15, nrow(results$go_bp)), 
-                      title = paste("Module", module, "- GO Biological Process"))
+      # Show top 20 enrichments regardless of total count
+      p_bp <- dotplot(results$go_bp, showCategory = min(20, nrow(results$go_bp)), 
+                      title = paste("Module", current_module, "- GO Biological Process"))
       plots_to_draw[[length(plots_to_draw) + 1]] <- p_bp
     }, error = function(e) {
       cat("    Warning: Could not create GO BP dotplot -", e$message, "\n")
@@ -343,10 +455,10 @@ for (module in names(enrichment_results)) {
   }
   
   # GO MF dotplot
-  if (nrow(results$go_mf) > 0 && nrow(results$go_mf) <= 30) {
+  if (nrow(results$go_mf) > 0) {
     tryCatch({
-      p_mf <- dotplot(results$go_mf, showCategory = min(15, nrow(results$go_mf)),
-                      title = paste("Module", module, "- GO Molecular Function"))
+      p_mf <- dotplot(results$go_mf, showCategory = min(20, nrow(results$go_mf)),
+                      title = paste("Module", current_module, "- GO Molecular Function"))
       plots_to_draw[[length(plots_to_draw) + 1]] <- p_mf
     }, error = function(e) {
       cat("    Warning: Could not create GO MF dotplot -", e$message, "\n")
@@ -354,10 +466,10 @@ for (module in names(enrichment_results)) {
   }
   
   # GO CC dotplot
-  if (nrow(results$go_cc) > 0 && nrow(results$go_cc) <= 30) {
+  if (nrow(results$go_cc) > 0) {
     tryCatch({
-      p_cc <- dotplot(results$go_cc, showCategory = min(15, nrow(results$go_cc)),
-                      title = paste("Module", module, "- GO Cellular Component"))
+      p_cc <- dotplot(results$go_cc, showCategory = min(20, nrow(results$go_cc)),
+                      title = paste("Module", current_module, "- GO Cellular Component"))
       plots_to_draw[[length(plots_to_draw) + 1]] <- p_cc
     }, error = function(e) {
       cat("    Warning: Could not create GO CC dotplot -", e$message, "\n")
@@ -372,7 +484,7 @@ for (module in names(enrichment_results)) {
   } else if (nrow(results$go_bp) == 0 && nrow(results$go_mf) == 0 && nrow(results$go_cc) == 0) {
     # Create a simple text plot if no enrichments found
     plot.new()
-    text(0.5, 0.5, paste("No enrichments found for module", module), 
+    text(0.5, 0.5, paste("No enrichments found for module", current_module), 
          cex = 1.5, ha = "center")
   }
 }
@@ -380,16 +492,68 @@ for (module in names(enrichment_results)) {
 dev.off()
 cat("  Saved: enrichment_plots.pdf\n")
 
+# ----- 10b. Generate module summary bar chart -----
+cat("Generating module summary bar chart...\n")
+
+# Prepare data for plotting
+plot_data <- data.frame()
+for (current_module in names(enrichment_results)) {
+  results <- enrichment_results[[current_module]]
+  plot_data <- rbind(plot_data, data.frame(
+    module = current_module,
+    n_genes = results$n_genes
+  ))
+}
+
+# Sort by module size (ascending so largest appears at top after coord_flip)
+# But put grey at the bottom
+plot_data <- plot_data %>%
+  dplyr::arrange(n_genes) %>%
+  dplyr::mutate(module_label = ifelse(module == "grey", "non-modular genes", module))
+
+# Move grey to the beginning (bottom after coord_flip)
+if ("grey" %in% plot_data$module) {
+  grey_row <- plot_data %>% dplyr::filter(module == "grey")
+  other_rows <- plot_data %>% dplyr::filter(module != "grey")
+  plot_data <- rbind(grey_row, other_rows)
+}
+
+# Create proper WGCNA module colors (module name IS the colour)
+module_colors <- setNames(plot_data$module, plot_data$module)
+
+# Create simple bar chart showing module sizes
+p_summary <- ggplot(plot_data, aes(x = factor(module_label, levels = module_label), y = n_genes, fill = module)) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = module_colors, name = "Module") +
+  coord_flip() +
+  labs(title = "Module Sizes",
+       x = "",
+       y = "Number of Genes") +
+  theme_bw(base_size = 12)
+
+# Save plot
+ggsave(file.path(output_dir, "module_summary_barplot.pdf"), 
+       plot = p_summary, width = 10, height = 8)
+cat("  Saved: module_summary_barplot.pdf\n")
+
 # ----- 11. Generate summary statistics -----
 cat("\n=== ENRICHMENT SUMMARY ===\n")
 
-for (module in names(enrichment_results)) {
-  results <- enrichment_results[[module]]
-  cat("\nModule:", module, "\n")
+# Create summary data frame
+module_summary <- data.frame()
+
+for (current_module in names(enrichment_results)) {
+  results <- enrichment_results[[current_module]]
+  cat("\nModule:", current_module, "\n")
   cat("  Genes:", results$n_genes, "(mapped:", results$n_mapped, ")\n")
   cat("  GO BP enrichments:", nrow(results$go_bp), "\n")
   cat("  GO MF enrichments:", nrow(results$go_mf), "\n")
   cat("  GO CC enrichments:", nrow(results$go_cc), "\n")
+  
+  # Show simplified enrichment summary
+  if (!is.null(results$go_bp_simplified) && nrow(results$go_bp_simplified) > 0) {
+    cat("  Simplified BP terms:", nrow(results$go_bp_simplified), "\n")
+  }
   
   # Top enrichment
   all_go <- rbind(
@@ -398,23 +562,95 @@ for (module in names(enrichment_results)) {
     if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL
   )
   
+  top_term_1 <- NA
+  top_term_2 <- NA
+  top_term_3 <- NA
+  top_pval_1 <- NA
+  top_pval_2 <- NA
+  top_pval_3 <- NA
+  
   if (!is.null(all_go) && nrow(all_go) > 0) {
     top_enrich <- all_go %>%
-      arrange(pvalue) %>%
-      slice_head(n = 3) %>%
-      select(Description, pvalue, p.adjust)
+      dplyr::arrange(pvalue) %>%
+      dplyr::slice_head(n = 3) %>%
+      dplyr::select(Description, pvalue, p.adjust)
     
     cat("  Top enrichments:\n")
     for (i in 1:nrow(top_enrich)) {
       cat("    -", top_enrich$Description[i], 
           "(p =", format(top_enrich$pvalue[i], digits = 3), ")\n")
     }
+    
+    # Store top terms for summary file
+    if (nrow(top_enrich) >= 1) {
+      top_term_1 <- top_enrich$Description[1]
+      top_pval_1 <- top_enrich$pvalue[1]
+    }
+    if (nrow(top_enrich) >= 2) {
+      top_term_2 <- top_enrich$Description[2]
+      top_pval_2 <- top_enrich$pvalue[2]
+    }
+    if (nrow(top_enrich) >= 3) {
+      top_term_3 <- top_enrich$Description[3]
+      top_pval_3 <- top_enrich$pvalue[3]
+    }
   }
+  
+  # Simplified functional summary
+  simplified_term_1 <- NA
+  simplified_term_2 <- NA
+  simplified_term_3 <- NA
+  
+  if (!is.null(results$go_bp_simplified) && nrow(results$go_bp_simplified) > 0) {
+    simplified_summary <- as.data.frame(results$go_bp_simplified) %>%
+      dplyr::arrange(pvalue) %>%
+      dplyr::slice_head(n = 3) %>%
+      dplyr::select(Description)
+    
+    cat("  Simplified functional summary (BP):\n")
+    for (i in 1:nrow(simplified_summary)) {
+      cat("    *", simplified_summary$Description[i], "\n")
+    }
+    
+    # Store simplified terms
+    if (nrow(simplified_summary) >= 1) simplified_term_1 <- simplified_summary$Description[1]
+    if (nrow(simplified_summary) >= 2) simplified_term_2 <- simplified_summary$Description[2]
+    if (nrow(simplified_summary) >= 3) simplified_term_3 <- simplified_summary$Description[3]
+  }
+  
+  # Add to summary dataframe
+  module_summary <- rbind(module_summary, data.frame(
+    module = current_module,
+    n_genes = results$n_genes,
+    n_mapped = results$n_mapped,
+    n_BP_enrichments = nrow(results$go_bp),
+    n_MF_enrichments = nrow(results$go_mf),
+    n_CC_enrichments = nrow(results$go_cc),
+    n_BP_simplified = if (!is.null(results$go_bp_simplified)) nrow(results$go_bp_simplified) else 0,
+    top_term_1 = top_term_1,
+    top_pvalue_1 = top_pval_1,
+    top_term_2 = top_term_2,
+    top_pvalue_2 = top_pval_2,
+    top_term_3 = top_term_3,
+    top_pvalue_3 = top_pval_3,
+    simplified_BP_1 = simplified_term_1,
+    simplified_BP_2 = simplified_term_2,
+    simplified_BP_3 = simplified_term_3,
+    stringsAsFactors = FALSE
+  ))
 }
+
+# Write summary to file
+write.csv(module_summary, 
+          file.path(output_dir, "module_enrichment_summary.csv"), 
+          row.names = FALSE)
+cat("\n  Saved: module_enrichment_summary.csv\n")
 
 cat("\n=== Analysis Complete ===\n")
 cat("Results saved to:", output_dir, "\n")
 cat("\nOutput files:\n")
 cat("  - all_module_enrichments.csv (combined enrichments for all modules)\n")
+cat("  - module_enrichment_summary.csv (one-line summary per module)\n")
 cat("  - enrichment_[MODULE].txt (detailed reports per module)\n")
 cat("  - enrichment_plots.pdf (visualization of top enrichments)\n")
+cat("  - module_summary_barplot.pdf (overview of module sizes and enrichment counts)\n")
