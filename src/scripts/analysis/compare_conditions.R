@@ -20,6 +20,7 @@ suppressPackageStartupMessages({
   library(data.table)
   library(dplyr)
   library(tidyr)
+  library(tibble)
   library(ggplot2)
   library(gridExtra)
   library(pheatmap)
@@ -444,7 +445,301 @@ p_volcano <- do.call(gridExtra::grid.arrange, c(volcano_plots, ncol = 1))
 ggsave(file.path(output_dir, "06_condition_changes.pdf"), p_volcano, width = 12, height = 20)
 cat("  Saved: 06_condition_changes.pdf\n")
 
-# ----- 12. Summary statistics -----
+# ----- 12. Heatmaps -----
+cat("Generating heatmaps...\n")
+
+# 12a. Correlation heatmap - within each condition
+cat("  Creating within-condition correlation heatmaps...\n")
+cor_ctrl <- combined %>% 
+  select(all_of(paste0(pca_vars, "_ctrl"))) %>%
+  na.omit() %>%
+  cor()
+colnames(cor_ctrl) <- rownames(cor_ctrl) <- gsub("_ctrl", "", colnames(cor_ctrl))
+
+cor_treat <- combined %>% 
+  select(all_of(paste0(pca_vars, "_treat"))) %>%
+  na.omit() %>%
+  cor()
+colnames(cor_treat) <- rownames(cor_treat) <- gsub("_treat", "", colnames(cor_treat))
+
+pdf(file.path(output_dir, "07a_correlation_heatmap_within_conditions.pdf"), width = 12, height = 5)
+par(mfrow = c(1, 2))
+corrplot(cor_ctrl, method = "color", type = "upper", 
+         title = paste0(args$ctrl_label, " - Network Metrics Correlation"),
+         mar = c(0, 0, 2, 0), tl.col = "black", tl.srt = 45,
+         col = colorRampPalette(c("#2166AC", "white", "#B2182B"))(200),
+         addCoef.col = "black", number.cex = 0.7)
+corrplot(cor_treat, method = "color", type = "upper", 
+         title = paste0(args$treat_label, " - Network Metrics Correlation"),
+         mar = c(0, 0, 2, 0), tl.col = "black", tl.srt = 45,
+         col = colorRampPalette(c("#2166AC", "white", "#B2182B"))(200),
+         addCoef.col = "black", number.cex = 0.7)
+dev.off()
+cat("    Saved: 07a_correlation_heatmap_within_conditions.pdf\n")
+
+# 12b. Delta heatmap - changes for top genes
+cat("  Creating delta heatmap for top differentially affected genes...\n")
+delta_vars <- c("delta_connectivity", "delta_degree", "delta_betweenness", 
+                "delta_expression", "delta_variance")
+
+# Select top 50 genes by absolute change in connectivity
+top_delta_genes <- diff_metrics %>%
+  filter(!is.na(delta_connectivity)) %>%
+  mutate(abs_delta_conn = abs(delta_connectivity)) %>%
+  arrange(desc(abs_delta_conn)) %>%
+  slice_head(n = 50)
+
+# Create matrix for heatmap
+delta_matrix <- top_delta_genes %>%
+  select(gene, all_of(delta_vars)) %>%
+  column_to_rownames("gene") %>%
+  as.matrix()
+
+# Scale by column (z-score) for better visualization
+delta_matrix_scaled <- scale(delta_matrix)
+
+# Create annotation for modules
+annotation_row <- top_delta_genes %>%
+  select(gene, module_ctrl, module_treat) %>%
+  column_to_rownames("gene")
+
+# Create color mapping for modules - only include modules that exist in the data
+unique_modules_ctrl <- unique(annotation_row$module_ctrl)
+unique_modules_treat <- unique(annotation_row$module_treat)
+
+module_colors_ctrl <- module_color_map[unique_modules_ctrl]
+module_colors_ctrl <- module_colors_ctrl[!is.na(module_colors_ctrl)]
+
+module_colors_treat <- module_color_map[unique_modules_treat]
+module_colors_treat <- module_colors_treat[!is.na(module_colors_treat)]
+
+annotation_colors <- list(
+  module_ctrl = module_colors_ctrl,
+  module_treat = module_colors_treat
+)
+
+pdf(file.path(output_dir, "07b_delta_heatmap_top_genes.pdf"), width = 10, height = 12)
+tryCatch({
+  pheatmap(delta_matrix_scaled,
+           color = colorRampPalette(c("#2166AC", "white", "#B2182B"))(100),
+           main = "Top 50 Genes by Connectivity Change\n(Z-scored deltas)",
+           annotation_row = annotation_row,
+           annotation_colors = annotation_colors,
+           cluster_cols = FALSE,
+           show_rownames = TRUE,
+           fontsize_row = 6,
+           angle_col = 45)
+}, error = function(e) {
+  cat("    Warning: Error creating annotated heatmap, creating simplified version\n")
+  pheatmap(delta_matrix_scaled,
+           color = colorRampPalette(c("#2166AC", "white", "#B2182B"))(100),
+           main = "Top 50 Genes by Connectivity Change\n(Z-scored deltas)",
+           cluster_cols = FALSE,
+           show_rownames = TRUE,
+           fontsize_row = 6,
+           angle_col = 45)
+})
+dev.off()
+cat("    Saved: 07b_delta_heatmap_top_genes.pdf\n")
+
+# 12c. Module preservation heatmap
+cat("  Creating module preservation heatmap...\n")
+module_transition <- combined %>%
+  filter(!is.na(module_ctrl) & !is.na(module_treat)) %>%
+  group_by(module_ctrl, module_treat) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(names_from = module_treat, values_from = count, values_fill = 0) %>%
+  column_to_rownames("module_ctrl") %>%
+  as.matrix()
+
+# Get all unique modules and sort them consistently
+all_modules_sorted <- sort(unique(c(rownames(module_transition), colnames(module_transition))))
+
+# Reorder matrix to have same order on both axes
+module_transition_ordered <- matrix(0, 
+                                    nrow = length(all_modules_sorted), 
+                                    ncol = length(all_modules_sorted),
+                                    dimnames = list(all_modules_sorted, all_modules_sorted))
+
+# Fill in the values
+for (i in rownames(module_transition)) {
+  for (j in colnames(module_transition)) {
+    module_transition_ordered[i, j] <- module_transition[i, j]
+  }
+}
+
+# Calculate preservation percentage (row-wise)
+module_preservation_pct <- sweep(module_transition_ordered, 1, rowSums(module_transition_ordered), "/") * 100
+
+pdf(file.path(output_dir, "07c_module_preservation_heatmap.pdf"), width = 10, height = 10)
+pheatmap(module_preservation_pct,
+         color = colorRampPalette(c("white", "#4575B4", "#313695"))(100),
+         main = "Module Preservation: Control (bottom)→ Treatment (right)\n(% of genes from ctrl module assigned to treat module)",
+         display_numbers = matrix(sprintf("%.0f%%", module_preservation_pct), 
+                                 nrow = nrow(module_preservation_pct)),
+         number_color = "black",
+         fontsize_number = 8,
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         angle_col = 45)
+dev.off()
+cat("    Saved: 07c_module_preservation_heatmap.pdf\n")
+
+# 12d. Cross-condition correlation heatmap
+cat("  Creating cross-condition correlation heatmap...\n")
+# For each ctrl metric, correlate with each treat metric
+cross_cor_matrix <- matrix(NA, nrow = length(pca_vars), ncol = length(pca_vars),
+                           dimnames = list(paste0(pca_vars, "\n(", args$ctrl_label, ")"), 
+                                         paste0(pca_vars, "\n(", args$treat_label, ")")))
+
+for (i in 1:length(pca_vars)) {
+  for (j in 1:length(pca_vars)) {
+    ctrl_col <- paste0(pca_vars[i], "_ctrl")
+    treat_col <- paste0(pca_vars[j], "_treat")
+    
+    valid_data <- combined %>%
+      select(all_of(c(ctrl_col, treat_col))) %>%
+      na.omit()
+    
+    if (nrow(valid_data) > 0) {
+      cross_cor_matrix[i, j] <- cor(valid_data[[ctrl_col]], valid_data[[treat_col]])
+    }
+  }
+}
+
+pdf(file.path(output_dir, "07d_cross_condition_correlation_heatmap.pdf"), width = 10, height = 8)
+pheatmap(cross_cor_matrix,
+         color = colorRampPalette(c("#2166AC", "white", "#B2182B"))(100),
+         main = "Cross-Condition Metric Correlations\n(How do metrics in one condition relate to metrics in the other?)",
+         display_numbers = TRUE,
+         number_format = "%.2f",
+         number_color = "black",
+         fontsize_number = 10,
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         breaks = seq(-1, 1, length.out = 101),
+         legend_breaks = c(-1, -0.5, 0, 0.5, 1),
+         angle_col = 0,
+         fontsize = 10)
+dev.off()
+cat("    Saved: 07d_cross_condition_correlation_heatmap.pdf\n")
+
+# 12e. Module-specific summary heatmap
+cat("  Creating module-specific metric summary heatmap...\n")
+# Calculate mean values per module for each metric
+module_summary_ctrl <- combined %>%
+  filter(!is.na(module_ctrl)) %>%
+  group_by(module_ctrl) %>%
+  summarise(
+    connectivity = mean(weighted_connectivity_ctrl, na.rm = TRUE),
+    degree = mean(degree_ctrl, na.rm = TRUE),
+    betweenness = mean(betweenness_centrality_ctrl, na.rm = TRUE),
+    clustering = mean(clustering_coefficient_ctrl, na.rm = TRUE),
+    eigenvector = mean(eigenvector_centrality_ctrl, na.rm = TRUE),
+    expression = mean(mean_expression_ctrl, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  column_to_rownames("module_ctrl") %>%
+  as.matrix()
+
+module_summary_treat <- combined %>%
+  filter(!is.na(module_treat)) %>%
+  group_by(module_treat) %>%
+  summarise(
+    connectivity = mean(weighted_connectivity_treat, na.rm = TRUE),
+    degree = mean(degree_treat, na.rm = TRUE),
+    betweenness = mean(betweenness_centrality_treat, na.rm = TRUE),
+    clustering = mean(clustering_coefficient_treat, na.rm = TRUE),
+    eigenvector = mean(eigenvector_centrality_treat, na.rm = TRUE),
+    expression = mean(mean_expression_treat, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  column_to_rownames("module_treat") %>%
+  as.matrix()
+
+# Get all unique modules and ensure both matrices have the same rows
+all_modules_for_summary <- sort(unique(c(rownames(module_summary_ctrl), rownames(module_summary_treat))))
+
+# Reorder/expand matrices to have same rows
+reorder_matrix <- function(mat, target_rows) {
+  result <- matrix(NA, nrow = length(target_rows), ncol = ncol(mat),
+                   dimnames = list(target_rows, colnames(mat)))
+  common_rows <- intersect(rownames(mat), target_rows)
+  result[common_rows, ] <- as.matrix(mat[common_rows, ])
+  return(result)
+}
+
+module_summary_ctrl_ordered <- reorder_matrix(module_summary_ctrl, all_modules_for_summary)
+module_summary_treat_ordered <- reorder_matrix(module_summary_treat, all_modules_for_summary)
+
+# Scale each metric (z-score by column) - handle NAs
+module_summary_ctrl_scaled <- scale(module_summary_ctrl_ordered)
+module_summary_treat_scaled <- scale(module_summary_treat_ordered)
+
+pdf(file.path(output_dir, "07e_module_summary_heatmap.pdf"), width = 12, height = 10)
+par(mfrow = c(1, 2))
+
+pheatmap(module_summary_ctrl_scaled,
+         color = colorRampPalette(c("#2166AC", "white", "#B2182B"))(100),
+         main = paste0(args$ctrl_label, " - Module Metric Averages\n(Z-scored)"),
+         display_numbers = TRUE,
+         number_format = "%.2f",
+         number_color = "black",
+         fontsize_number = 8,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         angle_col = 45,
+         na_col = "grey90")
+
+pheatmap(module_summary_treat_scaled,
+         color = colorRampPalette(c("#2166AC", "white", "#B2182B"))(100),
+         main = paste0(args$treat_label, " - Module Metric Averages\n(Z-scored)"),
+         display_numbers = TRUE,
+         number_format = "%.2f",
+         number_color = "black",
+         fontsize_number = 8,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         angle_col = 45,
+         na_col = "grey90")
+
+dev.off()
+cat("    Saved: 07e_module_summary_heatmap.pdf\n")
+
+# 12f. Expression-Network Integration bubble plot
+cat("  Creating expression-network integration bubble plot...\n")
+bubble_data <- diff_metrics %>%
+  filter(!is.na(delta_expression) & !is.na(delta_connectivity) & !is.na(fold_change_expression)) %>%
+  mutate(
+    abs_fold_change = abs(log2(fold_change_expression)),
+    direction = case_when(
+      delta_expression > 0 & delta_connectivity > 0 ~ "Both Increased",
+      delta_expression > 0 & delta_connectivity < 0 ~ "Expr Up, Connect Down",
+      delta_expression < 0 & delta_connectivity > 0 ~ "Expr Down, Connect Up",
+      delta_expression < 0 & delta_connectivity < 0 ~ "Both Decreased",
+      TRUE ~ "No Change"
+    )
+  )
+
+p_bubble <- ggplot(bubble_data, aes(x = delta_expression, y = delta_connectivity, 
+                                     size = abs_fold_change, color = module_ctrl)) +
+  geom_point(alpha = 0.6) +
+  scale_color_manual(values = module_color_map, name = "Control Module") +
+  scale_size_continuous(name = "Abs Log2 Fold Change", range = c(1, 10)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
+  labs(title = "Expression-Network Integration",
+       subtitle = "Bubble size = magnitude of expression fold change",
+       x = "Change in Mean Expression (delta)",
+       y = "Change in Weighted Connectivity (delta)") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+ggsave(file.path(output_dir, "07f_expression_network_integration.pdf"), 
+       p_bubble, width = 12, height = 8)
+cat("    Saved: 07f_expression_network_integration.pdf\n")
+
+# ----- 13. Summary statistics -----
 cat("\n=== Summary Statistics ===\n")
 
 cat("\nNetwork Metrics Comparison:\n")
@@ -455,7 +750,7 @@ for (var in pca_vars) {
   ctrl_vals <- combined[[var_ctrl]]
   treat_vals <- combined[[var_treat]]
   
-  cat(sprintf("%-30s: Ctrl mean=%.4f, Treat mean=%.4f, Δ=%.4f\n",
+  cat(sprintf("%-30s: Ctrl mean=%.4f, Treat mean=%.4f, delta=%.4f\n",
               var,
               mean(ctrl_vals, na.rm = TRUE),
               mean(treat_vals, na.rm = TRUE),
@@ -471,7 +766,7 @@ for (var in expr_vars) {
   ctrl_vals <- combined[[var_ctrl]]
   treat_vals <- combined[[var_treat]]
   
-  cat(sprintf("%-30s: Ctrl mean=%.4f, Treat mean=%.4f, Δ=%.4f\n",
+  cat(sprintf("%-30s: Ctrl mean=%.4f, Treat mean=%.4f, delta=%.4f\n",
               var,
               mean(ctrl_vals, na.rm = TRUE),
               mean(treat_vals, na.rm = TRUE),

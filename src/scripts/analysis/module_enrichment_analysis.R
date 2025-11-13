@@ -499,9 +499,32 @@ cat("Generating module summary bar chart...\n")
 plot_data <- data.frame()
 for (current_module in names(enrichment_results)) {
   results <- enrichment_results[[current_module]]
+  
+  # Get top enriched term
+  all_go <- rbind(
+    if (nrow(results$go_bp) > 0) as.data.frame(results$go_bp) else NULL,
+    if (nrow(results$go_mf) > 0) as.data.frame(results$go_mf) else NULL,
+    if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL
+  )
+  
+  top_term <- "No enrichment"
+  if (!is.null(all_go) && nrow(all_go) > 0) {
+    top_term <- all_go %>%
+      dplyr::arrange(pvalue) %>%
+      dplyr::slice_head(n = 1) %>%
+      dplyr::pull(Description)
+    
+    # Truncate long terms
+    if (nchar(top_term) > 40) {
+      top_term <- paste0(substr(top_term, 1, 37), "...")
+    }
+  }
+  
   plot_data <- rbind(plot_data, data.frame(
     module = current_module,
-    n_genes = results$n_genes
+    n_genes = results$n_genes,
+    top_enrichment = top_term,
+    stringsAsFactors = FALSE
   ))
 }
 
@@ -521,19 +544,27 @@ if ("grey" %in% plot_data$module) {
 # Create proper WGCNA module colors (module name IS the colour)
 module_colors <- setNames(plot_data$module, plot_data$module)
 
+# Create legend labels with module and top enrichment
+legend_labels <- paste0(plot_data$top_enrichment)
+names(legend_labels) <- plot_data$module
+
 # Create simple bar chart showing module sizes
 p_summary <- ggplot(plot_data, aes(x = factor(module_label, levels = module_label), y = n_genes, fill = module)) +
   geom_col(width = 0.7) +
-  scale_fill_manual(values = module_colors, name = "Module") +
+  scale_fill_manual(values = module_colors, 
+                    labels = legend_labels,
+                    name = "Module: Top Enrichment") +
   coord_flip() +
   labs(title = "Module Sizes",
        x = "",
        y = "Number of Genes") +
-  theme_bw(base_size = 12)
+  theme_bw(base_size = 12) +
+  theme(legend.text = element_text(size = 8),
+        legend.key.size = unit(0.4, "cm"))
 
 # Save plot
 ggsave(file.path(output_dir, "module_summary_barplot.pdf"), 
-       plot = p_summary, width = 10, height = 8)
+       plot = p_summary, width = 12, height = 8)
 cat("  Saved: module_summary_barplot.pdf\n")
 
 # ----- 11. Generate summary statistics -----
