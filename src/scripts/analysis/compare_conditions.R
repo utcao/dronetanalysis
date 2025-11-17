@@ -84,11 +84,11 @@ cat("Treatment:", nrow(treat_metrics), "genes,", ncol(treat_metrics), "columns\n
 combined <- merge(
   ctrl_metrics %>% select(gene, weighted_connectivity, degree, betweenness_centrality, 
                           clustering_coefficient, eigenvector_centrality,
-                          mean_expression, variance_expression, module) %>%
+                          mean_expression, variance_expression, mad_expression, module) %>%
     rename_with(~paste0(., "_ctrl"), -gene),
   treat_metrics %>% select(gene, weighted_connectivity, degree, betweenness_centrality,
                            clustering_coefficient, eigenvector_centrality,
-                           mean_expression, variance_expression, module) %>%
+                           mean_expression, variance_expression, mad_expression, module) %>%
     rename_with(~paste0(., "_treat"), -gene),
   by = "gene", all = TRUE
 )
@@ -169,13 +169,14 @@ cat("Generating delta barplot for metric changes...\n")
 
 # Calculate mean deltas for all metrics
 delta_summary <- data.frame(
-  Metric = c(pca_vars, "mean_expression", "variance_expression"),
+  Metric = c(pca_vars, "mean_expression", "variance_expression", "mad_expression"),
   Delta_Mean = c(
     sapply(pca_vars, function(var) {
       mean(combined[[paste0(var, "_treat")]] - combined[[paste0(var, "_ctrl")]], na.rm = TRUE)
     }),
     mean(combined$mean_expression_treat - combined$mean_expression_ctrl, na.rm = TRUE),
-    mean(combined$variance_expression_treat - combined$variance_expression_ctrl, na.rm = TRUE)
+    mean(combined$variance_expression_treat - combined$variance_expression_ctrl, na.rm = TRUE),
+    mean(combined$mad_expression_treat - combined$mad_expression_ctrl, na.rm = TRUE)
   )
 ) %>%
   mutate(
@@ -212,14 +213,14 @@ colors_conditions <- setNames(c("#2E86AB", "#A23B72"), c(args$ctrl_label, args$t
 # Prepare expression data in long format for violin plots
 expr_metrics_long <- bind_rows(
   combined %>% 
-    select(gene, mean_expression_ctrl, variance_expression_ctrl) %>%
-    rename(mean_expression = mean_expression_ctrl, variance_expression = variance_expression_ctrl) %>%
-    pivot_longer(cols = c(mean_expression, variance_expression), names_to = "metric", values_to = "value") %>%
+    select(gene, mean_expression_ctrl, variance_expression_ctrl, mad_expression_ctrl) %>%
+    rename(mean_expression = mean_expression_ctrl, variance_expression = variance_expression_ctrl, mad_expression = mad_expression_ctrl) %>%
+    pivot_longer(cols = c(mean_expression, variance_expression, mad_expression), names_to = "metric", values_to = "value") %>%
     mutate(condition = args$ctrl_label),
   combined %>%
-    select(gene, mean_expression_treat, variance_expression_treat) %>%
-    rename(mean_expression = mean_expression_treat, variance_expression = variance_expression_treat) %>%
-    pivot_longer(cols = c(mean_expression, variance_expression), names_to = "metric", values_to = "value") %>%
+    select(gene, mean_expression_treat, variance_expression_treat, mad_expression_treat) %>%
+    rename(mean_expression = mean_expression_treat, variance_expression = variance_expression_treat, mad_expression = mad_expression_treat) %>%
+    pivot_longer(cols = c(mean_expression, variance_expression, mad_expression), names_to = "metric", values_to = "value") %>%
     mutate(condition = args$treat_label)
 ) %>% filter(!is.na(value))
 
@@ -227,16 +228,22 @@ expr_metrics_long <- bind_rows(
 mean_expr_test <- wilcox.test(
   combined$mean_expression_ctrl, 
   combined$mean_expression_treat, 
-  paired = TRUE
+  paired = FALSE
 )
 var_expr_test <- wilcox.test(
   combined$variance_expression_ctrl, 
   combined$variance_expression_treat, 
-  paired = TRUE
+  paired = FALSE
+)
+mad_expr_test <- wilcox.test(
+  combined$mad_expression_ctrl, 
+  combined$mad_expression_treat, 
+  paired = FALSE
 )
 
 cat("  Mean expression test:", format_pval(mean_expr_test$p.value), "\n")
 cat("  Variance expression test:", format_pval(var_expr_test$p.value), "\n")
+cat("  MAD expression test:", format_pval(mad_expr_test$p.value), "\n")
 
 # Create violin plots with overlaid boxplots and significance indicators
 expr_violin_plots <- list(
@@ -267,11 +274,40 @@ expr_violin_plots <- list(
     theme_minimal() +
     theme(legend.position = "none",
           plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          plot.subtitle = element_text(hjust = 0.5, size = 11)),
+
+   # Expression MAD
+  ggplot(expr_metrics_long %>% filter(metric == "mad_expression"), 
+         aes(x = condition, y = value, fill = condition)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(width = 0.2, alpha = 0.8, outlier.alpha = 0.3) +
+    scale_fill_manual(values = colors_conditions) +
+    labs(title = "Expression MAD Distribution",
+         subtitle = format_pval(mad_expr_test$p.value),
+         x = "", y = "MAD (Median Absolute Deviation)") +
+    theme_minimal() +
+    theme(legend.position = "none",
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          plot.subtitle = element_text(hjust = 0.5, size = 11)),
+
+  # Expression log MAD
+  ggplot(expr_metrics_long %>% filter(metric == "mad_expression"), 
+         aes(x = condition, y = value, fill = condition)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(width = 0.2, alpha = 0.8, outlier.alpha = 0.3) +
+    scale_fill_manual(values = colors_conditions) +
+    scale_y_log10(labels = scales::label_scientific()) +
+    labs(title = "Expression logMAD Distribution",
+         subtitle = format_pval(mad_expr_test$p.value),
+         x = "", y = "MAD (Median Absolute Deviation, log10 scale)") +
+    theme_minimal() +
+    theme(legend.position = "none",
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
           plot.subtitle = element_text(hjust = 0.5, size = 11))
 )
 
 # Save the plot directly without capturing (grid.arrange plots directly to device)
-pdf(file.path(output_dir, "01b_expression_metrics_distributions.pdf"), width = 12, height = 5)
+pdf(file.path(output_dir, "01b_expression_metrics_distributions.pdf"), width = 18, height = 15)
 gridExtra::grid.arrange(grobs = expr_violin_plots, ncol = 2, 
                         top = grid::textGrob("Expression Metrics Distribution Comparison", 
                                             gp = grid::gpar(fontsize = 16, fontface = "bold")))
@@ -1000,7 +1036,7 @@ for (var in pca_vars) {
 }
 
 cat("\nExpression Statistics Comparison:\n")
-expr_vars <- c("mean_expression", "variance_expression")
+expr_vars <- c("mean_expression", "variance_expression", "mad_expression")
 for (var in expr_vars) {
   var_ctrl <- paste0(var, "_ctrl")
   var_treat <- paste0(var, "_treat")

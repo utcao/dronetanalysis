@@ -78,6 +78,7 @@ expr_stats <- data.frame(
   mean_expression = rowMeans(combined_expr, na.rm = TRUE),
   variance_expression = apply(combined_expr, 1, var, na.rm = TRUE),
   sd_expression = apply(combined_expr, 1, sd, na.rm = TRUE),
+  mad_expression = apply(combined_expr, 1, mad, na.rm = TRUE),
   median_expression = apply(combined_expr, 1, median, na.rm = TRUE),
   min_expression = apply(combined_expr, 1, min, na.rm = TRUE),
   max_expression = apply(combined_expr, 1, max, na.rm = TRUE),
@@ -87,6 +88,7 @@ expr_stats <- data.frame(
 cat("  Expression statistics computed for", nrow(expr_stats), "genes\n")
 cat("  Mean expression range:", round(range(expr_stats$mean_expression, na.rm = TRUE), 4), "\n")
 cat("  Variance expression range:", round(range(expr_stats$variance_expression, na.rm = TRUE), 4), "\n")
+cat("  MAD expression range:", round(range(expr_stats$mad_expression, na.rm = TRUE), 4), "\n")
 
 # ----- 7. Merge with gene metrics -----
 cat("\nMerging expression statistics with gene metrics...\n")
@@ -123,5 +125,8 @@ cat("  Mean expression: mean =", round(mean(enriched_metrics$mean_expression, na
 cat("  Variance expression: mean =", round(mean(enriched_metrics$variance_expression, na.rm = TRUE), 4), 
     ", range = [", round(min(enriched_metrics$variance_expression, na.rm = TRUE), 4), ", ",
     round(max(enriched_metrics$variance_expression, na.rm = TRUE), 4), "]\n")
+cat("  MAD expression: mean =", round(mean(enriched_metrics$mad_expression, na.rm = TRUE), 4), 
+    ", range = [", round(min(enriched_metrics$mad_expression, na.rm = TRUE), 4), ", ",
+    round(max(enriched_metrics$mad_expression, na.rm = TRUE), 4), "]\n")
 
 cat("\nMerge complete.\n")

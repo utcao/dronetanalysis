@@ -36,9 +36,9 @@ options(python_cmd = "/tmp/global2/gthornes/miniforge3/envs/dronetanalysis/bin/p
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Perform enrichment analysis on WGCNA modules (Drosophila)')
 parser$add_argument('--gene-metrics-file', help = 'Path to gene metrics CSV file with module assignments',
-                   default = 'results/network_features/gene_metrics/HS_adjacency_gene_metrics_with_expression.csv')
+                   default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--output-dir', help = 'Directory to save enrichment results', 
-                   default = 'results/analysis/HS_enrichment')
+                   default = 'results/analysis/control_enrichment')
 parser$add_argument('--pvalue-cutoff', help = 'P-value cutoff for enrichment significance', 
                    default = 0.05, type = 'double')
 parser$add_argument('--qvalue-cutoff', help = 'Q-value (adjusted p-value) cutoff', 
@@ -120,7 +120,31 @@ gene2entrez <- mapIds(org_db,
                       keytype = keytype_to_use,
                       multiVals = "first")
 
-cat("  Successfully mapped:", sum(!is.na(gene2entrez)), "/", length(gene2entrez), "genes\n")
+cat("  Successfully mapped:", sum(!is.na(gene2entrez)), "/", length(gene2entrez), "genes to Entrez IDs\n")
+
+# Create gene name to KEGG ID mapping for Drosophila
+# KEGG for Drosophila uses "dme:Dmel_" prefix format
+cat("\n  Creating KEGG ID mappings for Drosophila...\n")
+gene2kegg <- tryCatch({
+  mapIds(org_db,
+         keys = gene_metrics$gene,
+         column = "FLYBASE",  # FlyBase IDs work better for KEGG
+         keytype = keytype_to_use,
+         multiVals = "first")
+}, error = function(e) {
+  cat("    Warning: Could not map to FLYBASE, trying alternative approach\n")
+  NULL
+})
+
+# If FLYBASE mapping worked, convert FlyBase to KEGG format
+if (!is.null(gene2kegg)) {
+  # Remove "FBgn" prefix and keep only the numeric part for KEGG
+  # KEGG Drosophila genes are often just the Entrez ID
+  gene2kegg_clean <- gene2entrez  # Use Entrez IDs for KEGG
+  cat("  Successfully mapped:", sum(!is.na(gene2kegg_clean)), "/", length(gene2kegg_clean), "genes to KEGG-compatible IDs\n")
+} else {
+  gene2kegg_clean <- gene2entrez
+}
 
 # DIAGNOSTIC: Check a few successful and failed mappings
 cat("\n  DIAGNOSTIC - Sample mappings:\n")
@@ -130,7 +154,7 @@ for (g in sample_genes) {
   if (is.na(entrez)) {
     cat("    ", g, "-> FAILED\n")
   } else {
-    cat("    ", g, "->", entrez, "\n")
+    cat("    ", g, "-> Entrez:", entrez, "\n")
   }
 }
 cat("\n")
@@ -138,7 +162,9 @@ cat("\n")
 # Create background universe (all genes analyzed in WGCNA)
 cat("Creating background universe for enrichment...\n")
 universe_entrez <- gene2entrez[!is.na(gene2entrez)]
-cat("  Universe size:", length(universe_entrez), "genes\n")
+universe_kegg <- gene2kegg_clean[!is.na(gene2kegg_clean)]
+cat("  Universe size (Entrez):", length(universe_entrez), "genes\n")
+cat("  Universe size (KEGG):", length(universe_kegg), "genes\n")
 cat("  (Using analyzed genes as background instead of full genome)\n\n")
 
 # ----- 7. Perform enrichment for each module -----
@@ -161,7 +187,12 @@ for (current_module in modules) {
   module_entrez <- gene2entrez[names(gene2entrez) %in% module_genes]
   module_entrez <- module_entrez[!is.na(module_entrez)]
   
+  # Get KEGG IDs for module genes
+  module_kegg <- gene2kegg_clean[names(gene2kegg_clean) %in% module_genes]
+  module_kegg <- module_kegg[!is.na(module_kegg)]
+  
   cat("  Mapped to Entrez IDs:", length(module_entrez), "\n")
+  cat("  Mapped to KEGG IDs:", length(module_kegg), "\n")
   
   if (length(module_entrez) == 0) {
     cat("  WARNING: No genes could be mapped for this module\n\n")
@@ -321,6 +352,81 @@ for (current_module in modules) {
     go_cc <- data.frame()
   }
   
+  # ----- KEGG Enrichment -----
+  cat("  Running KEGG enrichment...\n")
+  cat("    DIAGNOSTIC: Sample KEGG IDs:", paste(head(module_kegg, 5), collapse = ", "), "\n")
+  cat("    Module has", length(module_kegg), "genes with KEGG IDs\n")
+  
+  # Skip KEGG if no genes mapped
+  if (length(module_kegg) == 0) {
+    cat("    WARNING: No genes mapped to KEGG IDs - skipping KEGG enrichment\n")
+    kegg <- data.frame()
+  } else {
+    # Check if genes are in KEGG database
+    tryCatch({
+      # Try to download KEGG pathway info
+      kegg_info <- clusterProfiler::download_KEGG(species = "dme", keggType = "KEGG", keyType = "kegg")
+      if (!is.null(kegg_info) && length(kegg_info) > 0) {
+        all_kegg_genes <- unique(unlist(kegg_info$KEGGPATHID2EXTID))
+        cat("    Total KEGG genes available for dme:", length(all_kegg_genes), "\n")
+        # Check overlap
+        overlap <- sum(as.character(module_kegg) %in% as.character(all_kegg_genes))
+        cat("    Module genes found in KEGG:", overlap, "/", length(module_kegg), "\n")
+      }
+    }, error = function(e) {
+      cat("    Could not check KEGG gene overlap:", e$message, "\n")
+    })
+    
+    tryCatch({
+      kegg <- enrichKEGG(gene = as.character(module_kegg),
+                         universe = as.character(universe_kegg),
+                         organism = "dme",  # Drosophila melanogaster
+                         keyType = "ncbi-geneid",  # Specify we're using Entrez IDs
+                         pvalueCutoff = args$pvalue_cutoff,
+                         qvalueCutoff = args$qvalue_cutoff,
+                         minGSSize = args$min_genesetsize,
+                         maxGSSize = args$max_genesetsize)
+      if (is.null(kegg) || nrow(kegg) == 0) {
+        cat("    No KEGG results - trying with relaxed cutoffs (p<0.2, q<1.0)...\n")
+        kegg <- enrichKEGG(gene = as.character(module_kegg),
+                           universe = as.character(universe_kegg),
+                           organism = "dme",
+                           keyType = "ncbi-geneid",
+                           pvalueCutoff = 0.2,
+                           qvalueCutoff = 1.0,
+                           minGSSize = args$min_genesetsize,
+                           maxGSSize = args$max_genesetsize)
+      }
+      if (is.null(kegg) || nrow(kegg) == 0) {
+        cat("    Still no KEGG results - trying with NO cutoffs (p<1.0, q<1.0)...\n")
+        kegg <- enrichKEGG(gene = as.character(module_kegg),
+                           universe = as.character(universe_kegg),
+                           organism = "dme",
+                           keyType = "ncbi-geneid",
+                           pvalueCutoff = 1.0,
+                           qvalueCutoff = 1.0,
+                           minGSSize = args$min_genesetsize,
+                           maxGSSize = args$max_genesetsize)
+      }
+      # Convert Entrez IDs to gene symbols for readability
+      if (!is.null(kegg) && nrow(kegg) > 0) {
+        kegg <- setReadable(kegg, OrgDb = org_db, keyType = "ENTREZID")
+        cat("    KEGG enrichment found:", nrow(kegg), "pathways\n")
+      } else {
+        cat("    No KEGG pathways enriched even with relaxed cutoffs\n")
+        cat("    This is common for Drosophila - KEGG has limited pathway coverage\n")
+      }
+    }, error = function(e) {
+      cat("    WARNING: KEGG enrichment failed -", e$message, "\n")
+      cat("    This may indicate KEGG database access issues or limited pathway annotations\n")
+      kegg <<- data.frame()
+    })
+  }
+  
+  if (is.null(kegg)) {
+    kegg <- data.frame()
+  }
+  
   # Store results
   enrichment_results[[current_module]] <- list(
     genes = module_genes,
@@ -329,6 +435,7 @@ for (current_module in modules) {
     go_bp = go_bp,
     go_mf = go_mf,
     go_cc = go_cc,
+    kegg = kegg,
     go_bp_simplified = if (exists("go_bp_simplified")) go_bp_simplified else data.frame(),
     go_mf_simplified = if (exists("go_mf_simplified")) go_mf_simplified else data.frame(),
     go_cc_simplified = if (exists("go_cc_simplified")) go_cc_simplified else data.frame()
@@ -350,10 +457,16 @@ for (current_module in modules) {
     all_enrichments[[paste(current_module, "GO_CC", sep = "_")]] <- go_cc_df
   }
   
+  if (nrow(kegg) > 0) {
+    kegg_df <- as.data.frame(kegg) %>% mutate(module = current_module, ontology = "KEGG")
+    all_enrichments[[paste(current_module, "KEGG", sep = "_")]] <- kegg_df
+  }
+  
   cat("  Enrichments found:\n")
   cat("    GO BP:", nrow(go_bp), "\n")
   cat("    GO MF:", nrow(go_mf), "\n")
   cat("    GO CC:", nrow(go_cc), "\n")
+  cat("    KEGG:", nrow(kegg), "\n")
   
   # Try to show actual p-value ranges if results exist
   if (!is.null(go_bp) && nrow(go_bp) > 0) {
@@ -449,6 +562,20 @@ for (current_module in names(enrichment_results)) {
   } else {
     cat("No significant enrichments\n", file = report_file, append = TRUE)
   }
+  
+  cat("\n--- KEGG PATHWAYS ---\n",
+      file = report_file, append = TRUE)
+  if (!is.null(results$kegg) && nrow(results$kegg) > 0) {
+    kegg_df <- as.data.frame(results$kegg) %>%
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID) %>%
+      dplyr::arrange(pvalue)
+    # Convert geneID to character
+    kegg_df$geneID <- as.character(kegg_df$geneID)
+    write.table(kegg_df, file = report_file, append = TRUE, quote = FALSE,
+                sep = "\t", col.names = TRUE, row.names = FALSE)
+  } else {
+    cat("No significant enrichments\n", file = report_file, append = TRUE)
+  }
 }
 
 # ----- 10. Generate enrichment plots -----
@@ -497,12 +624,24 @@ for (current_module in names(enrichment_results)) {
     })
   }
   
+  # KEGG dotplot
+  if (nrow(results$kegg) > 0) {
+    tryCatch({
+      p_kegg <- dotplot(results$kegg, showCategory = min(10, nrow(results$kegg)),
+                        title = "KEGG Pathways") +
+                        theme(plot.title = element_text(hjust = 0.5, size = 10))
+      plots_to_draw[["KEGG"]] <- p_kegg
+    }, error = function(e) {
+      cat("    Warning: Could not create KEGG dotplot -", e$message, "\n")
+    })
+  }
+  
   # Combine plots into one figure
   if (length(plots_to_draw) > 0) {
     # Add overall title
     library(gridExtra)
     library(grid)
-    grid_title <- textGrob(paste("Module", current_module, "- GO Enrichment"), 
+    grid_title <- textGrob(paste("Module", current_module, "- Functional Enrichment"), 
                            gp = gpar(fontsize = 14, fontface = "bold"))
     
     # Arrange plots based on how many we have
@@ -515,7 +654,7 @@ for (current_module in names(enrichment_results)) {
     }
     
     print(combined_plot)
-  } else if (nrow(results$go_bp) == 0 && nrow(results$go_mf) == 0 && nrow(results$go_cc) == 0) {
+  } else if (nrow(results$go_bp) == 0 && nrow(results$go_mf) == 0 && nrow(results$go_cc) == 0 && nrow(results$kegg) == 0) {
     # Create a simple text plot if no enrichments found
     plot.new()
     text(0.5, 0.5, paste("No enrichments found for module", current_module), 
@@ -534,11 +673,12 @@ plot_data <- data.frame()
 for (current_module in names(enrichment_results)) {
   results <- enrichment_results[[current_module]]
   
-  # Get top enriched term
+  # Get top enriched term (including KEGG)
   all_go <- rbind(
     if (nrow(results$go_bp) > 0) as.data.frame(results$go_bp) else NULL,
     if (nrow(results$go_mf) > 0) as.data.frame(results$go_mf) else NULL,
-    if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL
+    if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL,
+    if (nrow(results$kegg) > 0) as.data.frame(results$kegg) else NULL
   )
   
   top_term <- "No enrichment"
@@ -605,7 +745,7 @@ cat("  Saved: module_summary_barplot.pdf\n")
 cat("\n=== ENRICHMENT SUMMARY ===\n")
 
 # Create summary data frame
-module_summary <- data.frame()
+  module_summary <- data.frame()
 
 for (current_module in names(enrichment_results)) {
   results <- enrichment_results[[current_module]]
@@ -614,17 +754,17 @@ for (current_module in names(enrichment_results)) {
   cat("  GO BP enrichments:", nrow(results$go_bp), "\n")
   cat("  GO MF enrichments:", nrow(results$go_mf), "\n")
   cat("  GO CC enrichments:", nrow(results$go_cc), "\n")
-  
-  # Show simplified enrichment summary
+  cat("  KEGG enrichments:", nrow(results$kegg), "\n")  # Show simplified enrichment summary
   if (!is.null(results$go_bp_simplified) && nrow(results$go_bp_simplified) > 0) {
     cat("  Simplified BP terms:", nrow(results$go_bp_simplified), "\n")
   }
   
-  # Top enrichment
+  # Top enrichment (GO + KEGG)
   all_go <- rbind(
     if (nrow(results$go_bp) > 0) as.data.frame(results$go_bp) else NULL,
     if (nrow(results$go_mf) > 0) as.data.frame(results$go_mf) else NULL,
-    if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL
+    if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL,
+    if (nrow(results$kegg) > 0) as.data.frame(results$kegg) else NULL
   )
   
   top_term_1 <- NA
@@ -691,6 +831,7 @@ for (current_module in names(enrichment_results)) {
     n_BP_enrichments = nrow(results$go_bp),
     n_MF_enrichments = nrow(results$go_mf),
     n_CC_enrichments = nrow(results$go_cc),
+    n_KEGG_enrichments = nrow(results$kegg),
     n_BP_simplified = if (!is.null(results$go_bp_simplified)) nrow(results$go_bp_simplified) else 0,
     top_term_1 = top_term_1,
     top_pvalue_1 = top_pval_1,
