@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 10/11/2025
+# Last Updated: 17/11/2025
 #
 # This script::
 #   1. Takes wide correlation matrix following soft thresholding as input
@@ -15,110 +15,128 @@
 rm(list = ls())
 
 # ----- 1. Load required packages -----
-library(data.table)
-library(dplyr)
-library(tidyr)
-library(WGCNA)
-library(yaml)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(dplyr)
+  library(tidyr)
+  library(WGCNA)
+  library(argparse)
+})
 
-# ----- 2. Set Input and Output Paths from config.yaml -----
+# ----- 2. Set up utility functions -----
 source("src/utils/utils_io.R")
 source("src/utils/utils_network_feats.R")
-config <- yaml::read_yaml("config/config.yaml")
-sft_input_dir <- config$network_feature_files$soft_threshold_files
-spearman_input_dir <- config$spearman_correlation_files$permutation_files
-spearman_input_file <- file.path(spearman_input_dir, "sig_matrix_wide.csv")
-adjacency_output_dir <- file.path(config$output_dirs$network_features_dir, "features_calc/HS_adjacency")
-sum_output_dir <- file.path(config$output_dirs$network_features_dir, "features_calc")
 
-spearman <- read.csv(file.path(spearman_input_file))
-adjacency <- read.csv(file.path(sft_input_dir))
-cat("Files read successfully:\n")
-cat("- Spearman correlation matrix:", nrow(spearman), "x", ncol(spearman), "\n")
-cat("- Adjacency matrix:", nrow(adjacency), "x", ncol(adjacency), "\n")
+# ----- 3. Command-line arguments -----
+parser <- ArgumentParser(description = 'Calculate network features and identify modules from adjacency matrix')
+parser$add_argument('--adjacency-file', help = 'Path to soft-thresholded adjacency matrix CSV file',
+                   default = 'results/network_features/soft_threshold/HS_soft_thresholded_adjacency_matrix.csv')
+parser$add_argument('--output-dir', help = 'Directory to save network metrics and module results', 
+                   default = 'results/network_features/features_calc/HS_adjacency')
+parser$add_argument('--connection-threshold', help = 'Connection threshold for degree calculation', 
+                   default = 0.01, type = 'double')
+parser$add_argument('--min-module-size', help = 'Minimum module size for WGCNA', 
+                   default = 20, type = 'integer')
+parser$add_argument('--merge-threshold', help = 'Module merge threshold (height to merge similar modules)', 
+                   default = 0.15, type = 'double')
+parser$add_argument('--deep-split', help = 'Deep split parameter for module detection (0-4)', 
+                   default = 3, type = 'integer')
+parser$add_argument('--top-n-hubs', help = 'Number of top hub genes to identify per module', 
+                   default = 5, type = 'integer')
+args <- parser$parse_args()
+
+output_dir <- args$output_dir
+module_output_dir <- file.path(output_dir, "modules")
+
+cat("=== Network Metrics Analysis ===\n")
+cat("Adjacency file:", args$adjacency_file, "\n")
+cat("Output directory:", output_dir, "\n")
+cat("Connection threshold:", args$connection_threshold, "\n")
+cat("Min module size:", args$min_module_size, "\n")
+cat("Merge threshold:", args$merge_threshold, "\n")
+cat("Deep split:", args$deep_split, "\n")
+cat("Top hubs per module:", args$top_n_hubs, "\n\n")
+
+# Read adjacency matrix
+adjacency <- read.csv(args$adjacency_file)
+cat("Adjacency matrix loaded:", nrow(adjacency), "x", ncol(adjacency), "\n\n")
 
 # Create output directory if it doesn't exist
-create_directories(sum_output_dir)
+create_directories(output_dir)
+create_directories(module_output_dir)
 
-# ----- 3. Calculate network-level summary statistics -----
+# ----- 4. Calculate network-level summary statistics -----
 
-# Convert matrices to proper format
-spearman_matrix <- as.matrix(spearman[,-1])
-rownames(spearman_matrix) <- spearman[[1]]
-colnames(spearman_matrix) <- spearman[[1]]
-spearman_matrix[spearman_matrix == 0] <- NA  # Set zero correlations to NA for summary stats
-
+# Convert adjacency to proper matrix format
 adjacency_matrix <- as.matrix(adjacency[,-1])
 rownames(adjacency_matrix) <- adjacency[[1]]
 colnames(adjacency_matrix) <- adjacency[[1]]
 
 cat("Matrix conversion completed:\n")
-cat("- Spearman matrix dimensions:", dim(spearman_matrix), "\n")
-cat("- Adjacency matrix dimensions:", dim(adjacency_matrix), "\n")
+cat("- Adjacency matrix dimensions:", dim(adjacency_matrix), "\n\n")
 
-plot_threshold_analysis(adjacency_matrix, output_file = file.path(sum_output_dir, "HS_adjacency_threshold_analysis.pdf"), threshold_range = seq(0.02, 0.4, by=0.02),
+cat("Generating threshold analysis plot...\n")
+plot_threshold_analysis(adjacency_matrix, 
+                        output_file = file.path(output_dir, "adjacency_threshold_analysis.pdf"), 
+                        threshold_range = seq(0.02, 0.4, by = 0.02),
                         matrix_name = "Adjacency Matrix")
 
-
-# Calculate metrics for matrices
-adjacency_metrics <- calculate_network_metrics(adjacency_matrix, "Soft-Thresholded Adjacency", connection_threshold = 0.01) # decide threshold based on plot
+# Calculate network metrics
+cat("\nCalculating network metrics...\n")
+adjacency_metrics <- calculate_network_metrics(adjacency_matrix, 
+                                               "Soft-Thresholded Adjacency", 
+                                               connection_threshold = args$connection_threshold)
 
 # Create summary data frame for export
 summary_stats <- data.frame(
-    Matrix_Type = c("Adjacency"),
-    Mean_Abs_Correlation = c(adjacency_metrics$mean_abs_corr),
-    Median_Abs_Correlation = c(adjacency_metrics$median_abs_corr),
-    Max_Correlation = c(adjacency_metrics$max_corr),
-    Min_Correlation = c(adjacency_metrics$min_corr),
-    Mean_Connectivity = c(mean(adjacency_metrics$weighted_connectivity, na.rm = TRUE)),
-    Mean_Degree = c(mean(adjacency_metrics$degree, na.rm = TRUE))
-    )
+    Matrix_Type = "Adjacency",
+    Mean_Abs_Correlation = adjacency_metrics$mean_abs_corr,
+    Median_Abs_Correlation = adjacency_metrics$median_abs_corr,
+    Max_Correlation = adjacency_metrics$max_corr,
+    Min_Correlation = adjacency_metrics$min_corr,
+    Mean_Connectivity = mean(adjacency_metrics$weighted_connectivity, na.rm = TRUE),
+    Mean_Degree = mean(adjacency_metrics$degree, na.rm = TRUE)
+)
 
 # Save summary statistics
-summary_file <- file.path(sum_output_dir, "HS_network_metrics_summary.csv")
+summary_file <- file.path(output_dir, "network_metrics_summary.csv")
 write.csv(summary_stats, file = summary_file, row.names = FALSE)
 
-cat("\n=== Summary ===\n")
+cat("\n=== Network Summary Statistics ===\n")
 print(summary_stats)
 cat("\nSummary statistics saved to:", summary_file, "\n")
 
-# ----- 4. Calculate gene-level network features via WGCNA -----
+# ----- 5. Calculate gene-level network features via WGCNA -----
 
-# Create output directories
-create_directories(adjacency_output_dir) 
-create_directories(sum_output_dir)
-
-# WGCNA Module Detection and Hub Gene Identification
-
-# Create modules for adjacency network
-cat("\n=== Processing Adjacency Network ===\n")
+cat("\n=== WGCNA Module Detection ===\n")
 adjacency_modules <- create_modules(
     adjacency_matrix = adjacency_matrix,
-    min_module_size = 30,
-    merge_threshold = 0.25,
-    deep_split = 2,
-    output_dir = adjacency_output_dir,
+    min_module_size = args$min_module_size,
+    merge_threshold = args$merge_threshold,
+    deep_split = args$deep_split,
+    output_dir = module_output_dir,
     save_plots = TRUE
 )
  
-# Identify hub genes for adjacency network
-cat("\n=== Identifying Hub Genes - Adjacency Network ===\n")
+# Identify hub genes
+cat("\n=== Identifying Hub Genes ===\n")
 adjacency_hubs <- identify_hubs(
     module_results = adjacency_modules,
-    top_n_hubs = 5,
-    output_dir = adjacency_output_dir,
+    top_n_hubs = args$top_n_hubs,
+    output_dir = module_output_dir,
     save_files = TRUE
 )
 
 # Save TOM matrices (from the module results)
-tom_adjacency_file <- file.path(adjacency_output_dir, "HS_tom_adjacency_matrix.csv")
-tomd_adjacency_file <- file.path(adjacency_output_dir, "HS_tomd_adjacency_matrix.csv")
+tom_file <- file.path(module_output_dir, "tom_matrix.csv")
+tomd_file <- file.path(module_output_dir, "tomd_matrix.csv")
 
-write.csv(adjacency_modules$tom_matrix, file = tom_adjacency_file, row.names = TRUE)
-write.csv(adjacency_modules$tomd_matrix, file = tomd_adjacency_file, row.names = TRUE)
+write.csv(adjacency_modules$tom_matrix, file = tom_file, row.names = TRUE)
+write.csv(adjacency_modules$tomd_matrix, file = tomd_file, row.names = TRUE)
 
-cat("TOM matrices saved:\n")
-cat("- TOM Adjacency matrix:", tom_adjacency_file, "\n")
-cat("- TOMD Adjacency matrix:", tomd_adjacency_file, "\n")
+cat("\nTOM matrices saved:\n")
+cat("- TOM matrix:", tom_file, "\n")
+cat("- TOMD matrix:", tomd_file, "\n")
 
-cat("Network features analysis complete. Results saved to:", sum_output_dir, "\n")
+cat("\n=== Analysis Complete ===\n")
+cat("Results saved to:", output_dir, "\n")
