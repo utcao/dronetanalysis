@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 13/11/2025
+# Last Updated: 16/11/2025
 #
 # This script:
 #   1. Loads gene metrics and module assignments
@@ -29,12 +29,16 @@ suppressPackageStartupMessages({
   library(org.Dm.eg.db)
 })
 
+# Set Python path to conda environment Python for clusterProfiler::simplify() 
+Sys.setenv(PYTHON = "/tmp/global2/gthornes/miniforge3/envs/dronetanalysis/bin/python")
+options(python_cmd = "/tmp/global2/gthornes/miniforge3/envs/dronetanalysis/bin/python")
+
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Perform enrichment analysis on WGCNA modules (Drosophila)')
 parser$add_argument('--gene-metrics-file', help = 'Path to gene metrics CSV file with module assignments',
-                   default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
+                   default = 'results/network_features/gene_metrics/HS_adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--output-dir', help = 'Directory to save enrichment results', 
-                   default = 'results/analysis/enrichment')
+                   default = 'results/analysis/HS_enrichment')
 parser$add_argument('--pvalue-cutoff', help = 'P-value cutoff for enrichment significance', 
                    default = 0.05, type = 'double')
 parser$add_argument('--qvalue-cutoff', help = 'Q-value (adjusted p-value) cutoff', 
@@ -131,6 +135,12 @@ for (g in sample_genes) {
 }
 cat("\n")
 
+# Create background universe (all genes analyzed in WGCNA)
+cat("Creating background universe for enrichment...\n")
+universe_entrez <- gene2entrez[!is.na(gene2entrez)]
+cat("  Universe size:", length(universe_entrez), "genes\n")
+cat("  (Using analyzed genes as background instead of full genome)\n\n")
+
 # ----- 7. Perform enrichment for each module -----
 cat("Performing enrichment analysis for each module...\n\n")
 
@@ -165,6 +175,7 @@ for (current_module in modules) {
   cat("  Running GO enrichment (BP)...\n")
   tryCatch({
     go_bp <- enrichGO(gene = as.character(module_entrez),
+                      universe = as.character(universe_entrez),
                       OrgDb = org_db,
                       ont = "BP",
                       pvalueCutoff = args$pvalue_cutoff,
@@ -175,6 +186,7 @@ for (current_module in modules) {
     if (is.null(go_bp) || nrow(go_bp) == 0) {
       cat("    No BP results - trying with relaxed cutoffs (p<0.2, q<1.0)...\n")
       go_bp <- enrichGO(gene = as.character(module_entrez),
+                        universe = as.character(universe_entrez),
                         OrgDb = org_db,
                         ont = "BP",
                         pvalueCutoff = 0.2,
@@ -186,6 +198,7 @@ for (current_module in modules) {
     if (is.null(go_bp) || nrow(go_bp) == 0) {
       cat("    Still no BP results - trying with NO cutoffs (p<1.0, q<1.0)...\n")
       go_bp <- enrichGO(gene = as.character(module_entrez),
+                        universe = as.character(universe_entrez),
                         OrgDb = org_db,
                         ont = "BP",
                         pvalueCutoff = 1.0,
@@ -212,6 +225,7 @@ for (current_module in modules) {
   cat("  Running GO enrichment (MF)...\n")
   tryCatch({
     go_mf <- enrichGO(gene = as.character(module_entrez),
+                      universe = as.character(universe_entrez),
                       OrgDb = org_db,
                       ont = "MF",
                       pvalueCutoff = args$pvalue_cutoff,
@@ -222,6 +236,7 @@ for (current_module in modules) {
     if (is.null(go_mf) || nrow(go_mf) == 0) {
       cat("    No MF results - trying with relaxed cutoffs (p<0.2, q<1.0)...\n")
       go_mf <- enrichGO(gene = as.character(module_entrez),
+                        universe = as.character(universe_entrez),
                         OrgDb = org_db,
                         ont = "MF",
                         pvalueCutoff = 0.2,
@@ -233,6 +248,7 @@ for (current_module in modules) {
     if (is.null(go_mf) || nrow(go_mf) == 0) {
       cat("    Still no MF results - trying with NO cutoffs (p<1.0, q<1.0)...\n")
       go_mf <- enrichGO(gene = as.character(module_entrez),
+                        universe = as.character(universe_entrez),
                         OrgDb = org_db,
                         ont = "MF",
                         pvalueCutoff = 1.0,
@@ -259,6 +275,7 @@ for (current_module in modules) {
   cat("  Running GO enrichment (CC)...\n")
   tryCatch({
     go_cc <- enrichGO(gene = as.character(module_entrez),
+                      universe = as.character(universe_entrez),
                       OrgDb = org_db,
                       ont = "CC",
                       pvalueCutoff = args$pvalue_cutoff,
@@ -269,6 +286,7 @@ for (current_module in modules) {
     if (is.null(go_cc) || nrow(go_cc) == 0) {
       cat("    No CC results - trying with relaxed cutoffs (p<0.2, q<1.0)...\n")
       go_cc <- enrichGO(gene = as.character(module_entrez),
+                        universe = as.character(universe_entrez),
                         OrgDb = org_db,
                         ont = "CC",
                         pvalueCutoff = 0.2,
@@ -280,6 +298,7 @@ for (current_module in modules) {
     if (is.null(go_cc) || nrow(go_cc) == 0) {
       cat("    Still no CC results - trying with NO cutoffs (p<1.0, q<1.0)...\n")
       go_cc <- enrichGO(gene = as.character(module_entrez),
+                        universe = as.character(universe_entrez),
                         OrgDb = org_db,
                         ont = "CC",
                         pvalueCutoff = 1.0,
@@ -435,7 +454,7 @@ for (current_module in names(enrichment_results)) {
 # ----- 10. Generate enrichment plots -----
 cat("Generating enrichment plots...\n")
 
-pdf(file.path(output_dir, "enrichment_plots.pdf"), width = 14, height = 10)
+pdf(file.path(output_dir, "enrichment_plots.pdf"), width = 14, height = 15)
 
 for (current_module in names(enrichment_results)) {
   results <- enrichment_results[[current_module]]
@@ -445,10 +464,10 @@ for (current_module in names(enrichment_results)) {
   # GO BP dotplot
   if (nrow(results$go_bp) > 0) {
     tryCatch({
-      # Show top 20 enrichments regardless of total count
-      p_bp <- dotplot(results$go_bp, showCategory = min(20, nrow(results$go_bp)), 
-                      title = paste("Module", current_module, "- GO Biological Process"))
-      plots_to_draw[[length(plots_to_draw) + 1]] <- p_bp
+      p_bp <- dotplot(results$go_bp, showCategory = min(10, nrow(results$go_bp)), 
+                      title = "Biological Process") +
+                      theme(plot.title = element_text(hjust = 0.5, size = 10))
+      plots_to_draw[["BP"]] <- p_bp
     }, error = function(e) {
       cat("    Warning: Could not create GO BP dotplot -", e$message, "\n")
     })
@@ -457,9 +476,10 @@ for (current_module in names(enrichment_results)) {
   # GO MF dotplot
   if (nrow(results$go_mf) > 0) {
     tryCatch({
-      p_mf <- dotplot(results$go_mf, showCategory = min(20, nrow(results$go_mf)),
-                      title = paste("Module", current_module, "- GO Molecular Function"))
-      plots_to_draw[[length(plots_to_draw) + 1]] <- p_mf
+      p_mf <- dotplot(results$go_mf, showCategory = min(10, nrow(results$go_mf)),
+                      title = "Molecular Function") +
+                      theme(plot.title = element_text(hjust = 0.5, size = 10))
+      plots_to_draw[["MF"]] <- p_mf
     }, error = function(e) {
       cat("    Warning: Could not create GO MF dotplot -", e$message, "\n")
     })
@@ -468,24 +488,38 @@ for (current_module in names(enrichment_results)) {
   # GO CC dotplot
   if (nrow(results$go_cc) > 0) {
     tryCatch({
-      p_cc <- dotplot(results$go_cc, showCategory = min(20, nrow(results$go_cc)),
-                      title = paste("Module", current_module, "- GO Cellular Component"))
-      plots_to_draw[[length(plots_to_draw) + 1]] <- p_cc
+      p_cc <- dotplot(results$go_cc, showCategory = min(10, nrow(results$go_cc)),
+                      title = "Cellular Component") +
+                      theme(plot.title = element_text(hjust = 0.5, size = 10))
+      plots_to_draw[["CC"]] <- p_cc
     }, error = function(e) {
       cat("    Warning: Could not create GO CC dotplot -", e$message, "\n")
     })
   }
   
-  # Print plots (one per page or grouped)
+  # Combine plots into one figure
   if (length(plots_to_draw) > 0) {
-    for (p in plots_to_draw) {
-      print(p)
+    # Add overall title
+    library(gridExtra)
+    library(grid)
+    grid_title <- textGrob(paste("Module", current_module, "- GO Enrichment"), 
+                           gp = gpar(fontsize = 14, fontface = "bold"))
+    
+    # Arrange plots based on how many we have
+    if (length(plots_to_draw) == 3) {
+      combined_plot <- grid.arrange(grobs = plots_to_draw, ncol = 1, top = grid_title)
+    } else if (length(plots_to_draw) == 2) {
+      combined_plot <- grid.arrange(grobs = plots_to_draw, ncol = 1, top = grid_title)
+    } else {
+      combined_plot <- grid.arrange(grobs = plots_to_draw, ncol = 1, top = grid_title)
     }
+    
+    print(combined_plot)
   } else if (nrow(results$go_bp) == 0 && nrow(results$go_mf) == 0 && nrow(results$go_cc) == 0) {
     # Create a simple text plot if no enrichments found
     plot.new()
     text(0.5, 0.5, paste("No enrichments found for module", current_module), 
-         cex = 1.5, ha = "center")
+         cex = 1.5, col = "grey50")
   }
 }
 
@@ -528,8 +562,7 @@ for (current_module in names(enrichment_results)) {
   ))
 }
 
-# Sort by module size (ascending so largest appears at top after coord_flip)
-# But put grey at the bottom
+# Sort by module size (ascending)
 plot_data <- plot_data %>%
   dplyr::arrange(n_genes) %>%
   dplyr::mutate(module_label = ifelse(module == "grey", "non-modular genes", module))
@@ -560,7 +593,8 @@ p_summary <- ggplot(plot_data, aes(x = factor(module_label, levels = module_labe
        y = "Number of Genes") +
   theme_bw(base_size = 12) +
   theme(legend.text = element_text(size = 8),
-        legend.key.size = unit(0.4, "cm"))
+        legend.key.size = unit(0.4, "cm"),
+        plot.title = element_text(hjust = 0.5))
 
 # Save plot
 ggsave(file.path(output_dir, "module_summary_barplot.pdf"), 
