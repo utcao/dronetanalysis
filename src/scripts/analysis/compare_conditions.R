@@ -29,6 +29,22 @@ suppressPackageStartupMessages({
   library(argparse)
 })
 
+# Helper function to format p-values for display
+format_pval <- function(p) {
+  if (p < 0.001) return("p < 0.001***")
+  if (p < 0.01) return(sprintf("p = %.3f**", p))
+  if (p < 0.05) return(sprintf("p = %.3f*", p))
+  return(sprintf("p = %.3f", p))
+}
+
+# Helper function to get significance stars
+get_sig_stars <- function(p) {
+  if (p < 0.001) return("***")
+  if (p < 0.01) return("**")
+  if (p < 0.05) return("*")
+  return("ns")
+}
+
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Compare gene metrics between two conditions')
 parser$add_argument('--ctrl-file', help = 'Control condition gene metrics + expression CSV', 
@@ -46,7 +62,7 @@ args <- parser$parse_args()
 output_dir <- args$output_dir
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-cat("=== Comparing Gene Metrics Between Conditions ===\n")
+cat("=== Comparing Gene Metrics Between Conditions ===")
 cat("Control file:", args$ctrl_file, "\n")
 cat("Treatment file:", args$treat_file, "\n")
 cat("Control label:", args$ctrl_label, "\n")
@@ -148,13 +164,148 @@ p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = condition, fill = conditio
 ggsave(file.path(output_dir, "01_pca_network_metrics.pdf"), p_pca, width = 8, height = 6)
 cat("  Saved: 01_pca_network_metrics.pdf\n")
 
+# ----- 5a. Delta barplot showing mean changes across all metrics -----
+cat("Generating delta barplot for metric changes...\n")
+
+# Calculate mean deltas for all metrics
+delta_summary <- data.frame(
+  Metric = c(pca_vars, "mean_expression", "variance_expression"),
+  Delta_Mean = c(
+    sapply(pca_vars, function(var) {
+      mean(combined[[paste0(var, "_treat")]] - combined[[paste0(var, "_ctrl")]], na.rm = TRUE)
+    }),
+    mean(combined$mean_expression_treat - combined$mean_expression_ctrl, na.rm = TRUE),
+    mean(combined$variance_expression_treat - combined$variance_expression_ctrl, na.rm = TRUE)
+  )
+) %>%
+  mutate(
+    Metric_Label = gsub("_", " ", Metric),
+    Metric_Label = tools::toTitleCase(Metric_Label),
+    Direction = ifelse(Delta_Mean > 0, "Increased", "Decreased"),
+    Metric_Type = ifelse(Metric %in% pca_vars, "Network", "Expression")
+  )
+
+# Create barplot with colors indicating direction
+p_delta <- ggplot(delta_summary, aes(x = reorder(Metric_Label, Delta_Mean), y = Delta_Mean, fill = Direction)) +
+  geom_col(alpha = 0.8) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black", linewidth = 0.5) +
+  scale_fill_manual(values = c("Increased" = "#A23B72", "Decreased" = "#2E86AB")) +
+  coord_flip() +
+  facet_wrap(~Metric_Type, scales = "free_y", ncol = 1) +
+  labs(title = paste0("Mean Change in Metrics: ", args$ctrl_label, " → ", args$treat_label),
+       x = "", y = "Mean Delta (Treatment - Control)",
+       fill = "Direction") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+        legend.position = "right",
+        strip.text = element_text(face = "bold", size = 12))
+
+ggsave(file.path(output_dir, "01a_metric_deltas_barplot.pdf"), p_delta, width = 10, height = 8)
+cat("  Saved: 01a_metric_deltas_barplot.pdf\n")
+
+# ----- 5b. Violin/Box plots for expression metrics comparison -----
+cat("Generating expression metrics distribution comparison plots...\n")
+
+# Define custom colors for conditions (needed for violin plots)
+colors_conditions <- setNames(c("#2E86AB", "#A23B72"), c(args$ctrl_label, args$treat_label))  # Blue and magenta
+
+# Prepare expression data in long format for violin plots
+expr_metrics_long <- bind_rows(
+  combined %>% 
+    select(gene, mean_expression_ctrl, variance_expression_ctrl) %>%
+    rename(mean_expression = mean_expression_ctrl, variance_expression = variance_expression_ctrl) %>%
+    pivot_longer(cols = c(mean_expression, variance_expression), names_to = "metric", values_to = "value") %>%
+    mutate(condition = args$ctrl_label),
+  combined %>%
+    select(gene, mean_expression_treat, variance_expression_treat) %>%
+    rename(mean_expression = mean_expression_treat, variance_expression = variance_expression_treat) %>%
+    pivot_longer(cols = c(mean_expression, variance_expression), names_to = "metric", values_to = "value") %>%
+    mutate(condition = args$treat_label)
+) %>% filter(!is.na(value))
+
+# Statistical tests for expression metrics
+mean_expr_test <- wilcox.test(
+  combined$mean_expression_ctrl, 
+  combined$mean_expression_treat, 
+  paired = TRUE
+)
+var_expr_test <- wilcox.test(
+  combined$variance_expression_ctrl, 
+  combined$variance_expression_treat, 
+  paired = TRUE
+)
+
+cat("  Mean expression test:", format_pval(mean_expr_test$p.value), "\n")
+cat("  Variance expression test:", format_pval(var_expr_test$p.value), "\n")
+
+# Create violin plots with overlaid boxplots and significance indicators
+expr_violin_plots <- list(
+  # Mean expression
+  ggplot(expr_metrics_long %>% filter(metric == "mean_expression"), 
+         aes(x = condition, y = value, fill = condition)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(width = 0.2, alpha = 0.8, outlier.alpha = 0.3) +
+    scale_fill_manual(values = colors_conditions) +
+    labs(title = "Mean Expression Distribution",
+         subtitle = format_pval(mean_expr_test$p.value),
+         x = "", y = "Mean Expression (log2 CPM)") +
+    theme_minimal() +
+    theme(legend.position = "none",
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          plot.subtitle = element_text(hjust = 0.5, size = 11)),
+  
+  # Expression variance
+  ggplot(expr_metrics_long %>% filter(metric == "variance_expression"), 
+         aes(x = condition, y = value, fill = condition)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(width = 0.2, alpha = 0.8, outlier.alpha = 0.3) +
+    scale_fill_manual(values = colors_conditions) +
+    scale_y_log10(labels = scales::label_scientific()) +
+    labs(title = "Expression Variance Distribution",
+         subtitle = format_pval(var_expr_test$p.value),
+         x = "", y = "Expression Variance (log10 scale)") +
+    theme_minimal() +
+    theme(legend.position = "none",
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          plot.subtitle = element_text(hjust = 0.5, size = 11))
+)
+
+# Save the plot directly without capturing (grid.arrange plots directly to device)
+pdf(file.path(output_dir, "01b_expression_metrics_distributions.pdf"), width = 12, height = 5)
+gridExtra::grid.arrange(grobs = expr_violin_plots, ncol = 2, 
+                        top = grid::textGrob("Expression Metrics Distribution Comparison", 
+                                            gp = grid::gpar(fontsize = 16, fontface = "bold")))
+dev.off()
+cat("  Saved: 01b_expression_metrics_distributions.pdf\n")
+
 # ----- 6. Histogram comparisons: Network metrics -----
 cat("Generating histogram comparisons...\n")
 
 # Define custom colors for conditions (use setNames to create named vector dynamically)
 colors_conditions <- setNames(c("#2E86AB", "#A23B72"), c(args$ctrl_label, args$treat_label))  # Blue and magenta
 
-hist_plots <- lapply(pca_vars, function(var) {
+# Perform statistical tests for network metrics
+network_tests <- lapply(pca_vars, function(var) {
+  var_ctrl <- paste0(var, "_ctrl")
+  var_treat <- paste0(var, "_treat")
+  
+  ctrl_vals <- combined[[var_ctrl]][!is.na(combined[[var_ctrl]])]
+  treat_vals <- combined[[var_treat]][!is.na(combined[[var_treat]])]
+  
+  test_result <- wilcox.test(ctrl_vals, treat_vals, paired = FALSE)
+  list(var = var, p.value = test_result$p.value)
+})
+
+# Bonferroni correction for multiple testing
+n_tests <- length(network_tests)
+for (i in seq_along(network_tests)) {
+  network_tests[[i]]$p.adjusted <- network_tests[[i]]$p.value * n_tests
+  network_tests[[i]]$p.adjusted <- min(network_tests[[i]]$p.adjusted, 1)  # Cap at 1
+  cat("  ", network_tests[[i]]$var, ":", format_pval(network_tests[[i]]$p.adjusted), "(Bonferroni-corrected)\n")
+}
+
+hist_plots <- lapply(seq_along(pca_vars), function(i) {
+  var <- pca_vars[i]
   var_ctrl <- paste0(var, "_ctrl")
   var_treat <- paste0(var, "_treat")
   
@@ -167,9 +318,12 @@ hist_plots <- lapply(pca_vars, function(var) {
     geom_histogram(bins = 50, position = "dodge", alpha = 0.75) +
     scale_fill_manual(values = colors_conditions) +
     facet_wrap(~condition, scales = "free_y") +
-    labs(title = gsub("_", " ", var), x = "Value", y = "Count") +
+    labs(title = gsub("_", " ", var),
+         subtitle = format_pval(network_tests[[i]]$p.adjusted),
+         x = "Value", y = "Count") +
     theme_minimal() +
-    theme(legend.position = "none")
+    theme(legend.position = "none",
+          plot.subtitle = element_text(hjust = 0.5, size = 9))
 })
 
 p_hists <- do.call(gridExtra::grid.arrange, c(hist_plots, ncol = 2))
@@ -218,9 +372,12 @@ expr_overlay_plots <- list(
     geom_density(alpha = 0.4, linewidth = 1) +
     scale_fill_manual(values = colors_conditions) +
     scale_color_manual(values = colors_conditions) +
-    labs(title = "Mean Expression Distribution (Overlaid)", x = "Expression Level", y = "Density", fill = "Condition", color = "Condition") +
+    labs(title = "Mean Expression Distribution (Overlaid)",
+         subtitle = format_pval(mean_expr_test$p.value),
+         x = "Expression Level", y = "Density", fill = "Condition", color = "Condition") +
     theme_minimal() +
-    theme(legend.position = "right"),
+    theme(legend.position = "right",
+          plot.subtitle = element_text(hjust = 0.5, size = 10)),
   
   ggplot(bind_rows(
     combined %>% select(variance_expression_ctrl) %>% rename(value = variance_expression_ctrl) %>% mutate(condition = args$ctrl_label),
@@ -229,9 +386,12 @@ expr_overlay_plots <- list(
     geom_density(alpha = 0.4, linewidth = 1) +
     scale_fill_manual(values = colors_conditions) +
     scale_color_manual(values = colors_conditions) +
-    labs(title = "Expression Variance Distribution (Overlaid)", x = "Variance", y = "Density", fill = "Condition", color = "Condition") +
+    labs(title = "Expression Variance Distribution (Overlaid)",
+         subtitle = format_pval(var_expr_test$p.value),
+         x = "Variance", y = "Density", fill = "Condition", color = "Condition") +
     theme_minimal() +
-    theme(legend.position = "right")
+    theme(legend.position = "right",
+          plot.subtitle = element_text(hjust = 0.5, size = 10))
 )
 
 p_expr_overlay <- do.call(gridExtra::grid.arrange, c(expr_overlay_plots, ncol = 2))
@@ -241,6 +401,7 @@ cat("  Saved: 03b_overlaid_expression_distributions.pdf\n")
 # ----- 8. Scatterplots: Ctrl vs Treat network metrics -----
 cat("Generating scatterplots (Ctrl vs Treat)...\n")
 
+# Control module coloring (reference modules from Control diet)
 scatter_plots <- lapply(pca_vars, function(var) {
   var_ctrl <- paste0(var, "_ctrl")
   var_treat <- paste0(var, "_treat")
@@ -252,7 +413,7 @@ scatter_plots <- lapply(pca_vars, function(var) {
   ggplot(scatter_data, aes_string(x = var_ctrl, y = var_treat, color = "module_ctrl")) +
     geom_point(alpha = 0.6, size = 2) +
     geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey", linewidth = 1) +
-    scale_color_manual(values = module_color_map, name = "Module (Ctrl)") +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
     labs(title = gsub("_", " ", var),
          x = paste0(args$ctrl_label, " - ", gsub("_", " ", var)),
          y = paste0(args$treat_label, " - ", gsub("_", " ", var))) +
@@ -267,7 +428,77 @@ cat("  Saved: 04_scatterplots_ctrl_vs_treat.pdf\n")
 # ----- 9. Expression vs Network metrics scatterplots -----
 cat("Generating expression vs network metrics plots...\n")
 
-expr_net_plots <- list(
+# VERSION 1: Control module coloring for both conditions (reference module tracking)
+cat("  Creating Control-module reference plots...\n")
+expr_net_plots_ctrl <- list(
+  ggplot(combined %>% filter(!is.na(weighted_connectivity_ctrl) & !is.na(mean_expression_ctrl)), 
+         aes(x = mean_expression_ctrl, y = weighted_connectivity_ctrl, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "Control: Expression vs Weighted Connectivity",
+         x = "Mean Expression", y = "Weighted Connectivity") +
+    theme_minimal(),
+  
+  ggplot(combined %>% filter(!is.na(weighted_connectivity_treat) & !is.na(mean_expression_treat)), 
+         aes(x = mean_expression_treat, y = weighted_connectivity_treat, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "High Sugar: Expression vs Weighted Connectivity\n(colored by Control module assignment)",
+         x = "Mean Expression", y = "Weighted Connectivity") +
+    theme_minimal(),
+  
+  ggplot(combined %>% filter(!is.na(variance_expression_ctrl) & !is.na(degree_ctrl)), 
+         aes(x = variance_expression_ctrl, y = degree_ctrl, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "Control: Expression Variance vs Degree",
+         x = "Expression Variance", y = "Degree") +
+    theme_minimal(),
+  
+  ggplot(combined %>% filter(!is.na(variance_expression_treat) & !is.na(degree_treat)), 
+         aes(x = variance_expression_treat, y = degree_treat, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "High Sugar: Expression Variance vs Degree\n(colored by Control module assignment)",
+         x = "Expression Variance", y = "Degree") +
+    theme_minimal(),
+
+  ggplot(combined %>% filter(!is.na(mean_expression_ctrl) & !is.na(eigenvector_centrality_ctrl)), 
+         aes(x = mean_expression_ctrl, y = eigenvector_centrality_ctrl, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "Control: Mean Expression vs Eigenvector Centrality",
+         x = "Mean Expression", y = "Eigenvector Centrality") +
+    theme_minimal(),
+  
+  ggplot(combined %>% filter(!is.na(mean_expression_treat) & !is.na(eigenvector_centrality_treat)), 
+         aes(x = mean_expression_treat, y = eigenvector_centrality_treat, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "High Sugar: Mean Expression vs Eigenvector Centrality\n(colored by Control module assignment)",
+         x = "Mean Expression", y = "Eigenvector Centrality") +
+    theme_minimal(),
+
+  ggplot(combined %>% filter(!is.na(variance_expression_ctrl) & !is.na(eigenvector_centrality_ctrl)), 
+         aes(x = variance_expression_ctrl, y = eigenvector_centrality_ctrl, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "Control: Expression Variance vs Eigenvector Centrality",
+         x = "Expression Variance", y = "Eigenvector Centrality") +
+    theme_minimal(),
+  
+  ggplot(combined %>% filter(!is.na(variance_expression_treat) & !is.na(eigenvector_centrality_treat)), 
+         aes(x = variance_expression_treat, y = eigenvector_centrality_treat, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = "High Sugar: Expression Variance vs Eigenvector Centrality\n(colored by Control module assignment)",
+         x = "Expression Variance", y = "Eigenvector Centrality") +
+    theme_minimal()
+)
+
+# VERSION 2: Native module assignments for side-by-side comparison (shows interesting patterns)
+cat("  Creating native module assignment plots for side-by-side comparison...\n")
+expr_net_plots_native <- list(
   ggplot(combined %>% filter(!is.na(weighted_connectivity_ctrl) & !is.na(mean_expression_ctrl)), 
          aes(x = mean_expression_ctrl, y = weighted_connectivity_ctrl, color = module_ctrl)) +
     geom_point(alpha = 0.6, size = 2) +
@@ -280,7 +511,7 @@ expr_net_plots <- list(
          aes(x = mean_expression_treat, y = weighted_connectivity_treat, color = module_treat)) +
     geom_point(alpha = 0.6, size = 2) +
     scale_color_manual(values = module_color_map, name = "Module") +
-    labs(title = "Treatment: Expression vs Weighted Connectivity",
+    labs(title = "High Sugar: Expression vs Weighted Connectivity",
          x = "Mean Expression", y = "Weighted Connectivity") +
     theme_minimal(),
   
@@ -296,7 +527,7 @@ expr_net_plots <- list(
          aes(x = variance_expression_treat, y = degree_treat, color = module_treat)) +
     geom_point(alpha = 0.6, size = 2) +
     scale_color_manual(values = module_color_map, name = "Module") +
-    labs(title = "Treatment: Expression Variance vs Degree",
+    labs(title = "High Sugar: Expression Variance vs Degree",
          x = "Expression Variance", y = "Degree") +
     theme_minimal(),
 
@@ -304,7 +535,7 @@ expr_net_plots <- list(
          aes(x = mean_expression_ctrl, y = eigenvector_centrality_ctrl, color = module_ctrl)) +
     geom_point(alpha = 0.6, size = 2) +
     scale_color_manual(values = module_color_map, name = "Module") +
-    labs(title = "Control: Expression Variance vs Eigenvector Centrality",
+    labs(title = "Control: Mean Expression vs Eigenvector Centrality",
          x = "Mean Expression", y = "Eigenvector Centrality") +
     theme_minimal(),
   
@@ -312,11 +543,11 @@ expr_net_plots <- list(
          aes(x = mean_expression_treat, y = eigenvector_centrality_treat, color = module_treat)) +
     geom_point(alpha = 0.6, size = 2) +
     scale_color_manual(values = module_color_map, name = "Module") +
-    labs(title = "Treatment: Expression Variance vs Eigenvector Centrality",
+    labs(title = "High Sugar: Mean Expression vs Eigenvector Centrality",
          x = "Mean Expression", y = "Eigenvector Centrality") +
     theme_minimal(),
 
-    ggplot(combined %>% filter(!is.na(variance_expression_ctrl) & !is.na(eigenvector_centrality_ctrl)), 
+  ggplot(combined %>% filter(!is.na(variance_expression_ctrl) & !is.na(eigenvector_centrality_ctrl)), 
          aes(x = variance_expression_ctrl, y = eigenvector_centrality_ctrl, color = module_ctrl)) +
     geom_point(alpha = 0.6, size = 2) +
     scale_color_manual(values = module_color_map, name = "Module") +
@@ -328,21 +559,31 @@ expr_net_plots <- list(
          aes(x = variance_expression_treat, y = eigenvector_centrality_treat, color = module_treat)) +
     geom_point(alpha = 0.6, size = 2) +
     scale_color_manual(values = module_color_map, name = "Module") +
-    labs(title = "Treatment: Expression Variance vs Eigenvector Centrality",
+    labs(title = "High Sugar: Expression Variance vs Eigenvector Centrality",
          x = "Expression Variance", y = "Eigenvector Centrality") +
     theme_minimal()
-
 )
 
-# Save expression vs network metrics plots in multiple pages (6 plots total, 2 per page)
-pdf(file.path(output_dir, "05_expression_vs_network_metrics.pdf"), width = 14, height = 6)
-for (i in seq(1, length(expr_net_plots), by = 2)) {
-  plots_to_arrange <- expr_net_plots[i:min(i+1, length(expr_net_plots))]
+# Save Control-module reference plots (both conditions colored by Control modules)
+pdf(file.path(output_dir, "05a_expression_vs_network_metrics_CTRL_reference.pdf"), width = 14, height = 6)
+for (i in seq(1, length(expr_net_plots_ctrl), by = 2)) {
+  plots_to_arrange <- expr_net_plots_ctrl[i:min(i+1, length(expr_net_plots_ctrl))]
   p_expr_net_page <- do.call(gridExtra::grid.arrange, c(plots_to_arrange, ncol = 2))
   print(p_expr_net_page)
 }
 dev.off()
-cat("  Saved: 05_expression_vs_network_metrics.pdf\n")
+cat("  Saved: 05a_expression_vs_network_metrics_CTRL_reference.pdf\n")
+
+# Save native module assignment plots (side-by-side comparison)
+
+pdf(file.path(output_dir, "05b_expression_vs_network_metrics_native_comparison.pdf"), width = 14, height = 6)
+for (i in seq(1, length(expr_net_plots_native), by = 2)) {
+  plots_to_arrange <- expr_net_plots_native[i:min(i+1, length(expr_net_plots_native))]
+  p_expr_net_page <- do.call(gridExtra::grid.arrange, c(plots_to_arrange, ncol = 2))
+  print(p_expr_net_page)
+}
+dev.off()
+cat("  Saved: 05b_expression_vs_network_metrics_native_comparison.pdf\n")
 
 # ----- 10. Identify differentially important genes -----
 cat("Identifying genes with condition-specific patterns...\n")
@@ -405,14 +646,15 @@ cat("    - top_expression_changes.csv\n\n")
 # ----- 11. Volcano-like plots for network metrics changes -----
 cat("Generating condition-change plots...\n")
 
+# Control module coloring (reference modules)
 volcano_plots <- list(
   ggplot(diff_metrics %>% filter(!is.na(delta_connectivity) & !is.na(delta_expression)), 
          aes(x = delta_connectivity, y = delta_expression, color = module_ctrl)) +
     geom_point(alpha = 0.6, size = 2) +
-    scale_color_manual(values = module_color_map, name = "Ctrl Module") +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
     geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
-    labs(title = "Connectivity vs Expression Changes (Ctrl -> Treat)",
+    labs(title = "Connectivity vs Expression Changes (Ctrl -> HS)",
          x = "Change in Weighted Connectivity",
          y = "Change in Mean Expression") +
     theme_minimal(),
@@ -420,10 +662,10 @@ volcano_plots <- list(
   ggplot(diff_metrics %>% filter(!is.na(delta_degree) & !is.na(delta_betweenness)), 
          aes(x = delta_degree, y = delta_betweenness, color = module_ctrl)) +
     geom_point(alpha = 0.6, size = 2) +
-    scale_color_manual(values = module_color_map, name = "Ctrl Module") +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
     geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
-    labs(title = "Degree vs Betweenness Changes (Ctrl -> Treat)",
+    labs(title = "Degree vs Betweenness Changes (Ctrl -> HS)",
          x = "Change in Degree",
          y = "Change in Betweenness Centrality") +
     theme_minimal(),
@@ -431,14 +673,13 @@ volcano_plots <- list(
   ggplot(diff_metrics %>% filter(!is.na(delta_expression) & !is.na(delta_variance)), 
          aes(x = delta_expression, y = delta_variance, color = module_ctrl)) +
     geom_point(alpha = 0.6, size = 2) +
-    scale_color_manual(values = module_color_map, name = "Ctrl Module") +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
     geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
-    labs(title = "Expression vs Variance Changes (Ctrl -> Treat)",
+    labs(title = "Expression vs Variance Changes (Ctrl -> HS)",
          x = "Change in Mean Expression",
          y = "Change in Expression Variance") +
     theme_minimal()
-
 )
 
 p_volcano <- do.call(gridExtra::grid.arrange, c(volcano_plots, ncol = 1))
@@ -709,9 +950,9 @@ cat("    Saved: 07e_module_summary_heatmap.pdf\n")
 # 12f. Expression-Network Integration bubble plot
 cat("  Creating expression-network integration bubble plot...\n")
 bubble_data <- diff_metrics %>%
-  filter(!is.na(delta_expression) & !is.na(delta_connectivity) & !is.na(fold_change_expression)) %>%
+  filter(!is.na(delta_expression) & !is.na(delta_connectivity) & !is.na(delta_variance)) %>%
   mutate(
-    abs_fold_change = abs(log2(fold_change_expression)),
+    abs_delta_variance = abs(delta_variance),
     direction = case_when(
       delta_expression > 0 & delta_connectivity > 0 ~ "Both Increased",
       delta_expression > 0 & delta_connectivity < 0 ~ "Expr Up, Connect Down",
@@ -721,15 +962,16 @@ bubble_data <- diff_metrics %>%
     )
   )
 
+# Control module coloring (reference modules)
 p_bubble <- ggplot(bubble_data, aes(x = delta_expression, y = delta_connectivity, 
-                                     size = abs_fold_change, color = module_ctrl)) +
+                                     size = abs_delta_variance, color = module_ctrl)) +
   geom_point(alpha = 0.6) +
   scale_color_manual(values = module_color_map, name = "Control Module") +
-  scale_size_continuous(name = "Abs Log2 Fold Change", range = c(1, 10)) +
+  scale_size_continuous(name = "Abs Variance Change", range = c(1, 10)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
   labs(title = "Expression-Network Integration",
-       subtitle = "Bubble size = magnitude of expression fold change",
+       subtitle = "Bubble size = magnitude of expression variance change",
        x = "Change in Mean Expression (delta)",
        y = "Change in Weighted Connectivity (delta)") +
   theme_minimal() +

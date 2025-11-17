@@ -27,11 +27,11 @@ suppressPackageStartupMessages({
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Visualize gene co-expression network')
 parser$add_argument('--tom-file', help = 'TOM matrix CSV file', 
-                   default = 'results/network_features/features_calc/HS_adjacency/HS_tom_adjacency_matrix.csv')
+                   default = 'results/network_features/features_calc/adjacency/tom_adjacency_matrix.csv')
 parser$add_argument('--metrics-file', help = 'Gene metrics + expression CSV', 
                    default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--output-dir', help = 'Directory to save plots', 
-                   default = 'results/analysis/network_vis/HS')
+                   default = 'results/analysis/network_vis/Control_modules/ctrl')
 parser$add_argument('--threshold', type = 'double', help = 'TOM threshold for edge filtering', 
                    default = 0.2)
 parser$add_argument('--layout', help = 'Layout algorithm: fr (Fruchterman-Reingold), kk (Kamada-Kawai), drl', 
@@ -118,11 +118,15 @@ V(g)$degree <- gene_data$degree[match(V(g)$name, gene_data$gene)]
 V(g)$betweenness <- gene_data$betweenness_centrality[match(V(g)$name, gene_data$gene)]
 V(g)$eigenvector <- gene_data$eigenvector_centrality[match(V(g)$name, gene_data$gene)]
 
+# WGCNA module membership metrics
+V(g)$kWithin <- gene_data$kWithin[match(V(g)$name, gene_data$gene)]
+V(g)$kDiff <- gene_data$kDiff[match(V(g)$name, gene_data$gene)]
+
 # Expression
 V(g)$expression <- gene_data$mean_expression[match(V(g)$name, gene_data$gene)]
 V(g)$variance <- gene_data$variance_expression[match(V(g)$name, gene_data$gene)]
 
-cat("  Attributes added: module, connectivity, degree, betweenness, eigenvector, expression, variance\n\n")
+cat("  Attributes added: module, connectivity, degree, betweenness, eigenvector, kWithin, kDiff, expression, variance\n\n")
 
 # ----- 7. Set up visual properties -----
 cat("Setting up visual properties...\n")
@@ -263,13 +267,14 @@ cat("  Saved: 03_network_by_expression.pdf\n")
 # ----- 12. Highlight hub genes -----
 cat("Generating network with hub genes highlighted...\n")
 
-# Define hubs as top 1% by connectivity
-hub_threshold <- quantile(V(g)$connectivity, 0.99, na.rm = TRUE)
+# Define hubs as top 5% by weighted connectivity (global modifiers)
+# Weighted connectivity is the primary determinant of global modifier status
+hub_threshold <- quantile(V(g)$connectivity, 0.95, na.rm = TRUE)
 V(g)$is_hub <- V(g)$connectivity >= hub_threshold
 
 # Hub gene names
 hub_genes <- V(g)$name[V(g)$is_hub]
-cat("  Hub genes (top 1%):", length(hub_genes), "\n")
+cat("  Hub genes (top 5% by weighted connectivity >=", round(hub_threshold, 3), "):", length(hub_genes), "\n")
 
 # Color: hubs in red, others by module with transparency
 V(g)$hub_color <- ifelse(V(g)$is_hub, "red", 
@@ -290,10 +295,10 @@ plot(g,
      vertex.frame.color = ifelse(V(g)$is_hub, "black", NA),
      edge.width = E(g)$width,
      edge.color = E(g)$color,
-     main = "Network with Hub Genes Highlighted (Top 1% by Connectivity)")
+     main = "Network with Hub Genes Highlighted (Top 5% by Weighted Connectivity)")
 
 legend("topright",
-       legend = c("Hub genes", "Other genes"),
+       legend = c("Hub genes (global modifiers)", "Other genes"),
        pch = 21,
        pt.bg = c("red", "white"),
        pt.cex = 2,
@@ -345,6 +350,9 @@ cat("Saving hub genes list...\n")
 hub_df <- data.frame(
   gene = hub_genes,
   connectivity = V(g)$connectivity[V(g)$is_hub],
+  kWithin = V(g)$kWithin[V(g)$is_hub],
+  kDiff = V(g)$kDiff[V(g)$is_hub],
+  eigenvector = V(g)$eigenvector[V(g)$is_hub],
   module = V(g)$module[V(g)$is_hub],
   expression = V(g)$expression[V(g)$is_hub]
 ) %>%
