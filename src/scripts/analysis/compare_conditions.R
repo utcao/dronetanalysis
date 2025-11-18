@@ -307,7 +307,7 @@ expr_violin_plots <- list(
 )
 
 # Save the plot directly without capturing (grid.arrange plots directly to device)
-pdf(file.path(output_dir, "01b_expression_metrics_distributions.pdf"), width = 18, height = 15)
+pdf(file.path(output_dir, "01b_expression_metrics_distributions.pdf"), width = 18, height = 12)
 gridExtra::grid.arrange(grobs = expr_violin_plots, ncol = 2, 
                         top = grid::textGrob("Expression Metrics Distribution Comparison", 
                                             gp = grid::gpar(fontsize = 16, fontface = "bold")))

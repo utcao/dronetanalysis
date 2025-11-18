@@ -146,19 +146,6 @@ if (!is.null(gene2kegg)) {
   gene2kegg_clean <- gene2entrez
 }
 
-# DIAGNOSTIC: Check a few successful and failed mappings
-cat("\n  DIAGNOSTIC - Sample mappings:\n")
-sample_genes <- head(gene_metrics$gene, 10)
-for (g in sample_genes) {
-  entrez <- gene2entrez[names(gene2entrez) == g]
-  if (is.na(entrez)) {
-    cat("    ", g, "-> FAILED\n")
-  } else {
-    cat("    ", g, "-> Entrez:", entrez, "\n")
-  }
-}
-cat("\n")
-
 # Create background universe (all genes analyzed in WGCNA)
 cat("Creating background universe for enrichment...\n")
 universe_entrez <- gene2entrez[!is.na(gene2entrez)]
@@ -354,7 +341,6 @@ for (current_module in modules) {
   
   # ----- KEGG Enrichment -----
   cat("  Running KEGG enrichment...\n")
-  cat("    DIAGNOSTIC: Sample KEGG IDs:", paste(head(module_kegg, 5), collapse = ", "), "\n")
   cat("    Module has", length(module_kegg), "genes with KEGG IDs\n")
   
   # Skip KEGG if no genes mapped
@@ -411,6 +397,8 @@ for (current_module in modules) {
       # Convert Entrez IDs to gene symbols for readability
       if (!is.null(kegg) && nrow(kegg) > 0) {
         kegg <- setReadable(kegg, OrgDb = org_db, keyType = "ENTREZID")
+        # Remove " - Drosophila melanogaster (fruit fly)" suffix from pathway descriptions
+        kegg@result$Description <- gsub(" - Drosophila melanogaster \\(fruit fly\\)", "", kegg@result$Description)
         cat("    KEGG enrichment found:", nrow(kegg), "pathways\n")
       } else {
         cat("    No KEGG pathways enriched even with relaxed cutoffs\n")
@@ -443,22 +431,30 @@ for (current_module in modules) {
   
   # Combine all GO results for summary
   if (nrow(go_bp) > 0) {
-    go_bp_df <- as.data.frame(go_bp) %>% mutate(module = current_module, ontology = "BP")
+    go_bp_df <- as.data.frame(go_bp) %>% 
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID, Count) %>%
+      mutate(module = current_module, ontology = "BP")
     all_enrichments[[paste(current_module, "GO_BP", sep = "_")]] <- go_bp_df
   }
   
   if (nrow(go_mf) > 0) {
-    go_mf_df <- as.data.frame(go_mf) %>% mutate(module = current_module, ontology = "MF")
+    go_mf_df <- as.data.frame(go_mf) %>% 
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID, Count) %>%
+      mutate(module = current_module, ontology = "MF")
     all_enrichments[[paste(current_module, "GO_MF", sep = "_")]] <- go_mf_df
   }
   
   if (nrow(go_cc) > 0) {
-    go_cc_df <- as.data.frame(go_cc) %>% mutate(module = current_module, ontology = "CC")
+    go_cc_df <- as.data.frame(go_cc) %>% 
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID, Count) %>%
+      mutate(module = current_module, ontology = "CC")
     all_enrichments[[paste(current_module, "GO_CC", sep = "_")]] <- go_cc_df
   }
   
   if (nrow(kegg) > 0) {
-    kegg_df <- as.data.frame(kegg) %>% mutate(module = current_module, ontology = "KEGG")
+    kegg_df <- as.data.frame(kegg) %>% 
+      dplyr::select(ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID, Count) %>%
+      mutate(module = current_module, ontology = "KEGG")
     all_enrichments[[paste(current_module, "KEGG", sep = "_")]] <- kegg_df
   }
   
@@ -488,9 +484,8 @@ if (length(all_enrichments) > 0) {
   # Convert geneID to character to preserve gene list
   all_enrich_df$geneID <- as.character(all_enrich_df$geneID)
   
-  # Select and reorder columns
-  all_enrich_df <- all_enrich_df %>%
-    dplyr::select(module, ontology, ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID)
+  # Columns are already in the right order from above: 
+  # ID, Description, GeneRatio, BgRatio, pvalue, p.adjust, geneID, Count, module, ontology
   
   write.csv(all_enrich_df, 
             file.path(output_dir, "all_module_enrichments.csv"), 
@@ -581,7 +576,7 @@ for (current_module in names(enrichment_results)) {
 # ----- 10. Generate enrichment plots -----
 cat("Generating enrichment plots...\n")
 
-pdf(file.path(output_dir, "enrichment_plots.pdf"), width = 14, height = 15)
+pdf(file.path(output_dir, "enrichment_plots.pdf"), width = 14, height = 25)
 
 for (current_module in names(enrichment_results)) {
   results <- enrichment_results[[current_module]]
@@ -674,12 +669,27 @@ for (current_module in names(enrichment_results)) {
   results <- enrichment_results[[current_module]]
   
   # Get top enriched term (including KEGG)
-  all_go <- rbind(
-    if (nrow(results$go_bp) > 0) as.data.frame(results$go_bp) else NULL,
-    if (nrow(results$go_mf) > 0) as.data.frame(results$go_mf) else NULL,
-    if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL,
-    if (nrow(results$kegg) > 0) as.data.frame(results$kegg) else NULL
-  )
+  # Select common columns to avoid rbind mismatch
+  all_go_list <- list()
+  if (nrow(results$go_bp) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$go_bp) %>%
+      dplyr::select(Description, pvalue)
+  }
+  if (nrow(results$go_mf) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$go_mf) %>%
+      dplyr::select(Description, pvalue)
+  }
+  if (nrow(results$go_cc) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$go_cc) %>%
+      dplyr::select(Description, pvalue)
+  }
+  if (nrow(results$kegg) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$kegg) %>%
+      dplyr::select(Description, pvalue)
+  }
+  
+  # Combine only if we have results
+  all_go <- if (length(all_go_list) > 0) do.call(rbind, all_go_list) else NULL
   
   top_term <- "No enrichment"
   if (!is.null(all_go) && nrow(all_go) > 0) {
@@ -724,6 +734,7 @@ names(legend_labels) <- plot_data$module
 # Create simple bar chart showing module sizes
 p_summary <- ggplot(plot_data, aes(x = factor(module_label, levels = module_label), y = n_genes, fill = module)) +
   geom_col(width = 0.7) +
+  geom_text(aes(label = n_genes), hjust = -0.2, size = 3) +
   scale_fill_manual(values = module_colors, 
                     labels = legend_labels,
                     name = "Module: Top Enrichment") +
@@ -760,12 +771,27 @@ for (current_module in names(enrichment_results)) {
   }
   
   # Top enrichment (GO + KEGG)
-  all_go <- rbind(
-    if (nrow(results$go_bp) > 0) as.data.frame(results$go_bp) else NULL,
-    if (nrow(results$go_mf) > 0) as.data.frame(results$go_mf) else NULL,
-    if (nrow(results$go_cc) > 0) as.data.frame(results$go_cc) else NULL,
-    if (nrow(results$kegg) > 0) as.data.frame(results$kegg) else NULL
-  )
+  # Select common columns to avoid rbind mismatch
+  all_go_list <- list()
+  if (nrow(results$go_bp) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$go_bp) %>%
+      dplyr::select(Description, pvalue, p.adjust)
+  }
+  if (nrow(results$go_mf) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$go_mf) %>%
+      dplyr::select(Description, pvalue, p.adjust)
+  }
+  if (nrow(results$go_cc) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$go_cc) %>%
+      dplyr::select(Description, pvalue, p.adjust)
+  }
+  if (nrow(results$kegg) > 0) {
+    all_go_list[[length(all_go_list) + 1]] <- as.data.frame(results$kegg) %>%
+      dplyr::select(Description, pvalue, p.adjust)
+  }
+  
+  # Combine only if we have results
+  all_go <- if (length(all_go_list) > 0) do.call(rbind, all_go_list) else NULL
   
   top_term_1 <- NA
   top_term_2 <- NA
