@@ -16,6 +16,7 @@ results/spearman_correlation/spearman_matrices/
 results/spearman_correlation/perm/
 results/analysis
 Rplots.pdf
+dataset/
 
 # files
 src/test.r
