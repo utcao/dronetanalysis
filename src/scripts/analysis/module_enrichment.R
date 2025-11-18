@@ -38,7 +38,7 @@ parser <- ArgumentParser(description = 'Perform enrichment analysis on WGCNA mod
 parser$add_argument('--gene-metrics-file', help = 'Path to gene metrics CSV file with module assignments',
                    default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--output-dir', help = 'Directory to save enrichment results', 
-                   default = 'results/analysis/control_enrichment')
+                   default = 'results/analysis/Control_enrichment')
 parser$add_argument('--pvalue-cutoff', help = 'P-value cutoff for enrichment significance', 
                    default = 0.05, type = 'double')
 parser$add_argument('--qvalue-cutoff', help = 'Q-value (adjusted p-value) cutoff', 

@@ -11,11 +11,8 @@ scr/subset/01subset_dataset.R
 3. Spearman correlation matrix generation
 scr/spearman_corr/spearman_matrix.R
 
-4. Adjacency threshold plot analysis
+4. Adjacency thresholding
 scr/soft_threshold/adjacency_matrix.R
-
-5. Apply soft threshold after inspecting plots
-scr/soft_threshold/apply_threshold.R
 
 6. Calculate network-level features
 scr/network_metrics/network_metrics.R
