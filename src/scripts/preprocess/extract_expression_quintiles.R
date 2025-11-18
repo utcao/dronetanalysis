@@ -49,64 +49,54 @@ cat("Output directory:", output_dir, "\n\n")
 
 # ----- 4. Load Control diet expression data -----
 cat("Loading Control diet expression data...\n")
-ctrl_expr <- fread(args$control_file, header = TRUE)
+ctrl_expr <- fread(args$control_file)
 
-# Handle row names - first column should be gene IDs
-if (colnames(ctrl_expr)[1] %in% c("V1", "")) {
-  setnames(ctrl_expr, old = colnames(ctrl_expr)[1], new = "fly_id")
-} else if (colnames(ctrl_expr)[1] != "fly_id") {
-  setnames(ctrl_expr, old = colnames(ctrl_expr)[1], new = "fly_id")
-}
+# fread detects missing column name and assigns "V1" to first column (gene IDs)
+setnames(ctrl_expr, "V1", "fly_id")
 
 cat("  Control samples:", ncol(ctrl_expr) - 1, "\n")
-cat("  Control genes:", nrow(ctrl_expr), "\n\n")
+cat("  Control genes:", nrow(ctrl_expr), "\n")
+cat("  Sample ID examples:", paste(colnames(ctrl_expr)[2:min(6, ncol(ctrl_expr))], collapse = ", "), "\n\n")
 
 # ----- 5. Load High Sugar diet expression data -----
 cat("Loading High Sugar diet expression data...\n")
-hs_expr <- fread(args$highsugar_file, header = TRUE)
+hs_expr <- fread(args$highsugar_file)
 
-# Handle row names - first column should be gene IDs
-if (colnames(hs_expr)[1] %in% c("V1", "")) {
-  setnames(hs_expr, old = colnames(hs_expr)[1], new = "fly_id")
-} else if (colnames(hs_expr)[1] != "fly_id") {
-  setnames(hs_expr, old = colnames(hs_expr)[1], new = "fly_id")
-}
+# fread detects missing column name and assigns "V1" to first column (gene IDs)
+setnames(hs_expr, "V1", "fly_id")
 
 cat("  High Sugar samples:", ncol(hs_expr) - 1, "\n")
-cat("  High Sugar genes:", nrow(hs_expr), "\n\n")
+cat("  High Sugar genes:", nrow(hs_expr), "\n")
+cat("  Sample ID examples:", paste(colnames(hs_expr)[2:min(6, ncol(hs_expr))], collapse = ", "), "\n\n")
 
 # ----- 6. Process Control diet -----
 cat("=== Processing Control Diet ===\n")
 
-# Bin expression into quintiles
-cat("Binning Control expression into", args$n_bins, "bins...\n")
+# Bin expression into quintiles (per gene)
+cat("Binning Control expression into", args$n_bins, "bins per gene...\n")
 ctrl_binned <- bin_expr(ctrl_expr, n = args$n_bins)
 
-cat("  Binned data dimensions:", nrow(ctrl_binned), "rows\n")
-cat("  Samples per bin (approximate):\n")
-bin_counts <- ctrl_binned[, .N, by = tile][order(tile)]
-print(bin_counts)
+# For each gene, get the samples in bottom and top quintiles
+cat("Extracting bottom quintile samples for each gene...\n")
+ctrl_bottom_long <- ctrl_binned[tile == 1, .(gene = fly_id, sample = as.character(sample), value = logCPM)]
 
-# Extract bottom quintile (tile = 1)
-cat("\nExtracting bottom quintile (tile = 1)...\n")
-ctrl_bottom <- extract_biase_expr(ctrl_binned, ctrl_expr, nth_tile = 1)
-cat("  Bottom quintile dimensions:", nrow(ctrl_bottom), "samples ×", ncol(ctrl_bottom), "genes\n")
+cat("Extracting top quintile samples for each gene...\n")
+ctrl_top_long <- ctrl_binned[tile == args$n_bins, .(gene = fly_id, sample = as.character(sample), value = logCPM)]
 
-# Extract top quintile (tile = n_bins)
-cat("Extracting top quintile (tile =", args$n_bins, ")...\n")
-ctrl_top <- extract_biase_expr(ctrl_binned, ctrl_expr, nth_tile = args$n_bins)
-cat("  Top quintile dimensions:", nrow(ctrl_top), "samples ×", ncol(ctrl_top), "genes\n")
+# Convert to wide format: rows = genes, columns = samples (with expression values)
+cat("Converting to wide format...\n")
+ctrl_bottom_wide <- dcast(ctrl_bottom_long, gene ~ sample, value.var = "value")
+ctrl_top_wide <- dcast(ctrl_top_long, gene ~ sample, value.var = "value")
+
+cat("  Bottom quintile:", nrow(ctrl_bottom_wide), "genes ×", ncol(ctrl_bottom_wide)-1, "unique samples\n")
+cat("  Top quintile:", nrow(ctrl_top_wide), "genes ×", ncol(ctrl_top_wide)-1, "unique samples\n")
 
 # Save Control quintiles
 ctrl_bottom_file <- file.path(output_dir, "control_bottom_quintile.csv")
 ctrl_top_file <- file.path(output_dir, "control_top_quintile.csv")
 
-# Convert to data.table with sample names as first column
-ctrl_bottom_dt <- data.table(sample = rownames(ctrl_bottom), as.data.frame(ctrl_bottom))
-ctrl_top_dt <- data.table(sample = rownames(ctrl_top), as.data.frame(ctrl_top))
-
-fwrite(ctrl_bottom_dt, ctrl_bottom_file)
-fwrite(ctrl_top_dt, ctrl_top_file)
+fwrite(ctrl_bottom_wide, ctrl_bottom_file)
+fwrite(ctrl_top_wide, ctrl_top_file)
 
 cat("  Saved:", ctrl_bottom_file, "\n")
 cat("  Saved:", ctrl_top_file, "\n\n")
@@ -114,35 +104,31 @@ cat("  Saved:", ctrl_top_file, "\n\n")
 # ----- 7. Process High Sugar diet -----
 cat("=== Processing High Sugar Diet ===\n")
 
-# Bin expression into quintiles
-cat("Binning High Sugar expression into", args$n_bins, "bins...\n")
+# Bin expression into quintiles (per gene)
+cat("Binning High Sugar expression into", args$n_bins, "bins per gene...\n")
 hs_binned <- bin_expr(hs_expr, n = args$n_bins)
 
-cat("  Binned data dimensions:", nrow(hs_binned), "rows\n")
-cat("  Samples per bin (approximate):\n")
-bin_counts_hs <- hs_binned[, .N, by = tile][order(tile)]
-print(bin_counts_hs)
+# For each gene, get the samples in bottom and top quintiles
+cat("Extracting bottom quintile samples for each gene...\n")
+hs_bottom_long <- hs_binned[tile == 1, .(gene = fly_id, sample = as.character(sample), value = logCPM)]
 
-# Extract bottom quintile (tile = 1)
-cat("\nExtracting bottom quintile (tile = 1)...\n")
-hs_bottom <- extract_biase_expr(hs_binned, hs_expr, nth_tile = 1)
-cat("  Bottom quintile dimensions:", nrow(hs_bottom), "samples ×", ncol(hs_bottom), "genes\n")
+cat("Extracting top quintile samples for each gene...\n")
+hs_top_long <- hs_binned[tile == args$n_bins, .(gene = fly_id, sample = as.character(sample), value = logCPM)]
 
-# Extract top quintile (tile = n_bins)
-cat("Extracting top quintile (tile =", args$n_bins, ")...\n")
-hs_top <- extract_biase_expr(hs_binned, hs_expr, nth_tile = args$n_bins)
-cat("  Top quintile dimensions:", nrow(hs_top), "samples ×", ncol(hs_top), "genes\n")
+# Convert to wide format: rows = genes, columns = samples (with expression values)
+cat("Converting to wide format...\n")
+hs_bottom_wide <- dcast(hs_bottom_long, gene ~ sample, value.var = "value")
+hs_top_wide <- dcast(hs_top_long, gene ~ sample, value.var = "value")
+
+cat("  Bottom quintile:", nrow(hs_bottom_wide), "genes ×", ncol(hs_bottom_wide)-1, "unique samples\n")
+cat("  Top quintile:", nrow(hs_top_wide), "genes ×", ncol(hs_top_wide)-1, "unique samples\n")
 
 # Save High Sugar quintiles
 hs_bottom_file <- file.path(output_dir, "highsugar_bottom_quintile.csv")
 hs_top_file <- file.path(output_dir, "highsugar_top_quintile.csv")
 
-# Convert to data.table with sample names as first column
-hs_bottom_dt <- data.table(sample = rownames(hs_bottom), as.data.frame(hs_bottom))
-hs_top_dt <- data.table(sample = rownames(hs_top), as.data.frame(hs_top))
-
-fwrite(hs_bottom_dt, hs_bottom_file)
-fwrite(hs_top_dt, hs_top_file)
+fwrite(hs_bottom_wide, hs_bottom_file)
+fwrite(hs_top_wide, hs_top_file)
 
 cat("  Saved:", hs_bottom_file, "\n")
 cat("  Saved:", hs_top_file, "\n\n")
@@ -153,19 +139,19 @@ cat("=== Summary Statistics ===\n\n")
 summary_stats <- data.frame(
   Diet = c("Control", "Control", "High Sugar", "High Sugar"),
   Quintile = c("Bottom", "Top", "Bottom", "Top"),
-  n_samples = c(nrow(ctrl_bottom), nrow(ctrl_top), nrow(hs_bottom), nrow(hs_top)),
-  n_genes = c(ncol(ctrl_bottom), ncol(ctrl_top), ncol(hs_bottom), ncol(hs_top)),
-  mean_expression = c(
-    mean(as.matrix(ctrl_bottom), na.rm = TRUE),
-    mean(as.matrix(ctrl_top), na.rm = TRUE),
-    mean(as.matrix(hs_bottom), na.rm = TRUE),
-    mean(as.matrix(hs_top), na.rm = TRUE)
+  n_genes = c(nrow(ctrl_bottom_wide), nrow(ctrl_top_wide), 
+              nrow(hs_bottom_wide), nrow(hs_top_wide)),
+  n_samples_per_gene = c(
+    ncol(ctrl_bottom_wide) - 1,
+    ncol(ctrl_top_wide) - 1,
+    ncol(hs_bottom_wide) - 1,
+    ncol(hs_top_wide) - 1
   ),
-  median_expression = c(
-    median(as.matrix(ctrl_bottom), na.rm = TRUE),
-    median(as.matrix(ctrl_top), na.rm = TRUE),
-    median(as.matrix(hs_bottom), na.rm = TRUE),
-    median(as.matrix(hs_top), na.rm = TRUE)
+  mean_expression = c(
+    mean(as.matrix(ctrl_bottom_wide[, -1]), na.rm = TRUE),
+    mean(as.matrix(ctrl_top_wide[, -1]), na.rm = TRUE),
+    mean(as.matrix(hs_bottom_wide[, -1]), na.rm = TRUE),
+    mean(as.matrix(hs_top_wide[, -1]), na.rm = TRUE)
   )
 )
 
@@ -178,8 +164,11 @@ cat("\nSummary saved to:", summary_file, "\n")
 
 cat("\n=== Extraction Complete ===\n")
 cat("Output files:\n")
-cat("  - control_bottom_quintile.csv (lowest 20% expression per gene)\n")
-cat("  - control_top_quintile.csv (highest 20% expression per gene)\n")
-cat("  - highsugar_bottom_quintile.csv (lowest 20% expression per gene)\n")
-cat("  - highsugar_top_quintile.csv (highest 20% expression per gene)\n")
+cat("  - control_bottom_quintile.csv (lowest 20% samples per gene)\n")
+cat("  - control_top_quintile.csv (highest 20% samples per gene)\n")
+cat("  - highsugar_bottom_quintile.csv (lowest 20% samples per gene)\n")
+cat("  - highsugar_top_quintile.csv (highest 20% samples per gene)\n")
 cat("  - quintile_summary.csv (summary statistics)\n")
+cat("\nNote: Each gene has its own set of top/bottom samples.\n")
+cat("      Matrix format: rows = genes, columns = samples\n")
+cat("      NA values indicate samples not in that gene's quintile.\n")
