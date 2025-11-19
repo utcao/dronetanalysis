@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 13/11/2025
+# Last Updated: 19/11/2025
 #
 # This script:
 #   1. Loads TOM matrix and gene metrics
@@ -27,13 +27,17 @@ suppressPackageStartupMessages({
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Visualize gene co-expression network')
 parser$add_argument('--tom-file', help = 'TOM matrix CSV file', 
-                   default = 'results/network_features/features_calc/adjacency/tom_adjacency_matrix.csv')
+                   default = 'results/network_features/features_calc/HS_adjacency/modules/tom_matrix.csv')
 parser$add_argument('--metrics-file', help = 'Gene metrics + expression CSV', 
-                   default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
+                   default = 'results/network_features/gene_metrics/HS_adjacency_gene_metrics_with_expression.csv')
+parser$add_argument('--control-modules-file', help = 'Control (reference) modules assignment CSV', 
+                   default = 'results/network_features/features_calc/adjacency/modules/gene_connectivity.csv')
+parser$add_argument('--hsp-genes-file', help = 'Optional: CSV/TXT file with Hsp and cochaperone gene IDs (one per line or column named "gene")', 
+                   default = 'dataset/hsp_genes/HSP_genes.csv')
 parser$add_argument('--output-dir', help = 'Directory to save plots', 
-                   default = 'results/analysis/network_vis/Control_modules/ctrl')
+                   default = 'results/analysis/network_vis/Control_modules/HS')
 parser$add_argument('--threshold', type = 'double', help = 'TOM threshold for edge filtering', 
-                   default = 0.2)
+                   default = 0.1)
 parser$add_argument('--layout', help = 'Layout algorithm: fr (Fruchterman-Reingold), kk (Kamada-Kawai), drl', 
                    default = 'kk')
 parser$add_argument('--seed', type = 'integer', help = 'Random seed for reproducible layouts', 
@@ -103,14 +107,53 @@ cat("  Density:", round(edge_density(g), 6), "\n\n")
 # ----- 6. Add node attributes -----
 cat("Adding node attributes...\n")
 
+# Load control modules for reference (cross-condition tracking)
+cat("Loading control module assignments for reference...\n")
+control_modules <- read.csv(args$control_modules_file, stringsAsFactors = FALSE)
+cat("  Control modules loaded:", nrow(control_modules), "genes\n")
+
 # Match gene metrics to network nodes
 node_genes <- V(g)$name
 gene_data <- gene_metrics %>%
   filter(gene %in% node_genes) %>%
   arrange(match(gene, node_genes))
 
-# Module assignment
-V(g)$module <- gene_data$module[match(V(g)$name, gene_data$gene)]
+# Module assignment - use CONTROL modules for consistent tracking across conditions
+V(g)$module <- control_modules$module[match(V(g)$name, control_modules$gene)]
+cat("  Using control module assignments for all genes\n")
+
+# Load Hsp genes if provided
+if (!is.null(args$hsp_genes_file) && file.exists(args$hsp_genes_file)) {
+  cat("Loading Hsp and cochaperone genes...\n")
+  # Try reading as CSV first, then as plain text
+  hsp_data <- tryCatch({
+    read.csv(args$hsp_genes_file, stringsAsFactors = FALSE)
+  }, error = function(e) {
+    data.frame(gene = readLines(args$hsp_genes_file))
+  })
+  
+  # Extract gene IDs (handle different column names)
+  if ("gene" %in% colnames(hsp_data)) {
+    hsp_genes_list <- hsp_data$gene
+  } else {
+    hsp_genes_list <- hsp_data[[1]]
+  }
+  
+  # Remove empty lines and whitespace
+  hsp_genes_list <- trimws(hsp_genes_list)
+  hsp_genes_list <- hsp_genes_list[hsp_genes_list != ""]
+  
+  cat("  Loaded", length(hsp_genes_list), "Hsp/cochaperone genes\n")
+  
+  # Mark Hsp genes in network
+  V(g)$is_hsp <- V(g)$name %in% hsp_genes_list
+  hsp_in_network <- sum(V(g)$is_hsp)
+  cat("  Found", hsp_in_network, "Hsp/cochaperone genes in network\n")
+} else {
+  V(g)$is_hsp <- FALSE
+  hsp_in_network <- 0
+  cat("  No Hsp gene list provided (use --hsp-genes-file to annotate)\n")
+}
 
 # Network metrics
 V(g)$connectivity <- gene_data$weighted_connectivity[match(V(g)$name, gene_data$gene)]
@@ -307,6 +350,162 @@ legend("topright",
 dev.off()
 cat("  Saved: 04_network_hub_genes.pdf\n")
 
+# ----- 12a. Highlight Hsp and cochaperone genes if provided -----
+if (hsp_in_network > 0) {
+  cat("Generating network with Hsp/cochaperone genes highlighted...\n")
+  
+  # Color: Hsp genes in orange/red, others by module with transparency
+  V(g)$hsp_color <- ifelse(V(g)$is_hsp, "#FF6600",  # Bright orange for Hsp
+                            adjustcolor(V(g)$color, alpha.f = 0.5))
+  
+  # Size: Hsp genes slightly larger
+  V(g)$hsp_size <- ifelse(V(g)$is_hsp, 10, V(g)$size)
+  
+  # Get Hsp gene names for labeling
+  hsp_gene_names <- V(g)$name[V(g)$is_hsp]
+  
+  pdf(file.path(output_dir, "04a_network_hsp_genes.pdf"), width = 16, height = 16)
+  par(mar = c(0, 0, 2, 0))
+  plot(g,
+       layout = layout_coords,
+       vertex.label = ifelse(V(g)$is_hsp, V(g)$name, NA),
+       vertex.label.cex = 0.6,
+       vertex.label.color = "black",
+       vertex.label.font = 2,  # Bold
+       vertex.size = V(g)$hsp_size,
+       vertex.color = V(g)$hsp_color,
+       vertex.frame.color = ifelse(V(g)$is_hsp, "black", NA),
+       edge.width = E(g)$width,
+       edge.color = E(g)$color,
+       main = paste0("Network with Hsp/Cochaperone Genes Highlighted (n=", hsp_in_network, ")"))
+  
+  legend("topright",
+         legend = c("Hsp/cochaperone genes", "Other genes"),
+         pch = 21,
+         pt.bg = c("#FF6600", "white"),
+         pt.cex = 2,
+         cex = 0.8,
+         bty = "n")
+  dev.off()
+  cat("  Saved: 04a_network_hsp_genes.pdf\n")
+  
+  # Save Hsp genes info
+  cat("Saving Hsp/cochaperone genes information...\n")
+  hsp_df <- data.frame(
+    gene = hsp_gene_names,
+    connectivity = V(g)$connectivity[V(g)$is_hsp],
+    kWithin = V(g)$kWithin[V(g)$is_hsp],
+    kDiff = V(g)$kDiff[V(g)$is_hsp],
+    betweenness = V(g)$betweenness[V(g)$is_hsp],
+    eigenvector = V(g)$eigenvector[V(g)$is_hsp],
+    module = V(g)$module[V(g)$is_hsp],
+    expression = V(g)$expression[V(g)$is_hsp],
+    is_hub = V(g)$is_hub[V(g)$is_hsp]
+  ) %>%
+    arrange(desc(connectivity))
+  write.csv(hsp_df, file.path(output_dir, "hsp_genes_network_properties.csv"), row.names = FALSE)
+  cat("  Saved: hsp_genes_network_properties.csv\n")
+}
+
+# ----- 12b. Calculate additional centrality metrics and create comparison plot -----
+cat("Calculating hub scores and power centrality...\n")
+
+# Hub score (Kleinberg's algorithm) - use updated function name
+tryCatch({
+  hub_result <- authority_score(g, scale = TRUE)
+  V(g)$hub_score <- hub_result$vector
+  cat("  Hub scores calculated (range:", 
+      round(min(V(g)$hub_score, na.rm = TRUE), 4), "to", 
+      round(max(V(g)$hub_score, na.rm = TRUE), 4), ")\n")
+}, error = function(e) {
+  cat("  Warning: Could not calculate hub scores:", conditionMessage(e), "\n")
+  cat("  Using normalized degree centrality as fallback\n")
+  V(g)$hub_score <- degree(g, normalized = TRUE)
+  cat("  Hub score fallback set (range:", 
+      round(min(V(g)$hub_score, na.rm = TRUE), 4), "to", 
+      round(max(V(g)$hub_score, na.rm = TRUE), 4), ")\n")
+})
+
+# Power centrality (Bonacich power centrality)
+# Try with lower exponent first (more stable for modular networks)
+# rescale=FALSE to preserve negative values (nodes connected to low-degree nodes)
+power_success <- tryCatch({
+  power_cent_result <- power_centrality(g, exponent = 0.5, rescale = FALSE)
+  V(g)$power_centrality <- power_cent_result
+  cat("  Power centrality calculated with exponent=0.5 (range:", 
+      round(min(V(g)$power_centrality, na.rm = TRUE), 4), "to", 
+      round(max(V(g)$power_centrality, na.rm = TRUE), 4), ")\n")
+  TRUE
+}, error = function(e) {
+  cat("  Warning: Could not calculate power centrality with exponent=0.5:", conditionMessage(e), "\n")
+  # Try with even smaller exponent
+  tryCatch({
+    power_cent_result <- power_centrality(g, exponent = 0.1, rescale = FALSE)
+    V(g)$power_centrality <- power_cent_result
+    cat("  Power centrality calculated with exponent=0.1 (range:", 
+        round(min(V(g)$power_centrality, na.rm = TRUE), 4), "to", 
+        round(max(V(g)$power_centrality, na.rm = TRUE), 4), ")\n")
+    TRUE
+  }, error = function(e2) {
+    cat("  Warning: Could not calculate power centrality with exponent=0.1:", conditionMessage(e2), "\n")
+    FALSE
+  })
+})
+
+# Verify attributes before creating data frame
+cat("Preparing centrality data for plotting...\n")
+cat("  Checking vertex attributes:\n")
+cat("    V(g)$name length:", length(V(g)$name), "\n")
+cat("    V(g)$hub_score length:", length(V(g)$hub_score), "\n")
+cat("    V(g)$power_centrality length:", length(V(g)$power_centrality), "\n")
+cat("    V(g)$betweenness length:", length(V(g)$betweenness), "\n")
+centrality_data <- data.frame(
+  gene = V(g)$name,
+  hub_score = V(g)$hub_score,
+  power_centrality = V(g)$power_centrality,
+  betweenness = V(g)$betweenness,
+  module = V(g)$module,
+  connectivity = V(g)$connectivity
+)
+
+# Create comparison plots
+cat("Generating centrality comparison plots...\n")
+
+# Create color mapping for modules
+module_colors_vec <- module_color_map[centrality_data$module]
+
+pdf(file.path(output_dir, "05_centrality_comparison.pdf"), width = 18, height = 6)
+par(mfrow = c(1, 3), mar = c(5, 4, 4, 2))
+
+# Hub Score vs Betweenness
+plot(centrality_data$betweenness, centrality_data$hub_score,
+     col = adjustcolor(module_colors_vec, alpha.f = 0.6),
+     pch = 16, cex = 1.2,
+     xlab = "Betweenness Centrality",
+     ylab = "Hub Score (Authority Score)",
+     main = "Hub Score vs Betweenness")
+grid()
+
+# Power Centrality vs Betweenness  
+plot(centrality_data$betweenness, centrality_data$power_centrality,
+     col = adjustcolor(module_colors_vec, alpha.f = 0.6),
+     pch = 16, cex = 1.2,
+     xlab = "Betweenness Centrality",
+     ylab = "Power Centrality",
+     main = "Power Centrality vs Betweenness")
+grid()
+
+# Hub Score vs Power Centrality
+plot(centrality_data$hub_score, centrality_data$power_centrality,
+     col = adjustcolor(module_colors_vec, alpha.f = 0.6),
+     pch = 16, cex = 1.2,
+     ylab = "Power Centrality",
+     xlab = "Hub Score (Authority Score)",
+     main = "Hub Score vs Power Centrality")
+grid()
+dev.off()
+cat("  Saved: 05_centrality_comparison.pdf\n")
+
 # ----- 13. Network statistics summary -----
 cat("\n=== Network Statistics ===\n")
 
@@ -352,6 +551,9 @@ hub_df <- data.frame(
   connectivity = V(g)$connectivity[V(g)$is_hub],
   kWithin = V(g)$kWithin[V(g)$is_hub],
   kDiff = V(g)$kDiff[V(g)$is_hub],
+  hub_score = V(g)$hub_score[V(g)$is_hub],
+  power_centrality = V(g)$power_centrality[V(g)$is_hub],
+  betweenness = V(g)$betweenness[V(g)$is_hub],
   eigenvector = V(g)$eigenvector[V(g)$is_hub],
   module = V(g)$module[V(g)$is_hub],
   expression = V(g)$expression[V(g)$is_hub]
@@ -360,6 +562,11 @@ hub_df <- data.frame(
 write.csv(hub_df, file.path(output_dir, "hub_genes.csv"), row.names = FALSE)
 cat("  Saved: hub_genes.csv\n")
 
+# Save all centrality metrics for all genes
+cat("Saving centrality metrics for all genes...\n")
+write.csv(centrality_data, file.path(output_dir, "all_genes_centrality_metrics.csv"), row.names = FALSE)
+cat("  Saved: all_genes_centrality_metrics.csv\n")
+
 cat("\n=== Visualisation Complete ===\n")
 cat("All plots saved to:", output_dir, "\n")
 cat("\nGenerated files:\n")
@@ -367,6 +574,14 @@ cat("  - 01_full_network_overview.pdf (colored by module)\n")
 cat("  - 02_network_by_connectivity.pdf (colored by connectivity)\n")
 cat("  - 03_network_by_expression.pdf (colored by expression)\n")
 cat("  - 04_network_hub_genes.pdf (hub genes highlighted)\n")
+if (hsp_in_network > 0) {
+  cat("  - 04a_network_hsp_genes.pdf (Hsp/cochaperone genes highlighted)\n")
+}
+cat("  - 05_centrality_comparison.pdf (hub score, power centrality, betweenness)\n")
 cat("  - network_object.rds (saved igraph object)\n")
 cat("  - network_layout_coordinates.csv (x,y positions for reproducibility)\n")
-cat("  - hub_genes.csv (list of hub genes)\n")
+cat("  - hub_genes.csv (list of hub genes with all centrality metrics)\n")
+if (hsp_in_network > 0) {
+  cat("  - hsp_genes_network_properties.csv (Hsp/cochaperone genes network properties)\n")
+}
+cat("  - all_genes_centrality_metrics.csv (hub score, power centrality, betweenness for all genes)\n")

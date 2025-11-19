@@ -164,6 +164,45 @@ p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = condition, fill = conditio
 ggsave(file.path(output_dir, "01_pca_network_metrics.pdf"), p_pca, width = 8, height = 6)
 cat("  Saved: 01_pca_network_metrics.pdf\n")
 
+# ----- 5a2. PCA with network metrics + expression -----
+cat("Generating combined PCA plot (network + expression)...\n")
+
+# Select all variables including expression
+pca_all_vars <- c("weighted_connectivity", "degree", "betweenness_centrality", 
+                  "clustering_coefficient", "eigenvector_centrality",
+                  "mean_expression", "variance_expression")
+
+# Extract PCA data for combined analysis
+pca_all_ctrl <- combined[, paste0(pca_all_vars, "_ctrl")] %>% na.omit()
+colnames(pca_all_ctrl) <- pca_all_vars
+pca_all_ctrl$condition <- args$ctrl_label
+
+pca_all_treat <- combined[, paste0(pca_all_vars, "_treat")] %>% na.omit()
+colnames(pca_all_treat) <- pca_all_vars
+pca_all_treat$condition <- args$treat_label
+
+# Combined PCA
+combined_pca_all_data <- rbind(pca_all_ctrl, pca_all_treat)
+
+pca_all_result <- prcomp(combined_pca_all_data[, pca_all_vars], scale = TRUE, center = TRUE)
+pca_all_df <- data.frame(
+  PC1 = pca_all_result$x[, 1],
+  PC2 = pca_all_result$x[, 2],
+  condition = combined_pca_all_data$condition
+)
+
+p_pca_all <- ggplot(pca_all_df, aes(x = PC1, y = PC2, color = condition, fill = condition)) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_density2d(alpha = 0.2, show.legend = FALSE) +
+  labs(title = "PCA of Network Metrics + Expression",
+       x = paste0("PC1 (", round(summary(pca_all_result)$importance[2,1]*100, 1), "%)"),
+       y = paste0("PC2 (", round(summary(pca_all_result)$importance[2,2]*100, 1), "%)")) +
+  theme_minimal() +
+  theme(legend.position = "right", plot.title = element_text(hjust = 0.5, face = "bold"))
+
+ggsave(file.path(output_dir, "01a2_pca_network_and_expression.pdf"), p_pca_all, width = 8, height = 6)
+cat("  Saved: 01a2_pca_network_and_expression.pdf\n")
+
 # ----- 5a. Delta barplot showing mean changes across all metrics -----
 cat("Generating delta barplot for metric changes...\n")
 
@@ -433,6 +472,57 @@ expr_overlay_plots <- list(
 p_expr_overlay <- do.call(gridExtra::grid.arrange, c(expr_overlay_plots, ncol = 2))
 ggsave(file.path(output_dir, "03b_overlaid_expression_distributions.pdf"), p_expr_overlay, width = 12, height = 5)
 cat("  Saved: 03b_overlaid_expression_distributions.pdf\n")
+
+# ----- 7c. Centrality vs Connectivity plots -----
+cat("Generating centrality vs connectivity plots...\n")
+
+centrality_conn_plots <- list(
+  # Control: Eigenvector centrality vs Weighted connectivity
+  ggplot(combined %>% filter(!is.na(eigenvector_centrality_ctrl) & !is.na(weighted_connectivity_ctrl)), 
+         aes(x = weighted_connectivity_ctrl, y = eigenvector_centrality_ctrl, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = paste0(args$ctrl_label, ": Eigenvector Centrality vs Weighted Connectivity"),
+         x = "Weighted Connectivity", y = "Eigenvector Centrality") +
+    theme_minimal() +
+    theme(legend.position = "right"),
+  
+  # Treatment: Eigenvector centrality vs Weighted connectivity (colored by Control module)
+  ggplot(combined %>% filter(!is.na(eigenvector_centrality_treat) & !is.na(weighted_connectivity_treat)), 
+         aes(x = weighted_connectivity_treat, y = eigenvector_centrality_treat, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = paste0(args$treat_label, ": Eigenvector Centrality vs Weighted Connectivity"),
+         subtitle = "(colored by Control module assignment)",
+         x = "Weighted Connectivity", y = "Eigenvector Centrality") +
+    theme_minimal() +
+    theme(legend.position = "right"),
+  
+  # Control: Betweenness centrality vs Weighted connectivity
+  ggplot(combined %>% filter(!is.na(betweenness_centrality_ctrl) & !is.na(weighted_connectivity_ctrl)), 
+         aes(x = weighted_connectivity_ctrl, y = betweenness_centrality_ctrl, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = paste0(args$ctrl_label, ": Betweenness Centrality vs Weighted Connectivity"),
+         x = "Weighted Connectivity", y = "Betweenness Centrality") +
+    theme_minimal() +
+    theme(legend.position = "right"),
+  
+  # Treatment: Betweenness centrality vs Weighted connectivity (colored by Control module)
+  ggplot(combined %>% filter(!is.na(betweenness_centrality_treat) & !is.na(weighted_connectivity_treat)), 
+         aes(x = weighted_connectivity_treat, y = betweenness_centrality_treat, color = module_ctrl)) +
+    geom_point(alpha = 0.6, size = 2) +
+    scale_color_manual(values = module_color_map, name = "Control Module") +
+    labs(title = paste0(args$treat_label, ": Betweenness Centrality vs Weighted Connectivity"),
+         subtitle = "(colored by Control module assignment)",
+         x = "Weighted Connectivity", y = "Betweenness Centrality") +
+    theme_minimal() +
+    theme(legend.position = "right")
+)
+
+p_centrality_conn <- do.call(gridExtra::grid.arrange, c(centrality_conn_plots, ncol = 2))
+ggsave(file.path(output_dir, "03c_centrality_vs_connectivity.pdf"), p_centrality_conn, width = 14, height = 10)
+cat("  Saved: 03c_centrality_vs_connectivity.pdf\n")
 
 # ----- 8. Scatterplots: Ctrl vs Treat network metrics -----
 cat("Generating scatterplots (Ctrl vs Treat)...\n")
