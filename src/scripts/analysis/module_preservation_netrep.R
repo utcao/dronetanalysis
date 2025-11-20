@@ -35,13 +35,13 @@ suppressPackageStartupMessages({
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Module preservation analysis using NetRep')
 parser$add_argument('--ctrl-expr', help = 'Control expression data (genes x samples)', 
-                   default = 'results/preprocess/voomdataCtrl.txt')
+                   default = 'dataset/processed/VOOM/voomdataCtrl.txt')
 parser$add_argument('--treat-expr', help = 'Treatment expression data (genes x samples)', 
-                   default = 'results/preprocess/voomdataHS.txt')
+                   default = 'dataset/processed/VOOM/voomdataHS.txt')
 parser$add_argument('--ctrl-modules', help = 'Control module assignments CSV', 
                    default = 'results/network_features/features_calc/adjacency/modules/gene_connectivity.csv')
 parser$add_argument('--output-dir', help = 'Directory to save results', 
-                   default = 'results/analysis/module_preservation_netrep')
+                   default = 'results/analysis/module_overlap/module_preservation_netrep')
 parser$add_argument('--nPermutations', type = 'integer', help = 'Number of permutations for significance testing', 
                    default = 10000)
 parser$add_argument('--nThreads', type = 'integer', help = 'Number of parallel threads', 
@@ -65,26 +65,45 @@ cat("Correlation type:", args$corType, "\n\n")
 # ----- 3. Load data -----
 cat("Loading expression data...\n")
 
-# Control expression
+# Control expression - first column is gene names without header
 ctrl_expr <- fread(args$ctrl_expr, data.table = FALSE)
+# fread adds V1 as default name when first column has no header
 if (colnames(ctrl_expr)[1] %in% c("V1", "")) {
   colnames(ctrl_expr)[1] <- "gene"
 }
-ctrl_genes <- ctrl_expr$gene
-ctrl_expr_mat <- as.matrix(ctrl_expr[, -1])
+ctrl_genes <- as.character(ctrl_expr[[1]])  # Ensure character vector
+# Extract numeric columns only
+ctrl_expr_numeric <- ctrl_expr[, -1, drop = FALSE]
+# Convert to numeric matrix explicitly
+ctrl_expr_mat <- matrix(
+  as.numeric(as.matrix(ctrl_expr_numeric)),
+  nrow = nrow(ctrl_expr_numeric),
+  ncol = ncol(ctrl_expr_numeric)
+)
 rownames(ctrl_expr_mat) <- ctrl_genes
+colnames(ctrl_expr_mat) <- colnames(ctrl_expr_numeric)
 ctrl_expr_mat <- t(ctrl_expr_mat)  # NetRep expects samples x genes
+storage.mode(ctrl_expr_mat) <- "double"  # Ensure numeric storage
 cat("  Control:", nrow(ctrl_expr_mat), "samples x", ncol(ctrl_expr_mat), "genes\n")
 
-# Treatment expression
+# Treatment expression - first column is gene names without header
 treat_expr <- fread(args$treat_expr, data.table = FALSE)
 if (colnames(treat_expr)[1] %in% c("V1", "")) {
   colnames(treat_expr)[1] <- "gene"
 }
-treat_genes <- treat_expr$gene
-treat_expr_mat <- as.matrix(treat_expr[, -1])
+treat_genes <- as.character(treat_expr[[1]])  # Ensure character vector
+# Extract numeric columns only
+treat_expr_numeric <- treat_expr[, -1, drop = FALSE]
+# Convert to numeric matrix explicitly
+treat_expr_mat <- matrix(
+  as.numeric(as.matrix(treat_expr_numeric)),
+  nrow = nrow(treat_expr_numeric),
+  ncol = ncol(treat_expr_numeric)
+)
 rownames(treat_expr_mat) <- treat_genes
+colnames(treat_expr_mat) <- colnames(treat_expr_numeric)
 treat_expr_mat <- t(treat_expr_mat)  # NetRep expects samples x genes
+storage.mode(treat_expr_mat) <- "double"  # Ensure numeric storage
 cat("  Treatment:", nrow(treat_expr_mat), "samples x", ncol(treat_expr_mat), "genes\n")
 
 # Ensure same genes in both datasets
@@ -133,11 +152,43 @@ if (args$corType == "bicor") {
   treat_cor <- cor(treat_expr_mat, use = "pairwise.complete.obs")
 }
 
-cat("  Correlation matrices calculated\n\n")
+# Ensure matrices are proper numeric matrices (not data frames)
+ctrl_cor <- matrix(as.numeric(ctrl_cor), nrow = nrow(ctrl_cor), ncol = ncol(ctrl_cor))
+rownames(ctrl_cor) <- colnames(ctrl_expr_mat)
+colnames(ctrl_cor) <- colnames(ctrl_expr_mat)
+storage.mode(ctrl_cor) <- "double"
+
+treat_cor <- matrix(as.numeric(treat_cor), nrow = nrow(treat_cor), ncol = ncol(treat_cor))
+rownames(treat_cor) <- colnames(treat_expr_mat)
+colnames(treat_cor) <- colnames(treat_expr_mat)
+storage.mode(treat_cor) <- "double"
+
+# Ensure diagonal is exactly 1 (NetRep requirement)
+diag(ctrl_cor) <- 1
+diag(treat_cor) <- 1
+
+cat("  Correlation matrices calculated\n")
+cat("  Control correlation matrix:", nrow(ctrl_cor), "x", ncol(ctrl_cor), "\n")
+cat("  Treatment correlation matrix:", nrow(treat_cor), "x", ncol(treat_cor), "\n\n")
+
+# ----- 5. Create adjacency matrices (networks) -----
+cat("Creating adjacency matrices from correlations...\n")
+# NetRep expects both correlation AND network (adjacency) matrices
+# For weighted networks, we can use the absolute correlations as weights
+# Or use soft-thresholding as in WGCNA
+
+# Simple approach: use absolute correlation as adjacency
+ctrl_adj <- abs(ctrl_cor)
+treat_adj <- abs(treat_cor)
+
+# Ensure proper matrix format
+storage.mode(ctrl_adj) <- "double"
+storage.mode(treat_adj) <- "double"
+
+cat("  Adjacency matrices created\n\n")
 
 # ----- 5. Run NetRep module preservation analysis -----
 cat("Running NetRep module preservation analysis...\n")
-cat("  This is much faster than WGCNA's modulePreservation!\n")
 cat("  Expected runtime: 5-15 minutes with", args$nPermutations, "permutations\n\n")
 
 # Convert module assignments to list format for NetRep
@@ -153,16 +204,20 @@ cat("  Testing", length(module_list), "modules\n\n")
 
 # Run module preservation test
 # discovery = Control (reference), test = Treatment
+# NetRep requires: network (adjacency), data (expression), and correlation matrices
 preservation_result <- modulePreservation(
   network = list(
-    discovery = ctrl_cor,
-    test = treat_cor
+    discovery = ctrl_adj,
+    test = treat_adj
   ),
   data = list(
     discovery = ctrl_expr_mat,
     test = treat_expr_mat
   ),
-  correlation = args$corType,
+  correlation = list(
+    discovery = ctrl_cor,
+    test = treat_cor
+  ),
   moduleAssignments = list(discovery = module_assignments),
   modules = names(module_list),
   nPerm = args$nPermutations,
