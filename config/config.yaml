@@ -42,9 +42,41 @@ processed_files:
   vst_processed_files:
     - "dataset/processed/VST/VSTdataCtrl.txt"
     - "dataset/processed/VST/VSTdataHS.txt"
-spearman_correlation_files:
-  permutation_files:
-    - "results/spearman_correlation/permutation_test"
-network_feature_files:
-  soft_threshold_files:
-    - "results/network_features/soft_threshold/unsigned/unsigned_soft_thresholded_adjacency_matrix.csv"
+  spearman_correlation_files:
+    permutation_files:
+      - "results/spearman_correlation/permutation_test"
+  network_feature_files:
+    soft_threshold_files:
+      - "results/network_features/soft_threshold/unsigned/unsigned_soft_thresholded_adjacency_matrix.csv"
+
+# arguments for each steps
+genes:
+- FBgn0031081
+- FBgn0031082
+
+subset_expr_matrix:
+  output_dirs: "results/gene_wise/expr"
+  desc_body: ["_1stquin_expr", "_5thquin_expr"]
+  suffix: "csv"
+
+create_network:
+  output_dirs: "results/gene_wise/networks"
+  desc_body: ["_1stquin_network", "_5thquin_network"]
+  suffix: "csv"
+
+cal_diff_networks:
+  output_dirs: "results/gene_wise/networks"
+  desc_body: "_diff_network"
+  suffix: "csv"
+
+cal_network_features:
+  output_dirs: "results/gene_wise/features"
+  desc_body: ["_feats_diff_network", "_feats_1stquin_network", "_feats_5thquin_network"]
+  suffix: "csv"
+
+subset_features_neighbors:
+  output_dirs: "results/gene_wise/neighbors"
+  desc_body: ["_feats_1stlayer_diff_network", "_feats_2ndlayer_diff_network",
+              "_feats_1stlayer_1stquin_network", "_feats_2ndlayer_1stquin_network",
+              "_feats_1stlayer_5thquin_network", "_feats_2ndlayer_5thquin_network"]
+  neighbour_layers: [1,2]
