@@ -231,23 +231,42 @@ cat("\nModule preservation analysis complete!\n\n")
 cat("Extracting preservation statistics...\n")
 
 # Check structure of result
-cat("  Result structure:\n")
-print(str(preservation_result, max.level = 2))
+cat("  Result structure (full):\n")
+print(str(preservation_result, max.level = 3))
 
-# NetRep returns a list with different structure depending on simplify parameter
-# Extract the actual data - it should be in preservation_result[[1]] or similar
-if (is.list(preservation_result) && !is.null(names(preservation_result))) {
-  # If result has named elements
+# Print names at each level to understand structure
+cat("\n  Top level names:\n")
+print(names(preservation_result))
+
+# NetRep with simplify=TRUE (default) returns a simplified structure
+# For single discovery->test comparison, it simplifies the list
+# The structure should be: preservation_result$preservation, preservation_result$p.values, etc.
+# But for multiple comparisons, it's nested: preservation_result[[disc]][[test]]
+
+# Since we have 1 discovery and 1 test with simplify=TRUE, the structure should be flat
+cat("\n  Checking for direct access to preservation and p.values...\n")
+if (!is.null(preservation_result$preservation)) {
+  cat("  Found preservation at top level\n")
   pres_data <- preservation_result
-} else if (is.list(preservation_result) && length(preservation_result) == 1) {
-  # If result is a list with one element
+} else if (!is.null(preservation_result[[1]]$preservation)) {
+  cat("  Found preservation at second level [1]\n")
   pres_data <- preservation_result[[1]]
+} else if (!is.null(preservation_result[[1]][[1]]$preservation)) {
+  cat("  Found preservation at third level [1][1]\n")
+  pres_data <- preservation_result[[1]][[1]]
 } else {
+  cat("  ERROR: Cannot find preservation data\n")
+  cat("  Available names:\n")
+  print(names(preservation_result))
+  if (length(preservation_result) > 0) {
+    cat("  First element names:\n")
+    print(names(preservation_result[[1]]))
+  }
   pres_data <- preservation_result
 }
 
 cat("\n  Extracted data structure:\n")
-print(str(pres_data, max.level = 2))
+print(str(pres_data, max.level = 3))
 
 # Get preservation statistics for each module
 # NetRep returns preservation and p.values as matrices or data frames
@@ -323,137 +342,159 @@ cat("Saved: netrep_preservation_full_results.rds\n")
 # ----- 7. Generate plots -----
 cat("\nGenerating preservation plots...\n")
 
-# 7a. Preservation statistics plot (avg weight vs coherence)
-pdf(file.path(output_dir, "01_preservation_scatter.pdf"), width = 10, height = 8)
+# Check if we have valid data for plotting
+if (nrow(preservation_stats) == 0 || 
+    all(is.na(preservation_stats$avg_weight_preservation)) ||
+    all(is.na(preservation_stats$coherence_preservation))) {
+  cat("  Warning: No valid preservation data for plotting\n")
+  cat("  Skipping plots\n")
+} else {
+  # Replace any NA/NaN/Inf with appropriate values for plotting
+  plot_data <- preservation_stats %>%
+    mutate(
+      avg_weight_preservation = ifelse(is.finite(avg_weight_preservation), avg_weight_preservation, 0),
+      coherence_preservation = ifelse(is.finite(coherence_preservation), coherence_preservation, 0),
+      avg_cor_preservation = ifelse(is.finite(avg_cor_preservation), avg_cor_preservation, 0),
+      avg_contrib_preservation = ifelse(is.finite(avg_contrib_preservation), avg_contrib_preservation, 0),
+      avg_weight_pval = ifelse(is.finite(avg_weight_pval), avg_weight_pval, 1),
+      coherence_pval = ifelse(is.finite(coherence_pval), coherence_pval, 1),
+      avg_cor_pval = ifelse(is.finite(avg_cor_pval), avg_cor_pval, 1),
+      avg_contrib_pval = ifelse(is.finite(avg_contrib_pval), avg_contrib_pval, 1)
+    )
+  
+  # 7a. Preservation statistics plot (avg weight vs coherence)
+  pdf(file.path(output_dir, "01_preservation_scatter.pdf"), width = 10, height = 8)
+  
+  par(mfrow = c(1, 1), mar = c(5, 5, 4, 2))
+  plot(plot_data$avg_weight_preservation, plot_data$coherence_preservation,
+       pch = 21, bg = plot_data$module,
+       cex = 2,
+       xlab = "Average Edge Weight Preservation",
+       ylab = "Module Coherence Preservation",
+       main = "Module Preservation: Control → High Sugar\n(NetRep Analysis)",
+       cex.lab = 1.2, cex.axis = 1.1)
+  
+  # Add text labels for modules
+  text(plot_data$avg_weight_preservation, plot_data$coherence_preservation,
+       labels = plot_data$module, pos = 3, cex = 0.7)
+  
+  # Add grid
+  grid()
+  
+  dev.off()
+  cat("  Saved: 01_preservation_scatter.pdf\n")
+  
+  # 7b. P-value plot (-log10)
+  pdf(file.path(output_dir, "02_preservation_pvalues.pdf"), width = 10, height = 8)
+  
+  plot_data_pval <- plot_data %>%
+    mutate(
+      log10p_weight = pmin(-log10(avg_weight_pval + 1e-300), 300),
+      log10p_coherence = pmin(-log10(coherence_pval + 1e-300), 300)
+    )
+  
+  par(mfrow = c(1, 1), mar = c(5, 5, 4, 2))
+  plot(plot_data_pval$log10p_weight, plot_data_pval$log10p_coherence,
+       pch = 21, bg = plot_data_pval$module,
+       cex = 2,
+       xlab = "-log10(p-value) Weight Preservation",
+       ylab = "-log10(p-value) Coherence Preservation",
+       main = "Module Preservation Significance",
+       cex.lab = 1.2, cex.axis = 1.1)
+  
+  # Add significance thresholds
+  abline(h = -log10(0.05), v = -log10(0.05), lty = 2, col = "blue", lwd = 2)
+  abline(h = -log10(0.001), v = -log10(0.001), lty = 2, col = "darkgreen", lwd = 2)
+  
+  text(plot_data_pval$log10p_weight, plot_data_pval$log10p_coherence,
+       labels = plot_data_pval$module, pos = 3, cex = 0.7)
+  
+  legend("bottomright",
+         legend = c("p < 0.001", "p < 0.05"),
+         lty = 2, col = c("darkgreen", "blue"),
+         lwd = 2, cex = 0.9, bty = "n")
+  
+  dev.off()
+  cat("  Saved: 02_preservation_pvalues.pdf\n")
+  
+  # 7c. Bar plot of preservation levels
+  pdf(file.path(output_dir, "03_preservation_levels_barplot.pdf"), width = 12, height = 6)
+  
+  preservation_summary <- plot_data %>%
+    mutate(module = reorder(module, avg_weight_preservation))
+  
+  p <- ggplot(preservation_summary, 
+              aes(x = module, y = avg_weight_preservation, fill = preservation_level)) +
+    geom_col() +
+    scale_fill_manual(values = c("Strong preservation" = "#2E7D32",
+                                 "Moderate preservation" = "#FFA726",
+                                 "Weak preservation" = "#FFE082",
+                                 "No preservation" = "#D32F2F")) +
+    labs(title = "Module Preservation: Control → High Sugar\n(Average Edge Weight)",
+         x = "Module", 
+         y = "Average Edge Weight Preservation",
+         fill = "Preservation Level") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          legend.position = "right")
+  
+  print(p)
+  dev.off()
+  cat("  Saved: 03_preservation_levels_barplot.pdf\n")
+  
+  # 7d. Heatmap of preservation statistics
+  pdf(file.path(output_dir, "04_preservation_heatmap.pdf"), width = 10, height = 8)
+  
+  heatmap_data <- plot_data %>%
+    select(module, avg_weight_preservation, avg_cor_preservation, 
+           avg_contrib_preservation, coherence_preservation) %>%
+    column_to_rownames("module") %>%
+    as.matrix()
+  
+  # Scale by column (z-score) - handle case where all values are the same
+  heatmap_data_scaled <- scale(heatmap_data)
+  # Replace NaN from zero-variance columns with 0
+  heatmap_data_scaled[is.na(heatmap_data_scaled)] <- 0
+  
+  colnames(heatmap_data_scaled) <- c("Avg Weight", "Avg Correlation", 
+                                      "Avg Contribution", "Coherence")
+  
+  pheatmap(heatmap_data_scaled,
+           color = colorRampPalette(c("#2166AC", "white", "#B2182B"))(100),
+           cluster_rows = FALSE,
+           cluster_cols = FALSE,
+           display_numbers = TRUE,
+           number_format = "%.2f",
+           number_color = "black",
+           fontsize_number = 8,
+           main = "Module Preservation Statistics (Z-scored)\nControl → High Sugar",
+           angle_col = 45)
+  
+  dev.off()
+  cat("  Saved: 04_preservation_heatmap.pdf\n")
+  
+  # 7e. Module size vs preservation
+  pdf(file.path(output_dir, "05_size_vs_preservation.pdf"), width = 10, height = 8)
+  
+  par(mfrow = c(1, 1), mar = c(5, 5, 4, 2))
+  plot(plot_data$moduleSize, plot_data$avg_weight_preservation,
+       pch = 21, bg = plot_data$module,
+       cex = 2,
+       xlab = "Module Size (number of genes)",
+       ylab = "Average Edge Weight Preservation",
+       main = "Module Size vs Preservation",
+       cex.lab = 1.2, cex.axis = 1.1)
+  
+  text(plot_data$moduleSize, plot_data$avg_weight_preservation,
+       labels = plot_data$module, pos = 3, cex = 0.7)
+  
+  grid()
+  
+  dev.off()
+  cat("  Saved: 05_size_vs_preservation.pdf\n")
+}
 
-plot_data <- preservation_stats
-
-par(mfrow = c(1, 1), mar = c(5, 5, 4, 2))
-plot(plot_data$avg_weight_preservation, plot_data$coherence_preservation,
-     pch = 21, bg = plot_data$module,
-     cex = 2,
-     xlab = "Average Edge Weight Preservation",
-     ylab = "Module Coherence Preservation",
-     main = "Module Preservation: Control → High Sugar\n(NetRep Analysis)",
-     cex.lab = 1.2, cex.axis = 1.1)
-
-# Add text labels for modules
-text(plot_data$avg_weight_preservation, plot_data$coherence_preservation,
-     labels = plot_data$module, pos = 3, cex = 0.7)
-
-# Add grid
-grid()
-
-dev.off()
-cat("  Saved: 01_preservation_scatter.pdf\n")
-
-# 7b. P-value plot (-log10)
-pdf(file.path(output_dir, "02_preservation_pvalues.pdf"), width = 10, height = 8)
-
-plot_data_pval <- plot_data %>%
-  mutate(
-    log10p_weight = -log10(avg_weight_pval + 1e-300),
-    log10p_coherence = -log10(coherence_pval + 1e-300)
-  )
-
-par(mfrow = c(1, 1), mar = c(5, 5, 4, 2))
-plot(plot_data_pval$log10p_weight, plot_data_pval$log10p_coherence,
-     pch = 21, bg = plot_data_pval$module,
-     cex = 2,
-     xlab = "-log10(p-value) Weight Preservation",
-     ylab = "-log10(p-value) Coherence Preservation",
-     main = "Module Preservation Significance",
-     cex.lab = 1.2, cex.axis = 1.1)
-
-# Add significance thresholds
-abline(h = -log10(0.05), v = -log10(0.05), lty = 2, col = "blue", lwd = 2)
-abline(h = -log10(0.001), v = -log10(0.001), lty = 2, col = "darkgreen", lwd = 2)
-
-text(plot_data_pval$log10p_weight, plot_data_pval$log10p_coherence,
-     labels = plot_data_pval$module, pos = 3, cex = 0.7)
-
-legend("bottomright",
-       legend = c("p < 0.001", "p < 0.05"),
-       lty = 2, col = c("darkgreen", "blue"),
-       lwd = 2, cex = 0.9, bty = "n")
-
-dev.off()
-cat("  Saved: 02_preservation_pvalues.pdf\n")
-
-# 7c. Bar plot of preservation levels
-pdf(file.path(output_dir, "03_preservation_levels_barplot.pdf"), width = 12, height = 6)
-
-preservation_summary <- preservation_stats %>%
-  mutate(module = reorder(module, avg_weight_preservation))
-
-p <- ggplot(preservation_summary, 
-            aes(x = module, y = avg_weight_preservation, fill = preservation_level)) +
-  geom_col() +
-  scale_fill_manual(values = c("Strong preservation" = "#2E7D32",
-                               "Moderate preservation" = "#FFA726",
-                               "Weak preservation" = "#FFE082",
-                               "No preservation" = "#D32F2F")) +
-  labs(title = "Module Preservation: Control → High Sugar\n(Average Edge Weight)",
-       x = "Module", 
-       y = "Average Edge Weight Preservation",
-       fill = "Preservation Level") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
-        legend.position = "right")
-
-print(p)
-dev.off()
-cat("  Saved: 03_preservation_levels_barplot.pdf\n")
-
-# 7d. Heatmap of preservation statistics
-pdf(file.path(output_dir, "04_preservation_heatmap.pdf"), width = 10, height = 8)
-
-heatmap_data <- preservation_stats %>%
-  select(module, avg_weight_preservation, avg_cor_preservation, 
-         avg_contrib_preservation, coherence_preservation) %>%
-  column_to_rownames("module") %>%
-  as.matrix()
-
-# Scale by column (z-score)
-heatmap_data_scaled <- scale(heatmap_data)
-
-colnames(heatmap_data_scaled) <- c("Avg Weight", "Avg Correlation", 
-                                    "Avg Contribution", "Coherence")
-
-pheatmap(heatmap_data_scaled,
-         color = colorRampPalette(c("#2166AC", "white", "#B2182B"))(100),
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         display_numbers = TRUE,
-         number_format = "%.2f",
-         number_color = "black",
-         fontsize_number = 8,
-         main = "Module Preservation Statistics (Z-scored)\nControl → High Sugar",
-         angle_col = 45)
-
-dev.off()
-cat("  Saved: 04_preservation_heatmap.pdf\n")
-
-# 7e. Module size vs preservation
-pdf(file.path(output_dir, "05_size_vs_preservation.pdf"), width = 10, height = 8)
-
-par(mfrow = c(1, 1), mar = c(5, 5, 4, 2))
-plot(plot_data$moduleSize, plot_data$avg_weight_preservation,
-     pch = 21, bg = plot_data$module,
-     cex = 2,
-     xlab = "Module Size (number of genes)",
-     ylab = "Average Edge Weight Preservation",
-     main = "Module Size vs Preservation",
-     cex.lab = 1.2, cex.axis = 1.1)
-
-text(plot_data$moduleSize, plot_data$avg_weight_preservation,
-     labels = plot_data$module, pos = 3, cex = 0.7)
-
-grid()
-
-dev.off()
-cat("  Saved: 05_size_vs_preservation.pdf\n")
 
 # ----- 8. Summary statistics -----
 cat("\n=== Module Preservation Summary ===\n\n")
