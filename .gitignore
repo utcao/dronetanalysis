@@ -12,10 +12,7 @@ archives
 logs
 
 # gthornes
-results/network_features/
-results/spearman_correlation/spearman_matrices/
-results/spearman_correlation/perm/
-results/analysis
+results
 Rplots.pdf
 dataset/
 
