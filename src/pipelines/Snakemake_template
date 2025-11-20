@@ -116,7 +116,7 @@ rule cal_network_features:
 
 rule subset_features_neighbors:
     input:
-        lambda wc: outfile("cal_diff_networks", wc.gene, DESC_DIFF_NET)
+        lambda wc: outfile("cal_network_features", wc.gene, DESC_NET_FEATURES)
     output:
         [f"{OUTDIR_NEIGHBORS[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_NEIGHBORS]
     shell:
