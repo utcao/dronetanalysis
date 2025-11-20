@@ -196,7 +196,7 @@ sft_plot <- function(sft, output_file, powers = c(1:20)){
 #' @return A list containing various network metrics
 #' @export
 #'
-calculate_network_metrics <- function(matrix_data, matrix_name, connection_threshold = 0.1) {
+calculate_network_metrics <- function(matrix_data, matrix_name, connection_threshold = 0) {
     cat("\n=== Network Metrics for", matrix_name, "===\n")
     upper_tri_values <- matrix_data[upper.tri(matrix_data)]
     
@@ -317,6 +317,19 @@ create_modules <- function(adjacency_matrix,
     
     # Convert to colours
     module_colours <- labels2colors(dynamic_modules)
+    
+    # Step 3b: Plot gene dendrogram with module colors
+    if (save_plots && !is.null(output_dir)) {
+        cat("Step 3b: Saving gene dendrogram with module assignments...\n")
+        pdf(file = file.path(output_dir, "gene_dendrogram_modules.pdf"), 
+            width = 12, height = 9)
+        plotDendroAndColors(gene_tree, module_colours,
+                          "Module colors",
+                          dendroLabels = FALSE, hang = 0.03,
+                          addGuide = TRUE, guideHang = 0.05,
+                          main = "Gene Dendrogram and Module Colors")
+        dev.off()
+    }
     
     # Verify colour assignments match matrix dimensions
     if (length(module_colours) != nrow(adjacency_matrix)) {
