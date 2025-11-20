@@ -367,7 +367,7 @@ network_tests <- lapply(pca_vars, function(var) {
   ctrl_vals <- combined[[var_ctrl]][!is.na(combined[[var_ctrl]])]
   treat_vals <- combined[[var_treat]][!is.na(combined[[var_treat]])]
   
-  test_result <- wilcox.test(ctrl_vals, treat_vals, paired = FALSE)
+  test_result <- wilcox.test(ctrl_vals, treat_vals, paired = TRUE)
   list(var = var, p.value = test_result$p.value)
 })
 
