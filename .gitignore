@@ -24,3 +24,10 @@ src/test.r
 # yu-tao
 results/spearman_correlation/shuffle/
 results/spearman_correlation/permutation_test/
+dataset/processed/logCPM_ct_dros_subset.csv
+dataset/processed/logCPM_hs_dros_subset.csv
+dataset/raw/logCPM_Ctrl_Dros.csv
+dataset/raw/logCPM_HS_Dros.csv
+dataset/test/logCPM_ct_dros_subset.csv
+dataset/test/logCPM_hs_dros_subset.csv
+.snakemake/iocache/latest.pkl
