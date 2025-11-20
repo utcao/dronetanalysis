@@ -18,6 +18,7 @@ dataset/
 
 # files
 src/test.r
+*.pkl
 
 # yu-tao
 results/spearman_correlation/shuffle/
