@@ -230,22 +230,66 @@ cat("\nModule preservation analysis complete!\n\n")
 # ----- 6. Extract and save results -----
 cat("Extracting preservation statistics...\n")
 
+# Check structure of result
+cat("  Result structure:\n")
+print(str(preservation_result, max.level = 2))
+
+# NetRep returns a list with different structure depending on simplify parameter
+# Extract the actual data - it should be in preservation_result[[1]] or similar
+if (is.list(preservation_result) && !is.null(names(preservation_result))) {
+  # If result has named elements
+  pres_data <- preservation_result
+} else if (is.list(preservation_result) && length(preservation_result) == 1) {
+  # If result is a list with one element
+  pres_data <- preservation_result[[1]]
+} else {
+  pres_data <- preservation_result
+}
+
+cat("\n  Extracted data structure:\n")
+print(str(pres_data, max.level = 2))
+
 # Get preservation statistics for each module
+# NetRep returns preservation and p.values as matrices or data frames
 preservation_stats <- data.frame(
   module = names(module_list),
   moduleSize = sapply(module_list, length),
-  # Preservation statistics
-  avg_weight_preservation = preservation_result$preservation$avg.weight,
-  avg_cor_preservation = preservation_result$preservation$avg.cor,
-  avg_contrib_preservation = preservation_result$preservation$avg.contrib,
-  coherence_preservation = preservation_result$preservation$coherence,
-  # P-values
-  avg_weight_pval = preservation_result$p.values$avg.weight,
-  avg_cor_pval = preservation_result$p.values$avg.cor,
-  avg_contrib_pval = preservation_result$p.values$avg.contrib,
-  coherence_pval = preservation_result$p.values$coherence,
   stringsAsFactors = FALSE
-) %>%
+)
+
+# Add preservation statistics (check if they exist)
+if (!is.null(pres_data$preservation)) {
+  if (is.matrix(pres_data$preservation) || is.data.frame(pres_data$preservation)) {
+    preservation_stats$avg_weight_preservation <- pres_data$preservation[, "avg.weight"]
+    preservation_stats$avg_cor_preservation <- pres_data$preservation[, "avg.cor"]
+    preservation_stats$avg_contrib_preservation <- pres_data$preservation[, "avg.contrib"]
+    preservation_stats$coherence_preservation <- pres_data$preservation[, "coherence"]
+  } else {
+    # Try accessing as list
+    preservation_stats$avg_weight_preservation <- pres_data$preservation$avg.weight
+    preservation_stats$avg_cor_preservation <- pres_data$preservation$avg.cor
+    preservation_stats$avg_contrib_preservation <- pres_data$preservation$avg.contrib
+    preservation_stats$coherence_preservation <- pres_data$preservation$coherence
+  }
+}
+
+# Add p-values (check if they exist)
+if (!is.null(pres_data$p.values)) {
+  if (is.matrix(pres_data$p.values) || is.data.frame(pres_data$p.values)) {
+    preservation_stats$avg_weight_pval <- pres_data$p.values[, "avg.weight"]
+    preservation_stats$avg_cor_pval <- pres_data$p.values[, "avg.cor"]
+    preservation_stats$avg_contrib_pval <- pres_data$p.values[, "avg.contrib"]
+    preservation_stats$coherence_pval <- pres_data$p.values[, "coherence"]
+  } else {
+    # Try accessing as list
+    preservation_stats$avg_weight_pval <- pres_data$p.values$avg.weight
+    preservation_stats$avg_cor_pval <- pres_data$p.values$avg.cor
+    preservation_stats$avg_contrib_pval <- pres_data$p.values$avg.contrib
+    preservation_stats$coherence_pval <- pres_data$p.values$coherence
+  }
+}
+
+preservation_stats <- preservation_stats %>%
   arrange(avg_weight_pval)
 
 # Add FDR correction
