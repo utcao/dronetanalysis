@@ -1,13 +1,13 @@
 configfile: "config/config.yaml"
 import os
-# Get the current working directory
-current_directory = os.getcwd()
-print("Current Working Directory:", current_directory)
-file_path = "dataset/processed/VOOM/voomdataCtrl.txt"
-if os.path.isfile(file_path):
-   print("File exists.")
-else:
-   print("File does not exist.")
+# # Get the current working directory
+# current_directory = os.getcwd()
+# print("Current Working Directory:", current_directory)
+# file_path = "dataset/processed/VOOM/voomdataCtrl.txt"
+# if os.path.isfile(file_path):
+#    print("File exists.")
+# else:
+#    print("File does not exist.")
 ###########################################
 # Helper functions
 ###########################################
