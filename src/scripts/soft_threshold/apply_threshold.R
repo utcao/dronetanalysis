@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 27/10/2025
+# Last Updated: 30/10/2025
 #
 # This script::
 #   1. Takes adjacency matrices as input
@@ -15,48 +15,57 @@
 rm(list = ls())
 
 # ----- 1. Load required packages -----
+library(argparse)
 library(data.table)
 library(dplyr)
 library(tidyr)
 library(WGCNA)
 library(yaml)
 
-# ----- 2. Set Input and Output Paths from config.yaml -----
+# ----- Parse command line arguments -----
+parser <- ArgumentParser(description = 'Apply soft threshold to adjacency matrices')
+parser$add_argument('--input', type="character", 
+                   default="results/network_features/soft_threshold/HS_unsigned_adjacency_matrix.csv",
+                   help='Input adjacency matrix file path')
+parser$add_argument('--output-dir', type="character",
+                   default="results/network_features", 
+                   help='Output directory for soft-thresholded matrices')
+parser$add_argument('--soft-power', type="integer", default= 4,
+                   help='Soft-thresholding power to apply')
+
+args <- parser$parse_args()
+
+# ----- 2. Set Input and Output Paths -----
 source("src/utils/utils_io.R")
 source("src/utils/utils_network_feats.R")
-config <- yaml::read_yaml("config/config.yaml")
-soft_threshold_dir <- config$output_dirs$network_features_dir
-s_soft_threshold_file <- file.path(soft_threshold_dir, "soft_threshold/signed/signed_adjacency_matrix.csv")
-u_soft_threshold_file <- file.path(soft_threshold_dir, "soft_threshold/unsigned/unsigned_adjacency_matrix.csv")
-output_dir <- config$output_dirs$network_features_dir
+
+# Use command line arguments if provided, otherwise fall back to config
+if (!is.null(args$input) && args$input != "results/network_features/soft_threshold/HS_unsigned_adjacency_matrix.csv") {
+    soft_threshold_file <- args$input
+    output_dir <- args$output_dir
+} else {
+    # Fall back to config file
+    config <- yaml::read_yaml("config/config.yaml")
+    soft_threshold_dir <- config$output_dirs$network_features_dir
+    soft_threshold_file <- file.path(soft_threshold_dir, "soft_threshold/HS_unsigned_adjacency_matrix.csv")
+    output_dir <- config$output_dirs$network_features_dir
+}
+
+cat("Input file:", soft_threshold_file, "\n")
+cat("Output directory:", output_dir, "\n")
+cat("Soft power:", args$soft_power, "\n")
 
 # ----- 3. Load adjacency matrices -----
-sft_signed <- read.csv(s_soft_threshold_file, row.names = 1)
-cat("File read:", s_soft_threshold_file,"\n")
 
-sft_unsigned <- read.csv(u_soft_threshold_file, row.names = 1)
-cat("File read:", u_soft_threshold_file,"\n")
+sft_unsigned <- read.csv(soft_threshold_file, row.names = 1)
+cat("File read:", soft_threshold_file,"\n")
 
 # ----- 4. Apply soft-thresholding -----
 
-## Apply soft-thresholding power based on plot analysis ##
+## Apply soft-thresholding power from command line argument ##
 
-####################
-## Signed network ##
-####################
-
-soft_power_signed <- 10  ### Example power, adjust based on plot analysis ###
-soft_signed_adj <- sft_signed^soft_power_signed
-signed_output_file <- file.path(output_dir, "soft_threshold/signed/signed_soft_thresholded_adjacency_matrix.csv")
-write.csv(soft_signed_adj, signed_output_file, row.names = TRUE)
-cat("Signed soft-thresholded adjacency matrix saved to:", signed_output_file, "\n")
-
-######################
-## Unsigned network ##
-######################
-
-soft_power_unsigned <- 3  ### Example power, adjust based on plot analysis ###
-soft_unsigned_adj <- sft_unsigned^soft_power_unsigned
-unsigned_output_file <- file.path(output_dir, "soft_threshold/unsigned/unsigned_soft_thresholded_adjacency_matrix.csv")
-write.csv(soft_unsigned_adj, unsigned_output_file, row.names = TRUE)
-cat("Unsigned soft-thresholded adjacency matrix saved to:", unsigned_output_file, "\n")
+soft_power <- args$soft_power
+soft_adj <- sft_unsigned^soft_power
+output_file <- file.path(output_dir, "soft_threshold/HS_soft_thresholded_adjacency_matrix.csv")
+write.csv(soft_adj, output_file, row.names = TRUE)
+cat("Soft-thresholded adjacency matrix saved to:", output_file, "\n")

@@ -19,7 +19,7 @@ rm(list = ls())
 #  \/    enter NULL to select all samples/genes   \/  #
 #######################################################
 
-subset_sample_size <- 50
+subset_sample_size <- NULL
 subset_gene_size   <- NULL
 test_sample_size   <- 30
 test_gene_size     <- 30

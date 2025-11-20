@@ -3,7 +3,8 @@
 # Co-expression Network Filtering via Permutation Testing
 #
 # Author: Yu-tao Cao
-# Last Updated: 23/10/2025
+# Edited by Gabriel Thornes
+# Last Updated: 04/11/2025
 #
 # Description:
 #   This script performs statistical filtering of co-expression networks using
@@ -52,12 +53,11 @@ source("src/utils/utils_io.R")  # e.g., create_directories()
 source("src/utils/utils_permutation_net.R")
 
 # ----- 2. Extract Key Settings from config.yaml -----
-expcor_tab_dir <- "results/spearman_correlation"
-
+expcor_tab_dir <- "results/spearman_correlation/spearman_matrices"
 expcor_tab_file <- file.path(expcor_tab_dir, "spearman_correlation_matrix.csv")
-
+output_dir <- "results/spearman_correlation/perm"
 # ----- 3. Load data -----
-coexp_expr_tab <- fread(expcor_tab_file)[1:2000,1:2001]
+coexp_expr_tab <- fread(expcor_tab_file)[1:100,1:101]
 
 # ----- 4. create permutation datasets by shuffle gene_id -----
 sig_edge_tab_file <- "sig_edges_coexpr_net.csv"
@@ -66,17 +66,17 @@ setnames(coexp_expr_tab, "V1", "gene_id")
 sig_coexp_pairs <- permutation_test_stat(
                     coexp_expr_tab = coexp_expr_tab,
                     sig_edge_tab_file = sig_edge_tab_file,
-                    tab_output_dir = expcor_tab_dir,
+                    tab_output_dir = output_dir,
                     obs_col = "rho",
                     pair_id_col = "gene_pairs",
                     permu_cols_pattern = "seed",
-                    permu_n = 30,
+                    permu_n = 300,
                     alpha = 0.05, keep_permu = TRUE)
 
 id_col <- "gene_pairs"
 permu_cols_pat <- "seed"
 obs_col <- "rho"
-plot_output_dir <- file.path("results/spearman_correlation/permutation_test/plots")
+plot_output_dir <- file.path("results/spearman_correlation/perm/permutation_test/plots")
 
 # plot
 sig_coexp_pairs_ltab <- sig_coexp_pairs[, .SD, .SDcols = patterns(glue("{id_col}|{permu_cols_pat}|{obs_col}"))] |>

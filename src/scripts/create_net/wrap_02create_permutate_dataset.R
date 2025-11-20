@@ -137,8 +137,8 @@ permutation_test_stat <- function(coexp_expr_tab,
         print(keep_cols)
     }
 
+    permute_coexp_tab[, q_twotail_fdr:=p.adjust(p_twotail, method = "fdr")]
     sig_coexp_pairs <- permute_coexp_tab[p_twotail <= alpha, .SD, .SDcols = keep_cols]
-    sig_coexp_pairs[, q_twotail_fdr:=p.adjust(p_twotail, method = "fdr")]
     fwrite(sig_coexp_pairs, file.path(permutate_res_tab_dir, sig_edge_tab_file))
 
     raw_edges_n <- nrow(permute_coexp_tab)
