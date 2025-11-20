@@ -27,15 +27,15 @@ suppressPackageStartupMessages({
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Visualize gene co-expression network')
 parser$add_argument('--tom-file', help = 'TOM matrix CSV file', 
-                   default = 'results/network_features/features_calc/HS_adjacency/modules/tom_matrix.csv')
+                   default = 'results/network_features/features_calc/adjacency/modules/tom_matrix.csv')
 parser$add_argument('--metrics-file', help = 'Gene metrics + expression CSV', 
-                   default = 'results/network_features/gene_metrics/HS_adjacency_gene_metrics_with_expression.csv')
+                   default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--control-modules-file', help = 'Control (reference) modules assignment CSV', 
                    default = 'results/network_features/features_calc/adjacency/modules/gene_connectivity.csv')
 parser$add_argument('--hsp-genes-file', help = 'Optional: CSV/TXT file with Hsp and cochaperone gene IDs (one per line or column named "gene")', 
                    default = 'dataset/hsp_genes/HSP_genes.csv')
 parser$add_argument('--output-dir', help = 'Directory to save plots', 
-                   default = 'results/analysis/network_vis/Control_modules/HS')
+                   default = 'results/analysis/network_vis/Control_modules/ctrl')
 parser$add_argument('--threshold', type = 'double', help = 'TOM threshold for edge filtering', 
                    default = 0.1)
 parser$add_argument('--layout', help = 'Layout algorithm: fr (Fruchterman-Reingold), kk (Kamada-Kawai), drl', 
