@@ -27,15 +27,15 @@ suppressPackageStartupMessages({
 # ----- 2. Command-line arguments -----
 parser <- ArgumentParser(description = 'Visualize gene co-expression network')
 parser$add_argument('--tom-file', help = 'TOM matrix CSV file', 
-                   default = 'results/network_features/features_calc/HS_adjacency/modules/tom_matrix.csv')
+                   default = 'results/network_features/features_calc/adjacency/modules/tom_matrix.csv')
 parser$add_argument('--metrics-file', help = 'Gene metrics + expression CSV', 
-                   default = 'results/network_features/gene_metrics/HS_adjacency_gene_metrics_with_expression.csv')
+                   default = 'results/network_features/gene_metrics/adjacency_gene_metrics_with_expression.csv')
 parser$add_argument('--control-modules-file', help = 'Control (reference) modules assignment CSV', 
                    default = 'results/network_features/features_calc/adjacency/modules/gene_connectivity.csv')
 parser$add_argument('--hsp-genes-file', help = 'Optional: CSV/TXT file with Hsp and cochaperone gene IDs (one per line or column named "gene")', 
                    default = 'dataset/hsp_genes/HSP_genes.csv')
 parser$add_argument('--output-dir', help = 'Directory to save plots', 
-                   default = 'results/analysis/network_vis/Control_modules/HS')
+                   default = 'results/analysis/network_vis/Control_modules/ctrl')
 parser$add_argument('--threshold', type = 'double', help = 'TOM threshold for edge filtering', 
                    default = 0.1)
 parser$add_argument('--layout', help = 'Layout algorithm: fr (Fruchterman-Reingold), kk (Kamada-Kawai), drl', 
@@ -149,8 +149,20 @@ if (!is.null(args$hsp_genes_file) && file.exists(args$hsp_genes_file)) {
   V(g)$is_hsp <- V(g)$name %in% hsp_genes_list
   hsp_in_network <- sum(V(g)$is_hsp)
   cat("  Found", hsp_in_network, "Hsp/cochaperone genes in network\n")
+  
+  # Add gene names if available in the Hsp file
+  if ("gene_name" %in% colnames(hsp_data)) {
+    # Create lookup for gene ID -> gene name
+    hsp_name_map <- setNames(hsp_data$gene_name, hsp_data$gene)
+    V(g)$hsp_gene_name <- hsp_name_map[V(g)$name]
+    cat("  Gene names loaded for annotation\n")
+  } else {
+    V(g)$hsp_gene_name <- NA
+    cat("  No 'gene_name' column found - will use gene IDs for labels\n")
+  }
 } else {
   V(g)$is_hsp <- FALSE
+  V(g)$hsp_gene_name <- NA
   hsp_in_network <- 0
   cat("  No Hsp gene list provided (use --hsp-genes-file to annotate)\n")
 }
@@ -355,20 +367,25 @@ if (hsp_in_network > 0) {
   cat("Generating network with Hsp/cochaperone genes highlighted...\n")
   
   # Color: Hsp genes in orange/red, others by module with transparency
-  V(g)$hsp_color <- ifelse(V(g)$is_hsp, "#FF6600",  # Bright orange for Hsp
+  V(g)$hsp_color <- ifelse(V(g)$is_hsp, "#ff0062ff",  # Bright orange for Hsp
                             adjustcolor(V(g)$color, alpha.f = 0.5))
   
   # Size: Hsp genes slightly larger
-  V(g)$hsp_size <- ifelse(V(g)$is_hsp, 10, V(g)$size)
+  V(g)$hsp_size <- ifelse(V(g)$is_hsp, 8, V(g)$size)
   
   # Get Hsp gene names for labeling
   hsp_gene_names <- V(g)$name[V(g)$is_hsp]
+  
+  # Use gene names if available, otherwise use gene IDs
+  hsp_labels <- ifelse(V(g)$is_hsp, 
+                       ifelse(!is.na(V(g)$hsp_gene_name), V(g)$hsp_gene_name, V(g)$name),
+                       NA)
   
   pdf(file.path(output_dir, "04a_network_hsp_genes.pdf"), width = 16, height = 16)
   par(mar = c(0, 0, 2, 0))
   plot(g,
        layout = layout_coords,
-       vertex.label = ifelse(V(g)$is_hsp, V(g)$name, NA),
+       vertex.label = hsp_labels,
        vertex.label.cex = 0.6,
        vertex.label.color = "black",
        vertex.label.font = 2,  # Bold
@@ -382,7 +399,7 @@ if (hsp_in_network > 0) {
   legend("topright",
          legend = c("Hsp/cochaperone genes", "Other genes"),
          pch = 21,
-         pt.bg = c("#FF6600", "white"),
+         pt.bg = c("#ff0062ff", "white"),
          pt.cex = 2,
          cex = 0.8,
          bty = "n")
@@ -393,6 +410,7 @@ if (hsp_in_network > 0) {
   cat("Saving Hsp/cochaperone genes information...\n")
   hsp_df <- data.frame(
     gene = hsp_gene_names,
+    gene_name = V(g)$hsp_gene_name[V(g)$is_hsp],
     connectivity = V(g)$connectivity[V(g)$is_hsp],
     kWithin = V(g)$kWithin[V(g)$is_hsp],
     kDiff = V(g)$kDiff[V(g)$is_hsp],
