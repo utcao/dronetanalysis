@@ -3,7 +3,7 @@ import os
 # Get the current working directory
 current_directory = os.getcwd()
 print("Current Working Directory:", current_directory)
-file_path = "dataset/test/logCPM_ct_dros_subset.csv"
+file_path = "dataset/processed/VOOM/voomdataCtrl.txt"
 if os.path.isfile(file_path):
    print("File exists.")
 else:
@@ -16,7 +16,7 @@ def as_list(x):
     return x if isinstance(x, list) else [x]
 
 GENES = config["genes"]
-INPUT_EXPR_MAT = "dataset/test/logCPM_ct_dros_subset.csv"
+INPUT_EXPR_MAT = "dataset/processed/VOOM/voomdataCtrl.txt"
 
 DESC_SUBSET_EXPR = as_list(config["subset_expr_matrix"]["desc_body"])
 DESC_CREATE_NET = as_list(config["create_network"]["desc_body"])
