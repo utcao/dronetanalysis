@@ -53,7 +53,8 @@ source("src/utils/utils_network_feats.R")
 
 matrix_file <- args$input
 output_dir <- ifelse(is.null(args$output_dir), dirname(dirname(args$input)), args$output_dir)
-group <- strsplit(basename(matrix_file), "_")[[1]][1]
+parts <- strsplit(basename(matrix_file), "_")[[1]]
+group <- paste(parts[1:2], collapse = "_")
 cat("Input file:", matrix_file, "\n")
 cat("Output directory:", output_dir, "\n")
 cat("Power range:", paste(range(power_range), collapse = "-"), "\n")
@@ -145,7 +146,7 @@ cat("Selected power saved to:", power_file, "\n\n")
 cat("=== Applying Soft Threshold ===\n")
 soft_adj <- adjacency^selected_power
 
-soft_output_file <- file.path(unsigned_dir, paste0(group, "_soft_thresholded_adjacency_matrix.csv"))
+soft_output_file <- file.path(unsigned_dir, paste0(group, "_sf_adjacency.csv"))
 write.csv(soft_adj, soft_output_file, row.names = TRUE)
 cat("Soft-thresholded adjacency matrix saved to:", soft_output_file, "\n\n")
 

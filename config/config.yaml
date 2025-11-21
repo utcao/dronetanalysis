@@ -68,7 +68,7 @@ spearman_correlation:
 
 adjacency_matrix:
   output_dirs: "results/gene_wise/adjacency"
-  desc_body: ["_1stquin_adjacency", "_5thquin_adjacency"]
+  desc_body: ["_1stquin_st_adjacency", "_5thquin_st_adjacency"]
   suffix: "csv"
 
 create_network:
