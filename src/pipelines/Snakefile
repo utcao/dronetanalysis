@@ -1,13 +1,13 @@
 configfile: "config/config.yaml"
 import os
-# # Get the current working directory
-# current_directory = os.getcwd()
-# print("Current Working Directory:", current_directory)
-# file_path = "dataset/processed/VOOM/voomdataCtrl.txt"
-# if os.path.isfile(file_path):
-#    print("File exists.")
-# else:
-#    print("File does not exist.")
+# Get the current working directory
+current_directory = os.getcwd()
+print("Current Working Directory:", current_directory)
+file_path = "/Users/huiting/Downloads/dronetanalysis/dataset/test/voomdataCtrl_test.txt"
+if os.path.isfile(file_path):
+   print("File exists.")
+else:
+   print("File does not exist.")
 ###########################################
 # Helper functions
 ###########################################
@@ -16,7 +16,7 @@ def as_list(x):
     return x if isinstance(x, list) else [x]
 
 GENES = config["genes"]
-INPUT_EXPR_MAT = "dataset/processed/VOOM/voomdataCtrl.txt"
+INPUT_EXPR_MAT = "/Users/huiting/Downloads/dronetanalysis/dataset/test/voomdataCtrl_test.txt"
 
 DESC_SUBSET_EXPR = as_list(config["subset_expr_matrix"]["desc_body"])
 DESC_CREATE_NET = as_list(config["create_network"]["desc_body"])
@@ -42,6 +42,7 @@ def outfile(section, gene, desc):
 
 rule all:
     input:
+        #expand(f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" gene=GENES,i = DESC_SUBSET_EXPR)
         # neighbor features
         expand("{outdir}/{gene}{desc_body}.{suffix}",
                 outdir=OUTDIR_NEIGHBORS, gene=GENES, desc_body = DESC_NEIGHBORS,
@@ -62,45 +63,12 @@ rule subset_expr_matrix:
         INPUT_EXPR_MAT
     output:
         [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
-    params:
-        script = "src/scripts/preprocessing/subset_expr_by_gene_quintile.R"
-    shell:
-        """
-        Rscript {params.script} \
-            --expr-matrix {input} \
-            --target-gene {wildcards.gene} \
-            --output-1st {output[0]} \
-            --output-5th {output[1]} \
-            --n-bins 5
-        """
-
-###########################################
-# 2. spearman correlation
-###########################################
-
+    script:
+        '/Users/huiting/Downloads/dronetanalysis/src/scripts/preprocess/FinalProcessedDatasets.R'
 
 
 ###########################################
-# 3. adjacency matrix
-###########################################
-rule adjacency_matrix:
-    input:
-        lambda wc: outfile("subset_expr_matrix", wc.gene, DESC_SUBSET_EXPR)
-    output:
-        [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
-    params:
-        script = "src/scripts/soft_threshold/adjacency_matrix.R"
-    shell:
-        """
-        Rscript {params.script} \
-            --input {input} \
-            --output-dir 
-        """
-/Users/huiting/Downloads/dronetanalysis/src/scripts/soft_threshold/adjacency_matrix.R
-
-
-###########################################
-# 4. create_network
+# 2. create_network
 ###########################################
 
 rule create_network:
@@ -114,7 +82,7 @@ rule create_network:
         shell(f"touch {output}")
 
 ###########################################
-# 5. diff_network
+# 3. diff_network
 ###########################################
 
 rule cal_diff_networks:
@@ -128,7 +96,7 @@ rule cal_diff_networks:
         shell(f"touch {output}")
 
 # ###########################################
-# # 6. network features
+# # 4. network features
 # ###########################################
 
 rule cal_network_features:
@@ -143,7 +111,7 @@ rule cal_network_features:
         shell(f"touch {output}")
 
 ###########################################
-# 7. neighbor features
+# 5. neighbor features
 ###########################################
 
 rule subset_features_neighbors:
