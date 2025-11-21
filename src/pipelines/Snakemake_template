@@ -98,7 +98,7 @@ rule calc_spearman_correlation:
 # 3. adjacency matrix
 ###########################################
 
-ffd
+
 
 ###########################################
 # 4. create_network
