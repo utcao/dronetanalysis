@@ -102,6 +102,7 @@ rule calc_spearman_correlation:
 ###########################################
 # 3. adjacency matrix
 ###########################################
+<<<<<<< HEAD
 rule adjacency_matrix:
     input:
         lambda wc: outfile("calc_spearman_correlation", wc.gene, DESC_SUBSET_EXPR)
@@ -116,6 +117,11 @@ rule adjacency_matrix:
             --input {input} \
             --output-dir {params.output_dir} \
         """
+=======
+
+
+
+>>>>>>> 5de0d7edd1bc6d34246744bacab10f9a969d3760
 ###########################################
 # 4. create_network
 ###########################################
