@@ -53,7 +53,7 @@ source("src/utils/utils_network_feats.R")
 
 matrix_file <- args$input
 output_dir <- ifelse(is.null(args$output_dir), dirname(dirname(args$input)), args$output_dir)
-
+group <- strsplit(basename(matrix_file), "_")[[1]][1]
 cat("Input file:", matrix_file, "\n")
 cat("Output directory:", output_dir, "\n")
 cat("Power range:", paste(range(power_range), collapse = "-"), "\n")
@@ -69,7 +69,7 @@ rownames(df.corr.m) <- corr_matrix[[1]]
 # ----- 5. Create binary matrix to preserve negative correlations -----
 binary_output_dir <- file.path(output_dir, "binary_matrix")
 create_directories(binary_output_dir)
-binary_output_file <- file.path(binary_output_dir, "HS_binary_signed_matrix.csv")
+binary_output_file <- file.path(binary_output_dir, paste0(group, "_binary_signed_matrix.csv"))
 binary_matrix <- create_correlation_sign_matrix(df.corr.m, output_file = binary_output_file)
 cat("Binary sign matrix created and saved to:", binary_output_file, "\n\n")
 
@@ -79,7 +79,7 @@ adjacency <- abs(df.corr.m)
 # Save unsigned adjacency matrix
 unsigned_dir <- file.path(output_dir, "soft_threshold")
 create_directories(unsigned_dir)
-unsigned_output_file <- file.path(unsigned_dir, "HS_unsigned_adjacency_matrix.csv")
+unsigned_output_file <- file.path(unsigned_dir, paste0(group, "_unsigned_adjacency_matrix.csv"))
 write.csv(adjacency, unsigned_output_file, row.names = TRUE)
 cat("Unsigned adjacency matrix saved to:", unsigned_output_file, "\n\n")
 
@@ -89,12 +89,12 @@ sft <- pickSoftThreshold(adjacency, powerVector = power_range,
                          networkType = args$network_type, verbose = 5)
 
 # Save fit indices
-fit_indices_file <- file.path(unsigned_dir, "HS_soft_threshold_fit_indices.csv")
+fit_indices_file <- file.path(unsigned_dir, paste0(group, "_soft_threshold_fit_indices.csv"))
 write.csv(sft$fitIndices, file = fit_indices_file, row.names = FALSE)
 cat("\nFit indices saved to:", fit_indices_file, "\n")
 
 # Generate diagnostic plots
-plot_file <- file.path(unsigned_dir, "HS_soft_thresholding_diagnostics.pdf")
+plot_file <- file.path(unsigned_dir, paste0(group, "_soft_thresholding_diagnostics.pdf"))
 sft_plot(sft, plot_file, power_range)
 cat("Diagnostic plots saved to:", plot_file, "\n\n")
 
@@ -137,7 +137,7 @@ if (nrow(valid_powers) > 0) {
 }
 
 # Save selected power
-power_file <- file.path(unsigned_dir, "HS_selected_soft_power.txt")
+power_file <- file.path(unsigned_dir, paste0(group, "_selected_soft_power.txt"))
 writeLines(as.character(selected_power), power_file)
 cat("Selected power saved to:", power_file, "\n\n")
 
@@ -145,7 +145,7 @@ cat("Selected power saved to:", power_file, "\n\n")
 cat("=== Applying Soft Threshold ===\n")
 soft_adj <- adjacency^selected_power
 
-soft_output_file <- file.path(unsigned_dir, "HS_soft_thresholded_adjacency_matrix.csv")
+soft_output_file <- file.path(unsigned_dir, paste0(group, "_soft_thresholded_adjacency_matrix.csv"))
 write.csv(soft_adj, soft_output_file, row.names = TRUE)
 cat("Soft-thresholded adjacency matrix saved to:", soft_output_file, "\n\n")
 
