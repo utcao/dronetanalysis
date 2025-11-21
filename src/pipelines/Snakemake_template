@@ -48,12 +48,10 @@ rule all:
     input:
         # neighbor features
         expand("{outdir}/{gene}{desc_body}.{suffix}",
-                outdir=OUTDIR_NEIGHBORS, gene=GENES, desc_body = DESC_NEIGHBORS,
-                suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
-                outdir=OUTDIR_SPEARMAN_CAL, gene=GENES, desc_body = OUTDIR_SPEARMAN_CAL,
+                outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
                 suffix = TAB_SUFFIX)
         # [
+        
         #     f"{OUTDIR_NEIGHBORS[0]}/{gene}{desc}.{TAB_SUFFIX}"
         #     for gene in GENES
         #     for desc in DESC_NEIGHBORS
@@ -114,7 +112,7 @@ rule adjacency_matrix:
     output:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     params:
-        script = "src/scripts/soft_threshold/adjacency_matrix.R"
+        script = "src/scripts/soft_threshold/adjacency_matrix.R",
         output_dir = OUTDIR_ADJACENCY_MATRIX[0]
     shell:
         """

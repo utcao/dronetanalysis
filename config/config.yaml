@@ -54,7 +54,7 @@ network_feature_files:
 # arguments for each steps
 genes:
 - FBgn0031081
-- FBgn0031082
+- FBgn0031080
 
 subset_expr_matrix:
   output_dirs: "results/gene_wise/expr"
