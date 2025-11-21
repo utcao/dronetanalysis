@@ -40,9 +40,9 @@ parser$add_argument('--expr-matrix', help = 'Full expression matrix (genes x sam
                    required = TRUE)
 parser$add_argument('--target-gene', help = 'Gene ID to bin samples by', 
                    required = TRUE)
-parser$add_argument('--output-top', help = 'Output file for top quintile expression', 
+parser$add_argument('--output-5th', help = 'Output file for top quintile expression', 
                    required = TRUE)
-parser$add_argument('--output-bottom', help = 'Output file for bottom quintile expression', 
+parser$add_argument('--output-1st', help = 'Output file for bottom quintile expression', 
                    required = TRUE)
 parser$add_argument('--n-bins', type = 'integer', help = 'Number of expression bins (default 5 for quintiles)', 
                    default = 5)
@@ -61,7 +61,7 @@ cat("Loading expression data...\n")
 
 expr_data <- fread(args$expr_matrix, data.table = TRUE)
 
-# Check if first column needs renaming (common issue with fread)
+# Check if first column needs renaming
 if (colnames(expr_data)[1] %in% c("V1", "")) {
   setnames(expr_data, 1, "fly_id")
 }
