@@ -63,7 +63,7 @@ rule subset_expr_matrix:
     output:
         [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
     params:
-        script = "src/scripts/preprocessing/subset_expr_by_gene_quintile.R"
+        script = "src/scripts/preprocess/subset_expr_by_gene_quintile.R"
     shell:
         """
         Rscript {params.script} \
@@ -78,26 +78,27 @@ rule subset_expr_matrix:
 # 2. spearman correlation
 ###########################################
 
-
-
-###########################################
-# 3. adjacency matrix
-###########################################
-rule adjacency_matrix:
+rule calc_spearman_correlation:
     input:
-        lambda wc: outfile("subset_expr_matrix", wc.gene, DESC_SUBSET_EXPR)
+        "{outdir}/{gene}{desc}.csv"
     output:
-        [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
+        "{outdir}/{gene}{desc}_spearman.csv"
     params:
-        script = "src/scripts/soft_threshold/adjacency_matrix.R"
+        script = "src/scripts/spearman_corr/spearman_matrix.R"
     shell:
         """
         Rscript {params.script} \
             --input {input} \
-            --output-dir 
+            --output {output} \
+            --method spearman \
+            --use pairwise.complete.obs
         """
-/Users/huiting/Downloads/dronetanalysis/src/scripts/soft_threshold/adjacency_matrix.R
 
+###########################################
+# 3. adjacency matrix
+###########################################
+
+ffd
 
 ###########################################
 # 4. create_network
