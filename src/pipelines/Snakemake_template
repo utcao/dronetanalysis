@@ -78,11 +78,21 @@ rule subset_expr_matrix:
 # 2. spearman correlation
 ###########################################
 
-
-
-###########################################
-# 3. adjacency matrix
-###########################################
+rule calc_spearman_correlation:
+    input:
+        "{outdir}/{gene}{desc}.csv"
+    output:
+        "{outdir}/{gene}{desc}_spearman.csv"
+    params:
+        script = "src/scripts/spearman_corr/spearman_matrix.R"
+    shell:
+        """
+        Rscript {params.script} \
+            --input {input} \
+            --output {output} \
+            --method spearman \
+            --use pairwise.complete.obs
+        """
 
 
 
