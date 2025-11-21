@@ -80,7 +80,7 @@ rule subset_expr_matrix:
 
 rule calc_spearman_correlation:
     input:
-        "{outdir}/{gene}{desc}.csv"
+        [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
     output:
         "{outdir}/{gene}{desc}_spearman.csv"
     params:
@@ -88,7 +88,12 @@ rule calc_spearman_correlation:
     shell:
         """
         Rscript {params.script} \
-            --input {input} \
+            --input {input[0]} \
+            --output {output} \
+            --method spearman \
+            --use pairwise.complete.obs
+         Rscript {params.script} \
+            --input {input[1]} \
             --output {output} \
             --method spearman \
             --use pairwise.complete.obs
@@ -97,9 +102,20 @@ rule calc_spearman_correlation:
 ###########################################
 # 3. adjacency matrix
 ###########################################
-
-ffd
-
+rule adjacency_matrix:
+    input:
+        lambda wc: outfile("calc_spearman_correlation", wc.gene, DESC_SUBSET_EXPR)
+    output:
+        [f"{}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
+    params:
+        script = "src/scripts/soft_threshold/adjacency_matrix.R"
+        output_dir = OUTDIR_ADJACENCY_MATRIX[0]
+    shell:
+        """
+        Rscript {params.script} \
+            --input {input} \
+            --output-dir {params.output_dir} \
+        """
 ###########################################
 # 4. create_network
 ###########################################
