@@ -19,12 +19,16 @@ GENES = config["genes"]
 INPUT_EXPR_MAT = "dataset/processed/VOOM/voomdataCtrl.txt"
 
 DESC_SUBSET_EXPR = as_list(config["subset_expr_matrix"]["desc_body"])
+DESC_SPEARMAN_COR=as_list(config["spearman_correlation"]["desc_body"])
+DESC_ADJACENCY_MATRIX=as_list(config["adjacency_matrix"]["desc_body"])
 DESC_CREATE_NET = as_list(config["create_network"]["desc_body"])
 DESC_DIFF_NET = as_list(config["cal_diff_networks"]["desc_body"])
 DESC_NET_FEATURES = as_list(config["cal_network_features"]["desc_body"])
 DESC_NEIGHBORS = as_list(config["subset_features_neighbors"]["desc_body"])
 
 OUTDIR_SUBSET_EXPR = as_list(config["subset_expr_matrix"]['output_dirs'])
+OUTDIR_SPEARMAN_COR=as_list(config["spearman_correlation"]['output_dirs'])
+OUTDIR_ADJACENCY_MATRIX=as_list(config["adjacency_matrix"]['output_dirs'])
 OUTDIR_CREATE_NET = as_list(config["create_network"]['output_dirs'])
 OUTDIR_DIFF_NET = as_list(config["cal_diff_networks"]['output_dirs'])
 OUTDIR_NET_FEATURES = as_list(config["cal_network_features"]['output_dirs'])
@@ -45,8 +49,10 @@ rule all:
         # neighbor features
         expand("{outdir}/{gene}{desc_body}.{suffix}",
                 outdir=OUTDIR_NEIGHBORS, gene=GENES, desc_body = DESC_NEIGHBORS,
+                suffix = TAB_SUFFIX),
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
+                outdir=OUTDIR_SPEARMAN_CAL, gene=GENES, desc_body = OUTDIR_SPEARMAN_CAL,
                 suffix = TAB_SUFFIX)
-        # # or
         # [
         #     f"{OUTDIR_NEIGHBORS[0]}/{gene}{desc}.{TAB_SUFFIX}"
         #     for gene in GENES
@@ -82,19 +88,19 @@ rule calc_spearman_correlation:
     input:
         [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
     output:
-        "{outdir}/{gene}{desc}_spearman.csv"
+        [f"{OUTDIR_SPEARMAN_COR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SPEARMAN_COR]
     params:
         script = "src/scripts/spearman_corr/spearman_matrix.R"
     shell:
         """
         Rscript {params.script} \
             --input {input[0]} \
-            --output {output} \
+            --output {output[0]} \
             --method spearman \
             --use pairwise.complete.obs
          Rscript {params.script} \
             --input {input[1]} \
-            --output {output} \
+            --output {output[1]} \
             --method spearman \
             --use pairwise.complete.obs
         """
@@ -102,12 +108,11 @@ rule calc_spearman_correlation:
 ###########################################
 # 3. adjacency matrix
 ###########################################
-<<<<<<< HEAD
 rule adjacency_matrix:
     input:
         lambda wc: outfile("calc_spearman_correlation", wc.gene, DESC_SUBSET_EXPR)
     output:
-        [f"{}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     params:
         script = "src/scripts/soft_threshold/adjacency_matrix.R"
         output_dir = OUTDIR_ADJACENCY_MATRIX[0]
@@ -117,11 +122,6 @@ rule adjacency_matrix:
             --input {input} \
             --output-dir {params.output_dir} \
         """
-=======
-
-
-
->>>>>>> 5de0d7edd1bc6d34246744bacab10f9a969d3760
 ###########################################
 # 4. create_network
 ###########################################
