@@ -244,32 +244,37 @@ print(names(preservation_result))
 # But for multiple comparisons, it's nested: preservation_result[[disc]][[test]]
 
 # Since we have 1 discovery and 1 test with simplify=TRUE, the structure should be flat
-cat("\n  Checking for direct access to preservation and p.values...\n")
-if (!is.null(preservation_result$preservation)) {
-  cat("  Found preservation at top level\n")
+cat("\n  Checking for direct access to observed and p.values...\n")
+# NetRep uses "observed" for preservation statistics, not "preservation"
+if (!is.null(preservation_result$observed)) {
+  cat("  Found observed (preservation) statistics at top level\n")
   pres_data <- preservation_result
-} else if (!is.null(preservation_result[[1]]$preservation)) {
-  cat("  Found preservation at second level [1]\n")
+} else if (is.list(preservation_result[[1]]) && !is.null(preservation_result[[1]]$observed)) {
+  cat("  Found observed at second level [1]\n")
   pres_data <- preservation_result[[1]]
-} else if (!is.null(preservation_result[[1]][[1]]$preservation)) {
-  cat("  Found preservation at third level [1][1]\n")
+} else if (is.list(preservation_result[[1]]) && is.list(preservation_result[[1]][[1]]) && !is.null(preservation_result[[1]][[1]]$observed)) {
+  cat("  Found observed at third level [1][1]\n")
   pres_data <- preservation_result[[1]][[1]]
 } else {
-  cat("  ERROR: Cannot find preservation data\n")
-  cat("  Available names:\n")
+  cat("  ERROR: Cannot find observed data in expected structure\n")
+  cat("  Available names at top level:\n")
   print(names(preservation_result))
-  if (length(preservation_result) > 0) {
-    cat("  First element names:\n")
+  if (length(preservation_result) > 0 && is.list(preservation_result[[1]])) {
+    cat("  First element is a list with names:\n")
     print(names(preservation_result[[1]]))
+    if (length(preservation_result[[1]]) > 0 && is.list(preservation_result[[1]][[1]])) {
+      cat("  Second level first element is a list with names:\n")
+      print(names(preservation_result[[1]][[1]]))
+    }
   }
-  pres_data <- preservation_result
+  stop("Unable to extract preservation data from NetRep result")
 }
 
 cat("\n  Extracted data structure:\n")
 print(str(pres_data, max.level = 3))
 
 # Get preservation statistics for each module
-# NetRep returns preservation and p.values as matrices or data frames
+# NetRep returns "observed" for preservation statistics and p.values as matrices or data frames
 preservation_stats <- data.frame(
   module = names(module_list),
   moduleSize = sapply(module_list, length),
@@ -277,57 +282,119 @@ preservation_stats <- data.frame(
 )
 
 # Add preservation statistics (check if they exist)
-if (!is.null(pres_data$preservation)) {
-  if (is.matrix(pres_data$preservation) || is.data.frame(pres_data$preservation)) {
-    preservation_stats$avg_weight_preservation <- pres_data$preservation[, "avg.weight"]
-    preservation_stats$avg_cor_preservation <- pres_data$preservation[, "avg.cor"]
-    preservation_stats$avg_contrib_preservation <- pres_data$preservation[, "avg.contrib"]
-    preservation_stats$coherence_preservation <- pres_data$preservation[, "coherence"]
+# NetRep uses "observed" instead of "preservation"
+if (!is.null(pres_data$observed)) {
+  cat("  Extracting observed preservation statistics...\n")
+  cat("  Type of observed:", class(pres_data$observed), "\n")
+  
+  obs_data <- pres_data$observed
+  
+  # For matrix, use column names
+  if (is.matrix(obs_data)) {
+    cat("  Matrix columns:", paste(colnames(obs_data), collapse=", "), "\n")
+    preservation_stats$avg_weight_preservation <- obs_data[, "avg.weight"]
+    preservation_stats$avg_cor_preservation <- obs_data[, "avg.cor"]
+    preservation_stats$avg_contrib_preservation <- obs_data[, "avg.contrib"]
+    preservation_stats$coherence_preservation <- obs_data[, "coherence"]
+  } else if (is.data.frame(obs_data)) {
+    # For data frame, use column accessor
+    preservation_stats$avg_weight_preservation <- obs_data[["avg.weight"]]
+    preservation_stats$avg_cor_preservation <- obs_data[["avg.cor"]]
+    preservation_stats$avg_contrib_preservation <- obs_data[["avg.contrib"]]
+    preservation_stats$coherence_preservation <- obs_data[["coherence"]]
+  } else if (is.list(obs_data)) {
+    # For list, try list accessor
+    preservation_stats$avg_weight_preservation <- obs_data$avg.weight
+    preservation_stats$avg_cor_preservation <- obs_data$avg.cor
+    preservation_stats$avg_contrib_preservation <- obs_data$avg.contrib
+    preservation_stats$coherence_preservation <- obs_data$coherence
   } else {
-    # Try accessing as list
-    preservation_stats$avg_weight_preservation <- pres_data$preservation$avg.weight
-    preservation_stats$avg_cor_preservation <- pres_data$preservation$avg.cor
-    preservation_stats$avg_contrib_preservation <- pres_data$preservation$avg.contrib
-    preservation_stats$coherence_preservation <- pres_data$preservation$coherence
+    cat("  ERROR: Unexpected data type for observed\n")
   }
 }
 
 # Add p-values (check if they exist)
 if (!is.null(pres_data$p.values)) {
-  if (is.matrix(pres_data$p.values) || is.data.frame(pres_data$p.values)) {
-    preservation_stats$avg_weight_pval <- pres_data$p.values[, "avg.weight"]
-    preservation_stats$avg_cor_pval <- pres_data$p.values[, "avg.cor"]
-    preservation_stats$avg_contrib_pval <- pres_data$p.values[, "avg.contrib"]
-    preservation_stats$coherence_pval <- pres_data$p.values[, "coherence"]
+  cat("  Extracting p-values...\n")
+  cat("  Type of p.values:", class(pres_data$p.values), "\n")
+  
+  pval_data <- pres_data$p.values
+  
+  # For matrix, use column names
+  if (is.matrix(pval_data)) {
+    cat("  Matrix columns:", paste(colnames(pval_data), collapse=", "), "\n")
+    preservation_stats$avg_weight_pval <- pval_data[, "avg.weight"]
+    preservation_stats$avg_cor_pval <- pval_data[, "avg.cor"]
+    preservation_stats$avg_contrib_pval <- pval_data[, "avg.contrib"]
+    preservation_stats$coherence_pval <- pval_data[, "coherence"]
+  } else if (is.data.frame(pval_data)) {
+    # For data frame, use column accessor
+    preservation_stats$avg_weight_pval <- pval_data[["avg.weight"]]
+    preservation_stats$avg_cor_pval <- pval_data[["avg.cor"]]
+    preservation_stats$avg_contrib_pval <- pval_data[["avg.contrib"]]
+    preservation_stats$coherence_pval <- pval_data[["coherence"]]
+  } else if (is.list(pval_data)) {
+    # For list, try list accessor
+    preservation_stats$avg_weight_pval <- pval_data$avg.weight
+    preservation_stats$avg_cor_pval <- pval_data$avg.cor
+    preservation_stats$avg_contrib_pval <- pval_data$avg.contrib
+    preservation_stats$coherence_pval <- pval_data$coherence
   } else {
-    # Try accessing as list
-    preservation_stats$avg_weight_pval <- pres_data$p.values$avg.weight
-    preservation_stats$avg_cor_pval <- pres_data$p.values$avg.cor
-    preservation_stats$avg_contrib_pval <- pres_data$p.values$avg.contrib
-    preservation_stats$coherence_pval <- pres_data$p.values$coherence
+    cat("  ERROR: Unexpected data type for p.values\n")
   }
 }
 
-preservation_stats <- preservation_stats %>%
-  arrange(avg_weight_pval)
+# Check if we successfully extracted the preservation statistics
+if (!"avg_weight_pval" %in% colnames(preservation_stats)) {
+  cat("  Warning: avg_weight_pval not found, adding default values\n")
+  preservation_stats$avg_weight_pval <- NA
+  preservation_stats$avg_cor_pval <- NA
+  preservation_stats$avg_contrib_pval <- NA
+  preservation_stats$coherence_pval <- NA
+}
 
-# Add FDR correction
-preservation_stats$avg_weight_fdr <- p.adjust(preservation_stats$avg_weight_pval, method = "fdr")
-preservation_stats$coherence_fdr <- p.adjust(preservation_stats$coherence_pval, method = "fdr")
+if (!"avg_weight_preservation" %in% colnames(preservation_stats)) {
+  cat("  Warning: avg_weight_preservation not found, adding default values\n")
+  preservation_stats$avg_weight_preservation <- NA
+  preservation_stats$avg_cor_preservation <- NA
+  preservation_stats$avg_contrib_preservation <- NA
+  preservation_stats$coherence_preservation <- NA
+}
+
+# Sort by p-value (if available)
+if (all(!is.na(preservation_stats$avg_weight_pval))) {
+  preservation_stats <- preservation_stats[order(preservation_stats$avg_weight_pval), ]
+} else {
+  cat("  Warning: Cannot sort by p-value (contains NA)\n")
+}
+
+# Add FDR correction (use base R to avoid dplyr issues)
+if (all(!is.na(preservation_stats$avg_weight_pval))) {
+  preservation_stats$avg_weight_fdr <- p.adjust(preservation_stats$avg_weight_pval, method = "fdr")
+  preservation_stats$coherence_fdr <- p.adjust(preservation_stats$coherence_pval, method = "fdr")
+} else {
+  preservation_stats$avg_weight_fdr <- NA
+  preservation_stats$coherence_fdr <- NA
+}
 
 # Add interpretation based on p-values
-preservation_stats <- preservation_stats %>%
-  mutate(
-    preservation_level = case_when(
-      avg_weight_pval < 0.001 & coherence_pval < 0.001 ~ "Strong preservation",
-      avg_weight_pval < 0.05 & coherence_pval < 0.05 ~ "Moderate preservation",
-      avg_weight_pval < 0.1 | coherence_pval < 0.1 ~ "Weak preservation",
-      TRUE ~ "No preservation"
+preservation_stats$preservation_level <- ifelse(
+  preservation_stats$avg_weight_pval < 0.001 & preservation_stats$coherence_pval < 0.001, 
+  "Strong preservation",
+  ifelse(
+    preservation_stats$avg_weight_pval < 0.05 & preservation_stats$coherence_pval < 0.05,
+    "Moderate preservation",
+    ifelse(
+      preservation_stats$avg_weight_pval < 0.1 | preservation_stats$coherence_pval < 0.1,
+      "Weak preservation",
+      "No preservation"
     )
   )
+)
 
 cat("\nPreservation Summary:\n")
 print(preservation_stats)
+print(str(preservation_stats))
 
 # Save results
 write.csv(preservation_stats, 
@@ -342,25 +409,34 @@ cat("Saved: netrep_preservation_full_results.rds\n")
 # ----- 7. Generate plots -----
 cat("\nGenerating preservation plots...\n")
 
-# Check if we have valid data for plotting
-if (nrow(preservation_stats) == 0 || 
-    all(is.na(preservation_stats$avg_weight_preservation)) ||
-    all(is.na(preservation_stats$coherence_preservation))) {
+# Check if we have valid numeric data for plotting
+has_valid_data <- !all(is.na(preservation_stats$avg_weight_preservation)) &&
+                  !all(is.na(preservation_stats$coherence_preservation)) &&
+                  any(is.finite(preservation_stats$avg_weight_preservation)) &&
+                  any(is.finite(preservation_stats$coherence_preservation))
+
+if (nrow(preservation_stats) == 0 || !has_valid_data) {
   cat("  Warning: No valid preservation data for plotting\n")
   cat("  Skipping plots\n")
 } else {
   # Replace any NA/NaN/Inf with appropriate values for plotting
-  plot_data <- preservation_stats %>%
-    mutate(
-      avg_weight_preservation = ifelse(is.finite(avg_weight_preservation), avg_weight_preservation, 0),
-      coherence_preservation = ifelse(is.finite(coherence_preservation), coherence_preservation, 0),
-      avg_cor_preservation = ifelse(is.finite(avg_cor_preservation), avg_cor_preservation, 0),
-      avg_contrib_preservation = ifelse(is.finite(avg_contrib_preservation), avg_contrib_preservation, 0),
-      avg_weight_pval = ifelse(is.finite(avg_weight_pval), avg_weight_pval, 1),
-      coherence_pval = ifelse(is.finite(coherence_pval), coherence_pval, 1),
-      avg_cor_pval = ifelse(is.finite(avg_cor_pval), avg_cor_pval, 1),
-      avg_contrib_pval = ifelse(is.finite(avg_contrib_pval), avg_contrib_pval, 1)
-    )
+  plot_data <- preservation_stats
+  plot_data$avg_weight_preservation <- ifelse(is.finite(plot_data$avg_weight_preservation), 
+                                               plot_data$avg_weight_preservation, 0)
+  plot_data$coherence_preservation <- ifelse(is.finite(plot_data$coherence_preservation), 
+                                              plot_data$coherence_preservation, 0)
+  plot_data$avg_cor_preservation <- ifelse(is.finite(plot_data$avg_cor_preservation), 
+                                            plot_data$avg_cor_preservation, 0)
+  plot_data$avg_contrib_preservation <- ifelse(is.finite(plot_data$avg_contrib_preservation), 
+                                                plot_data$avg_contrib_preservation, 0)
+  plot_data$avg_weight_pval <- ifelse(is.finite(plot_data$avg_weight_pval), 
+                                       plot_data$avg_weight_pval, 1)
+  plot_data$coherence_pval <- ifelse(is.finite(plot_data$coherence_pval), 
+                                      plot_data$coherence_pval, 1)
+  plot_data$avg_cor_pval <- ifelse(is.finite(plot_data$avg_cor_pval), 
+                                    plot_data$avg_cor_pval, 1)
+  plot_data$avg_contrib_pval <- ifelse(is.finite(plot_data$avg_contrib_pval), 
+                                        plot_data$avg_contrib_pval, 1)
   
   # 7a. Preservation statistics plot (avg weight vs coherence)
   pdf(file.path(output_dir, "01_preservation_scatter.pdf"), width = 10, height = 8)
@@ -387,15 +463,12 @@ if (nrow(preservation_stats) == 0 ||
   # 7b. P-value plot (-log10)
   pdf(file.path(output_dir, "02_preservation_pvalues.pdf"), width = 10, height = 8)
   
-  plot_data_pval <- plot_data %>%
-    mutate(
-      log10p_weight = pmin(-log10(avg_weight_pval + 1e-300), 300),
-      log10p_coherence = pmin(-log10(coherence_pval + 1e-300), 300)
-    )
+  plot_data$log10p_weight <- pmin(-log10(plot_data$avg_weight_pval + 1e-300), 300)
+  plot_data$log10p_coherence <- pmin(-log10(plot_data$coherence_pval + 1e-300), 300)
   
   par(mfrow = c(1, 1), mar = c(5, 5, 4, 2))
-  plot(plot_data_pval$log10p_weight, plot_data_pval$log10p_coherence,
-       pch = 21, bg = plot_data_pval$module,
+  plot(plot_data$log10p_weight, plot_data$log10p_coherence,
+       pch = 21, bg = plot_data$module,
        cex = 2,
        xlab = "-log10(p-value) Weight Preservation",
        ylab = "-log10(p-value) Coherence Preservation",
@@ -406,8 +479,8 @@ if (nrow(preservation_stats) == 0 ||
   abline(h = -log10(0.05), v = -log10(0.05), lty = 2, col = "blue", lwd = 2)
   abline(h = -log10(0.001), v = -log10(0.001), lty = 2, col = "darkgreen", lwd = 2)
   
-  text(plot_data_pval$log10p_weight, plot_data_pval$log10p_coherence,
-       labels = plot_data_pval$module, pos = 3, cex = 0.7)
+  text(plot_data$log10p_weight, plot_data$log10p_coherence,
+       labels = plot_data$module, pos = 3, cex = 0.7)
   
   legend("bottomright",
          legend = c("p < 0.001", "p < 0.05"),
@@ -420,10 +493,12 @@ if (nrow(preservation_stats) == 0 ||
   # 7c. Bar plot of preservation levels
   pdf(file.path(output_dir, "03_preservation_levels_barplot.pdf"), width = 12, height = 6)
   
-  preservation_summary <- plot_data %>%
-    mutate(module = reorder(module, avg_weight_preservation))
+  # Order modules by preservation
+  plot_data_ordered <- plot_data[order(plot_data$avg_weight_preservation), ]
+  plot_data_ordered$module <- factor(plot_data_ordered$module, 
+                                      levels = plot_data_ordered$module)
   
-  p <- ggplot(preservation_summary, 
+  p <- ggplot(plot_data_ordered, 
               aes(x = module, y = avg_weight_preservation, fill = preservation_level)) +
     geom_col() +
     scale_fill_manual(values = c("Strong preservation" = "#2E7D32",
@@ -446,14 +521,12 @@ if (nrow(preservation_stats) == 0 ||
   # 7d. Heatmap of preservation statistics
   pdf(file.path(output_dir, "04_preservation_heatmap.pdf"), width = 10, height = 8)
   
-  heatmap_data <- plot_data %>%
-    select(module, avg_weight_preservation, avg_cor_preservation, 
-           avg_contrib_preservation, coherence_preservation) %>%
-    column_to_rownames("module") %>%
-    as.matrix()
+  heatmap_matrix <- as.matrix(plot_data[, c("avg_weight_preservation", "avg_cor_preservation",
+                                             "avg_contrib_preservation", "coherence_preservation")])
+  rownames(heatmap_matrix) <- plot_data$module
   
   # Scale by column (z-score) - handle case where all values are the same
-  heatmap_data_scaled <- scale(heatmap_data)
+  heatmap_data_scaled <- scale(heatmap_matrix)
   # Replace NaN from zero-variance columns with 0
   heatmap_data_scaled[is.na(heatmap_data_scaled)] <- 0
   
@@ -499,16 +572,14 @@ if (nrow(preservation_stats) == 0 ||
 # ----- 8. Summary statistics -----
 cat("\n=== Module Preservation Summary ===\n\n")
 
-preservation_counts <- preservation_stats %>%
-  count(preservation_level)
+preservation_counts <- table(preservation_stats$preservation_level)
 
 cat("Preservation levels:\n")
 print(preservation_counts)
 
 cat("\nModules with strong preservation (p < 0.001):\n")
-strong_pres <- preservation_stats %>% 
-  filter(preservation_level == "Strong preservation") %>%
-  select(module, moduleSize, avg_weight_preservation, avg_weight_pval)
+strong_pres <- preservation_stats[preservation_stats$preservation_level == "Strong preservation", 
+                                  c("module", "moduleSize", "avg_weight_preservation", "avg_weight_pval")]
 if (nrow(strong_pres) > 0) {
   print(strong_pres)
 } else {
@@ -516,9 +587,8 @@ if (nrow(strong_pres) > 0) {
 }
 
 cat("\nModules with no preservation:\n")
-no_pres <- preservation_stats %>% 
-  filter(preservation_level == "No preservation") %>%
-  select(module, moduleSize, avg_weight_preservation, avg_weight_pval)
+no_pres <- preservation_stats[preservation_stats$preservation_level == "No preservation", 
+                              c("module", "moduleSize", "avg_weight_preservation", "avg_weight_pval")]
 if (nrow(no_pres) > 0) {
   print(no_pres)
 } else {

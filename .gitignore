@@ -33,3 +33,10 @@ dataset/test/logCPM_hs_dros_subset.csv
 dag.pdf
 dag.svg
 .snakemake/log
+.snakemake/metadata
+.snakemake/incomplete
+.snakemake/locks
+.snakemake/tmp
+.snakemake/metadata/cmVzdWx0cy9nZW5lX3dpc2UvZXhwci9GQmduMDAzMTA4Ml81dGhxdWluX2V4cHIuY3N2
+.snakemake/metadata/cmVzdWx0cy9nZW5lX3dpc2UvZXhwci9GQmduMDAzMTA4Ml81dGhxdWluX2V4cHIuY3N2
+.snakemake/metadata/cmVzdWx0cy9nZW5lX3dpc2UvZXhwci9GQmduMDAzMTA4MV8xc3RxdWluX2V4cHIuY3N2

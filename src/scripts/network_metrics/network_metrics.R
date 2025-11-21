@@ -30,9 +30,9 @@ source("src/utils/utils_network_feats.R")
 # ----- 3. Command-line arguments -----
 parser <- ArgumentParser(description = 'Calculate network features and identify modules from adjacency matrix')
 parser$add_argument('--adjacency-file', help = 'Path to soft-thresholded adjacency matrix CSV file',
-                   default = 'results/network_features/soft_threshold/HS_soft_thresholded_adjacency_matrix.csv')
+                   default = 'results/network_features/soft_threshold/_st_adjacency_matrix.csv')
 parser$add_argument('--output-dir', help = 'Directory to save network metrics and module results', 
-                   default = 'results/network_features/features_calc/HS_adjacency')
+                   default = 'results/network_features/features_calc/_adjacency')
 parser$add_argument('--connection-threshold', help = 'Connection threshold for degree calculation', 
                    default = 0.01, type = 'double')
 parser$add_argument('--min-module-size', help = 'Minimum module size for WGCNA', 
@@ -117,7 +117,7 @@ adjacency_modules <- create_modules(
     output_dir = module_output_dir,
     save_plots = TRUE
 )
- 
+
 # Identify hub genes
 cat("\n=== Identifying Hub Genes ===\n")
 adjacency_hubs <- identify_hubs(
