@@ -48,8 +48,18 @@ rule all:
     input:
         # neighbor features
         expand("{outdir}/{gene}{desc_body}.{suffix}",
-                outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
-                suffix = TAB_SUFFIX)
+            outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
+            suffix = TAB_SUFFIX),
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
+            suffix = TAB_SUFFIX),
+        """
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
+            suffix = TAB_SUFFIX),
+         """
+
+
         # [
         
         #     f"{OUTDIR_NEIGHBORS[0]}/{gene}{desc}.{TAB_SUFFIX}"
@@ -95,7 +105,7 @@ rule calc_spearman_correlation:
             --input {input[0]} \
             --output {output[0]} \
             --method spearman \
-            --use pairwise.complete.obs
+            --use pairwise.complete.obs &&\
          Rscript {params.script} \
             --input {input[1]} \
             --output {output[1]} \
@@ -108,7 +118,7 @@ rule calc_spearman_correlation:
 ###########################################
 rule adjacency_matrix:
     input:
-        lambda wc: outfile("calc_spearman_correlation", wc.gene, DESC_SUBSET_EXPR)
+        [f"{OUTDIR_SPEARMAN_COR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SPEARMAN_COR]
     output:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     params:
@@ -117,7 +127,10 @@ rule adjacency_matrix:
     shell:
         """
         Rscript {params.script} \
-            --input {input} \
+            --input {input[0]} \
+            --output-dir {params.output_dir} &&\
+         Rscript {params.script} \
+            --input {input[1]} \
             --output-dir {params.output_dir} \
         """
 ###########################################
@@ -126,13 +139,21 @@ rule adjacency_matrix:
 
 rule create_network:
     input:
-        lambda wc: outfile("subset_expr_matrix", wc.gene, DESC_SUBSET_EXPR)
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     output:
         [f"{OUTDIR_CREATE_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_CREATE_NET]
-    run:
-        print("Wildcard gene:", wildcards.gene)
-        print("Resolved input:", input)
-        shell(f"touch {output}")
+    params:
+        script="src/scripts/network_metrics/network_metrics.R",
+        output_dir = OUTDIR_CREATE_NET
+    shell:
+        f"""
+        Rscript {params.script} \
+            -- adjacency-file {input[0]} \
+            --output-dir {params.output_dir}  &&\
+        Rscript {params.script} \
+            -- adjacency-file {input[1]} \
+            --output-dir {params.output_dir} 
+        """
 
 ###########################################
 # 5. diff_network
