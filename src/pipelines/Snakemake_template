@@ -53,15 +53,8 @@ rule all:
         expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
             suffix = TAB_SUFFIX),
-        """
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
-            suffix = TAB_SUFFIX),
-         """
-
 
         # [
-        
         #     f"{OUTDIR_NEIGHBORS[0]}/{gene}{desc}.{TAB_SUFFIX}"
         #     for gene in GENES
         #     for desc in DESC_NEIGHBORS

@@ -53,8 +53,8 @@ cat("=== Gene Expression Quintile Subsetting ===\n")
 cat("Expression matrix:", args$expr_matrix, "\n")
 cat("Target gene:", args$target_gene, "\n")
 cat("Number of bins:", args$n_bins, "\n")
-cat("Output (top quintile):", args$output_top, "\n")
-cat("Output (bottom quintile):", args$output_bottom, "\n\n")
+cat("Output (top quintile):", args$output_5th, "\n")
+cat("Output (bottom quintile):", args$output_1st, "\n\n")
 
 # ----- 3. Load expression data -----
 cat("Loading expression data...\n")
@@ -145,8 +145,8 @@ if (mean(target_gene_top) <= mean(target_gene_bottom)) {
 cat("\nSaving output files...\n")
 
 # Create output directories if they don't exist
-dir.create(dirname(args$output_bottom), recursive = TRUE, showWarnings = FALSE)
-dir.create(dirname(args$output_top), recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(args$output_1st), recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(args$output_5th), recursive = TRUE, showWarnings = FALSE)
 
 # Convert matrices back to data.table with gene IDs
 # Note: matrices are samples × genes, need to transpose for standard format (genes × samples)
@@ -154,11 +154,11 @@ bottom_dt <- as.data.table(t(bottom_quintile_mat), keep.rownames = "fly_id")
 top_dt <- as.data.table(t(top_quintile_mat), keep.rownames = "fly_id")
 
 # Save as CSV
-fwrite(bottom_dt, args$output_bottom)
-cat("  Saved bottom quintile:", args$output_bottom, "\n")
+fwrite(bottom_dt, args$output_1st)
+cat("  Saved bottom quintile:", args$output_1st, "\n")
 
-fwrite(top_dt, args$output_top)
-cat("  Saved top quintile:", args$output_top, "\n")
+fwrite(top_dt, args$output_5th)
+cat("  Saved top quintile:", args$output_5th, "\n")
 
 # ----- 8. Summary report -----
 cat("\n=== Subsetting Complete ===\n\n")
@@ -176,5 +176,5 @@ cat("  2. Compare networks between high/low expression contexts\n")
 cat("  3. Identify differential co-expression patterns\n\n")
 
 cat("Output files:\n")
-cat("  ", args$output_bottom, " (genes x samples, bottom quintile)\n")
-cat("  ", args$output_top, " (genes x samples, top quintile)\n")
+cat("  ", args$output_1st, " (genes x samples, bottom quintile)\n")
+cat("  ", args$output_5th, " (genes x samples, top quintile)\n")

@@ -200,27 +200,44 @@ calculate_network_metrics <- function(matrix_data, matrix_name, connection_thres
     cat("\n=== Network Metrics for", matrix_name, "===\n")
     upper_tri_values <- matrix_data[upper.tri(matrix_data)]
     
-    # Network-level metrics
-    mean_abs_corr <- mean(abs(upper_tri_values), na.rm = TRUE)
-    median_abs_corr <- median(abs(upper_tri_values), na.rm = TRUE)
-    max_corr <- max(upper_tri_values, na.rm = TRUE)
-    min_corr <- min(upper_tri_values, na.rm = TRUE)
+    # Apply threshold to create filtered matrix
+    thresholded_matrix <- matrix_data
+    thresholded_matrix[matrix_data <= connection_threshold] <- 0
     
-    # Sum of correlations (connectivity measure)
-    sum_correlations <- rowSums(abs(matrix_data), na.rm = TRUE)
+    # Get upper triangle values from thresholded matrix for network-level metrics
+    thresholded_upper_tri <- thresholded_matrix[upper.tri(thresholded_matrix)]
+    thresholded_upper_tri <- thresholded_upper_tri[thresholded_upper_tri > 0]  # Remove zeros
     
-    # Weighted connectivity (sum of all edge weights)
-    weighted_connectivity <- rowSums(matrix_data, na.rm = TRUE)
+    # Network-level metrics (on thresholded connections only)
+    if (length(thresholded_upper_tri) > 0) {
+        mean_abs_corr <- mean(abs(thresholded_upper_tri), na.rm = TRUE)
+        median_abs_corr <- median(abs(thresholded_upper_tri), na.rm = TRUE)
+        max_corr <- max(thresholded_upper_tri, na.rm = TRUE)
+        min_corr <- min(thresholded_upper_tri, na.rm = TRUE)
+    } else {
+        mean_abs_corr <- 0
+        median_abs_corr <- 0
+        max_corr <- 0
+        min_corr <- 0
+    }
+    
+    # Sum of correlations (connectivity measure) - using thresholded matrix
+    sum_correlations <- rowSums(abs(thresholded_matrix), na.rm = TRUE)
+    
+    # Weighted connectivity (sum of edge weights above threshold)
+    weighted_connectivity <- rowSums(thresholded_matrix, na.rm = TRUE)
     
     # Degree (discrete connections above threshold)
-    degree <- rowSums(matrix_data > connection_threshold, na.rm = TRUE)
+    degree <- rowSums(thresholded_matrix > 0, na.rm = TRUE)
     
     # Max connectivity measures
     max_connectivity <- max(weighted_connectivity, na.rm = TRUE)
     max_degree <- max(degree, na.rm = TRUE)
     
     # Print results
-    cat("Network-level metrics:\n")
+    cat("Network-level metrics (connections > threshold):\n")
+    cat("  Connection threshold:", connection_threshold, "\n")
+    cat("  Number of connections above threshold:", length(thresholded_upper_tri), "\n")
     cat("  Mean absolute correlation:", round(mean_abs_corr, 4), "\n")
     cat("  Median absolute correlation:", round(median_abs_corr, 4), "\n")
     cat("  Max correlation:", round(max_corr, 4), "\n")
