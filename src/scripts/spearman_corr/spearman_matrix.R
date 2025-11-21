@@ -1,15 +1,15 @@
-# !/usr/bin/env Rscript
+#!/usr/bin/env Rscript
 # ==============================================================================
-# Spearman-based WGCNA for drosophila transcriptomic data
+# Spearman Correlation Matrix Calculation
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 11/11/2025
+# Last Updated: 21/11/2025
 #
-# This script::
-#   1. Takes subset datasets as input
+# This script:
+#   1. Takes expression matrix as input (genes × samples)
 #   2. Calculates Spearman rank correlations
-#   4. Saves matrix outputs
+#   3. Saves correlation matrix output
 # ==============================================================================
 
 #################################
@@ -18,82 +18,93 @@
 suppressPackageStartupMessages({
     library(argparse)
     library(WGCNA)
-    library(yaml)
+    library(data.table)
 })
+
 # ----- Parse command line arguments -----
-parser <- ArgumentParser(description = 'Convert gene pairs to correlation matrix')
-parser$add_argument('--input', type="character", 
-                   default="/tmp/global2/gthornes/dronetanalysis/dataset/processed/VOOM/voomdataHS.txt",
-                   help='Input file path (e.g. VOOM or VST processed data)')
-parser$add_argument('--output', type="character",
-                   default="/tmp/global2/gthornes/dronetanalysis/results/spearman_correlation/spearman_matrices", 
-                   help='Output file path for Spearman correlation matrices')
+parser <- ArgumentParser(description = 'Calculate Spearman correlation matrix')
+parser$add_argument('--input', type="character", required=TRUE,
+                   help='Input expression matrix file (genes x samples)')
+parser$add_argument('--output', type="character", required=TRUE,
+                   help='Output file path for Spearman correlation matrix')
 parser$add_argument('--method', type="character", default="spearman",
-                   help='Correlation method')
-parser$add_argument('--use', type="character", default="complete.obs",
-                   help='Value column name')
+                   help='Correlation method (default: spearman)')
+parser$add_argument('--use', type="character", default="pairwise.complete.obs",
+                   help='Handling of missing values (default: pairwise.complete.obs)')
 
 args <- parser$parse_args()
-
-data_file <- args$input
-out_file <- args$output
-method <- args$method
-use <- args$use
-
-source("src/utils/utils_io.R")
-
-# Load configuration
-config <- yaml::read_yaml("config/config.yaml")
 
 # Options for the analysis
 options(stringsAsFactors = FALSE)
 
-# Create output directories if they don't exist  
-dir.create(file.path(config$output_dirs$spearman_dir, "spearman_matrices"), recursive = TRUE, showWarnings = FALSE)
+# Create output directory if it doesn't exist
+dir.create(dirname(args$output), recursive = TRUE, showWarnings = FALSE)
+
+cat("=== Spearman Correlation Matrix Calculation ===\n")
+cat("Input file:", args$input, "\n")
+cat("Output file:", args$output, "\n")
+cat("Method:", args$method, "\n")
+cat("Missing value handling:", args$use, "\n\n")
 
 ###############################
 ##### Data Loading ############
 ###############################
 
-# Load data
-data <- read.table(data_file, header=TRUE, sep="\t", row.names=1)
+cat("Loading expression data...\n")
 
-# Transpose data for WGCNA format (samples as rows)
-datExpr <- as.data.frame(t(data))
+# Load data using fread for better handling
+data <- fread(args$input, data.table = FALSE)
 
-# Store original gene names before any filtering
-original_gene_names <- colnames(datExpr)
-
-# Check for genes and samples with too many missing values
-gsg <- goodSamplesGenes(datExpr, verbose = 3)
-if (!gsg$allOK) {
-  # Remove the offending genes and samples
-  datExpr <- datExpr[gsg$goodSamples, gsg$goodGenes]
-  # Update the gene names list to match filtered data
-  original_gene_names <- original_gene_names[gsg$goodGenes]
+# Check if first column needs renaming
+if (colnames(data)[1] %in% c("V1", "")) {
+  colnames(data)[1] <- "gene_id"
 }
 
-cat("Working with", nrow(datExpr), "samples and", ncol(datExpr), "genes\n")
+# Set first column as row names
+rownames(data) <- data[[1]]
+data <- data[, -1]
+
+cat("  Loaded:", nrow(data), "genes x", ncol(data), "samples\n")
+
+# Transpose data for correlation calculation (samples as rows, genes as columns)
+datExpr <- as.data.frame(t(data))
+
+cat("  Transposed to:", nrow(datExpr), "samples x", ncol(datExpr), "genes\n")
+
+# Check for genes and samples with too many missing values
+cat("\nChecking data quality...\n")
+gsg <- goodSamplesGenes(datExpr, verbose = 3)
+if (!gsg$allOK) {
+  cat("  Removing genes/samples with too many missing values\n")
+  datExpr <- datExpr[gsg$goodSamples, gsg$goodGenes]
+  cat("  After filtering:", nrow(datExpr), "samples x", ncol(datExpr), "genes\n")
+} else {
+  cat("  All samples and genes pass quality check\n")
+}
 
 #################################
 ##### Spearman Correlation ######
 #################################
 
-cat("\n=== SPEARMAN CORRELATION CALCULATION ===\n")
+cat("\n=== CALCULATING SPEARMAN CORRELATION ===\n")
 
 # Calculate Spearman correlation matrix
-cat("Calculating Spearman correlation matrix...\n")
-spearman_cor <- cor(datExpr, method = method, use = use)
+cat("Computing correlation matrix (", args$method, ")...\n")
+spearman_cor <- cor(datExpr, method = args$method, use = args$use)
 
-# Save the correlation matrix
-spearman_file <- file.path(out_file, "/HS_spearman_correlation_matrix.csv")
-write.csv(spearman_cor, file = spearman_file)
-subset_spearman_file <- file.path(out_file, "/HS_spearman_correlation_matrix_subset.csv")
-write.csv(spearman_cor[1:500, 1:500], file = subset_spearman_file) # choose subset matrix size
-cat("Spearman correlation matrix saved to:", spearman_file, "\n")
-cat("Subset of Spearman correlation matrix (500x500) saved to:", subset_spearman_file, "\n")
+cat("  Correlation matrix dimensions:", nrow(spearman_cor), "x", ncol(spearman_cor), "\n")
 
 # Basic correlation statistics
-cat("Correlation statistics:\n")
-cat("Mean absolute correlation:", mean(abs(spearman_cor[upper.tri(spearman_cor)])), "\n")
-cat("Median absolute correlation:", median(abs(spearman_cor[upper.tri(spearman_cor)])), "\n")
+cat("\nCorrelation statistics:\n")
+upper_tri_vals <- spearman_cor[upper.tri(spearman_cor)]
+cat("  Mean absolute correlation:", round(mean(abs(upper_tri_vals)), 4), "\n")
+cat("  Median absolute correlation:", round(median(abs(upper_tri_vals)), 4), "\n")
+cat("  Min correlation:", round(min(upper_tri_vals), 4), "\n")
+cat("  Max correlation:", round(max(upper_tri_vals), 4), "\n")
+
+# Save the correlation matrix
+cat("\nSaving correlation matrix...\n")
+write.csv(spearman_cor, file = args$output, row.names = TRUE)
+cat("  Saved to:", args$output, "\n")
+
+cat("\n=== CORRELATION CALCULATION COMPLETE ===\n")
