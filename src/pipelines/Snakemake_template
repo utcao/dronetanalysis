@@ -62,10 +62,21 @@ rule subset_expr_matrix:
         INPUT_EXPR_MAT
     output:
         [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
-    run:
-        print("Wildcard gene:", wildcards.gene)
-        print("Resolved input:", input)
+    params:
+        script = "src/scripts/preprocessing/subset_expr_by_gene_quintile.R"
+    shell:
+        """
+        Rscript {params.script} \
+            --expr-matrix {input} \
+            --target-gene {wildcards.gene} \
+            --output-bottom {output[0]} \
+            --output-top {output[1]} \
+            --n-bins 5
+        """
 
+###########################################
+# 2. spearman correlation
+###########################################
 
 ###########################################
 # 2. create_network
