@@ -69,8 +69,8 @@ rule subset_expr_matrix:
         Rscript {params.script} \
             --expr-matrix {input} \
             --target-gene {wildcards.gene} \
-            --output-bottom {output[0]} \
-            --output-top {output[1]} \
+            --output-1st {output[0]} \
+            --output-5th {output[1]} \
             --n-bins 5
         """
 
@@ -78,8 +78,16 @@ rule subset_expr_matrix:
 # 2. spearman correlation
 ###########################################
 
+
+
 ###########################################
-# 2. create_network
+# 3. adjacency matrix
+###########################################
+
+
+
+###########################################
+# 4. create_network
 ###########################################
 
 rule create_network:
@@ -93,7 +101,7 @@ rule create_network:
         shell(f"touch {output}")
 
 ###########################################
-# 3. diff_network
+# 5. diff_network
 ###########################################
 
 rule cal_diff_networks:
@@ -107,7 +115,7 @@ rule cal_diff_networks:
         shell(f"touch {output}")
 
 # ###########################################
-# # 4. network features
+# # 6. network features
 # ###########################################
 
 rule cal_network_features:
@@ -122,7 +130,7 @@ rule cal_network_features:
         shell(f"touch {output}")
 
 ###########################################
-# 5. neighbor features
+# 7. neighbor features
 ###########################################
 
 rule subset_features_neighbors:
