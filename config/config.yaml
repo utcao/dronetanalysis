@@ -61,6 +61,16 @@ subset_expr_matrix:
   desc_body: ["_1stquin_expr", "_5thquin_expr"]
   suffix: "csv"
 
+spearman_correlation:
+  output_dirs: "results/gene_wise/spearman"
+  desc_body: ["_1stquin_spearman", "_5thquin_spearman"]
+  suffix: "csv"
+
+adjacency_matrix:
+  output_dirs: "results/gene_wise/adjacency"
+  desc_body: ["_1stquin_adjacency", "_5thquin_adjacency"]
+  suffix: "csv"
+
 create_network:
   output_dirs: "results/gene_wise/networks"
   desc_body: ["_1stquin_network", "_5thquin_network"]
