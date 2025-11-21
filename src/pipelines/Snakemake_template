@@ -96,7 +96,6 @@ rule adjacency_matrix:
             --input {input} \
             --output-dir 
         """
-/Users/huiting/Downloads/dronetanalysis/src/scripts/soft_threshold/adjacency_matrix.R
 
 
 ###########################################
