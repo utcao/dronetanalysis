@@ -4,7 +4,7 @@
 #
 # Script by Gabriel Thornes
 #
-# Last Updated: 17/11/2025
+# Last Updated: 21/12/2025
 #
 # This script::
 #   1. Takes wide correlation matrix following soft thresholding as input
@@ -106,7 +106,7 @@ cat("\n=== Network Summary Statistics ===\n")
 print(summary_stats)
 cat("\nSummary statistics saved to:", summary_file, "\n")
 
-# ----- 5. Calculate gene-level network features via WGCNA -----
+# ----- 5. Calculate modules and hub genes via WGCNA -----
 
 cat("\n=== WGCNA Module Detection ===\n")
 adjacency_modules <- create_modules(

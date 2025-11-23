@@ -20,7 +20,6 @@ output_dirs:
   logs_dir: "results/logs"
   reports_dir: "results/reports"
   wgcna_dir: "results/WGCNA"
-  GWENA_dir: "results/GWENA"
   spearman_dir: "results/spearman_correlation"
   network_features_dir: "results/network_features"
 raw_files:

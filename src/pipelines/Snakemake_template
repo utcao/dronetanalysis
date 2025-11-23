@@ -136,7 +136,7 @@ rule create_network:
     output:
         [f"{OUTDIR_CREATE_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_CREATE_NET]
     params:
-        script="src/scripts/network_metrics/network_metrics.R",
+        script="src/scripts/network_metrics/nm_and_modules.R",
         output_dir = OUTDIR_CREATE_NET
     shell:
         f"""
@@ -145,7 +145,7 @@ rule create_network:
             --output-dir {params.output_dir}  &&\
         Rscript {params.script} \
             -- adjacency-file {input[1]} \
-            --output-dir {params.output_dir} 
+            --output-dir {params.output_dir}
         """
 
 ###########################################
