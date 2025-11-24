@@ -166,7 +166,7 @@ rule cal_gene_features:
         script="src/scripts/gene_metrics/gene_level_metrics.R",
         output_dir = OUTDIR_GENE_FEATURES
     shell:
-        f"""
+        """
         Rscript {params.script} \
             --adjacency_file {input[0]} \
             --output_dir {params.output_dir}
@@ -207,7 +207,7 @@ rule :
 
 rule subset_features_neighbors:
     input:
-        lambda wc: outfile("cal_network_features", wc.gene, DESC_NET_FEATURES)
+        lambda wc: outfile("cal_network_features", wc.gene, DESC_GENE_FEATURES)
     output:
         [f"{OUTDIR_NEIGHBORS[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_NEIGHBORS]
     shell:
