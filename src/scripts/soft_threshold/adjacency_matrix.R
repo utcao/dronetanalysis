@@ -146,7 +146,7 @@ cat("Selected power saved to:", power_file, "\n\n")
 cat("=== Applying Soft Threshold ===\n")
 soft_adj <- adjacency^selected_power
 
-soft_output_file <- file.path(unsigned_dir, paste0(group, "_sf_adjacency.csv"))
+soft_output_file <- file.path(unsigned_dir, paste0(group, "_st_adjacency.csv"))
 write.csv(soft_adj, soft_output_file, row.names = TRUE)
 cat("Soft-thresholded adjacency matrix saved to:", soft_output_file, "\n\n")
 

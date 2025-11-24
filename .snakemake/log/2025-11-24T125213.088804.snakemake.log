@@ -1,0 +1,73 @@
+Assuming unrestricted shared filesystem usage.
+host: chimi
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 10
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+all                   1
+create_network        2
+total                 3
+
+Select jobs to execute...
+Failed to solve scheduling problem with ILP solver, falling back to greedy scheduler. You likely have to fix your ILP solver installation. Error message: PULP_CBC_CMD: Not Available (check permissions on cbc)
+Execute 2 jobs...
+[Mon Nov 24 12:52:13 2025]
+localrule create_network:
+    input: results/gene_wise/adjacency/FBgn0031080/FBgn0031080_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031080/FBgn0031080_5thquin_st_adjacency.csv
+    output: results/gene_wise/modules/FBgn0031080_1stquin_modules.csv, results/gene_wise/modules/FBgn0031080_5thquin_modules.csv
+    jobid: 8
+    reason: Missing output files: results/gene_wise/modules/FBgn0031080_1stquin_modules.csv, results/gene_wise/modules/FBgn0031080_5thquin_modules.csv
+    wildcards: gene=FBgn0031080
+    resources: tmpdir=/tmp
+[Mon Nov 24 12:52:13 2025]
+localrule create_network:
+    input: results/gene_wise/adjacency/FBgn0031081/FBgn0031081_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031081/FBgn0031081_5thquin_st_adjacency.csv
+    output: results/gene_wise/modules/FBgn0031081_1stquin_modules.csv, results/gene_wise/modules/FBgn0031081_5thquin_modules.csv
+    jobid: 7
+    reason: Missing output files: results/gene_wise/modules/FBgn0031081_1stquin_modules.csv, results/gene_wise/modules/FBgn0031081_5thquin_modules.csv
+    wildcards: gene=FBgn0031081
+    resources: tmpdir=/tmp
+Waiting at most 5 seconds for missing files:
+results/gene_wise/modules/FBgn0031080_1stquin_modules.csv (missing locally)
+results/gene_wise/modules/FBgn0031080_5thquin_modules.csv (missing locally)
+MissingOutputException in rule create_network in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 138:
+Job 8  completed successfully, but some output files are missing. Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+results/gene_wise/modules/FBgn0031080_1stquin_modules.csv (missing locally, parent dir contents: modules, adjacency_threshold_analysis.pdf, network_metrics_summary.csv)
+results/gene_wise/modules/FBgn0031080_5thquin_modules.csv (missing locally, parent dir contents: modules, adjacency_threshold_analysis.pdf, network_metrics_summary.csv)
+Waiting at most 5 seconds for missing files:
+results/gene_wise/modules/FBgn0031081_1stquin_modules.csv (missing locally)
+results/gene_wise/modules/FBgn0031081_5thquin_modules.csv (missing locally)
+MissingOutputException in rule create_network in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 138:
+Job 7  completed successfully, but some output files are missing. Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+results/gene_wise/modules/FBgn0031081_1stquin_modules.csv (missing locally, parent dir contents: modules, adjacency_threshold_analysis.pdf, network_metrics_summary.csv)
+results/gene_wise/modules/FBgn0031081_5thquin_modules.csv (missing locally, parent dir contents: modules, adjacency_threshold_analysis.pdf, network_metrics_summary.csv)
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look below for error messages
+[Mon Nov 24 13:22:16 2025]
+Error in rule create_network:
+    message: None
+    jobid: 8
+    input: results/gene_wise/adjacency/FBgn0031080/FBgn0031080_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031080/FBgn0031080_5thquin_st_adjacency.csv
+    output: results/gene_wise/modules/FBgn0031080_1stquin_modules.csv, results/gene_wise/modules/FBgn0031080_5thquin_modules.csv
+    shell:
+        
+        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031080/FBgn0031080_1stquin_st_adjacency.csv             --output-dir results/gene_wise/modules  &&        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031080/FBgn0031080_5thquin_st_adjacency.csv             --output-dir results/gene_wise/modules
+        
+        (command exited with non-zero exit code)
+[Mon Nov 24 13:22:16 2025]
+Error in rule create_network:
+    message: None
+    jobid: 7
+    input: results/gene_wise/adjacency/FBgn0031081/FBgn0031081_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031081/FBgn0031081_5thquin_st_adjacency.csv
+    output: results/gene_wise/modules/FBgn0031081_1stquin_modules.csv, results/gene_wise/modules/FBgn0031081_5thquin_modules.csv
+    shell:
+        
+        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031081/FBgn0031081_1stquin_st_adjacency.csv             --output-dir results/gene_wise/modules  &&        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031081/FBgn0031081_5thquin_st_adjacency.csv             --output-dir results/gene_wise/modules
+        
+        (command exited with non-zero exit code)
+Complete log(s): /tmp/global2/gthornes/dronetanalysis/.snakemake/log/2025-11-24T125213.088804.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.
