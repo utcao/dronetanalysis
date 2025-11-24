@@ -43,36 +43,19 @@ def outfile(section, gene, desc):
 ###########################################
 # Final rule: build everything
 ###########################################
+
 rule all:
     input:
-        # Spearman correlation matrices
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_SUBSET_EXPR, gene=GENES, desc_body = DESC_SUBSET_EXPR,
-            suffix = TAB_SUFFIX),
+        # neighbor features
         expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
             suffix = TAB_SUFFIX),
-<<<<<<< HEAD
-        # Adjacency matrices
-        expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
-            suffix = TAB_SUFFIX),
-        # TOM matrices from network creation
-        expand("{outdir}/{gene}/{gene}_1stquin_st_adjacency/modules/tom_matrix.csv",
-            outdir=OUTDIR_CREATE_NET, gene=GENES),
-        expand("{outdir}/{gene}/{gene}_5thquin_st_adjacency/modules/tom_matrix.csv",
-            outdir=OUTDIR_CREATE_NET, gene=GENES),
-        # Differential TOM matrices
-        expand("{outdir}/{gene}/differential_tom_matrix.csv",
-            outdir=OUTDIR_DIFF_TOM, gene=GENES)
-=======
         expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
             suffix = TAB_SUFFIX),
         expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
             suffix = TAB_SUFFIX)
->>>>>>> 836b6875fe838efa68af4202c64760da042cbdda
 
         # [
         #     f"{OUTDIR_NEIGHBORS[0]}/{gene}{desc}.{TAB_SUFFIX}"
@@ -137,7 +120,7 @@ rule adjacency_matrix:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     params:
         script = "src/scripts/soft_threshold/adjacency_matrix.R",
-        output_dir = OUTDIR_ADJACENCY_MATRIX[0]+"/{gene}"
+        output_dir = OUTDIR_ADJACENCY_MATRIX[0]
     shell:
         """
         Rscript {params.script} \
@@ -156,20 +139,21 @@ rule create_network:
     input:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     output:
-        tom_1st = f"{OUTDIR_CREATE_NET[0]}/{{gene}}/{{gene}}_1stquin_st_adjacency/modules/tom_matrix.csv",
-        tom_5th = f"{OUTDIR_CREATE_NET[0]}/{{gene}}/{{gene}}_5thquin_st_adjacency/modules/tom_matrix.csv"
+        [f"{OUTDIR_CREATE_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_CREATE_NET]
     params:
         script="src/scripts/network_metrics/nm_and_modules.R",
-        output_dir_1st = f"{OUTDIR_CREATE_NET[0]}/{{gene}}/{{gene}}_1stquin_st_adjacency",
-        output_dir_5th = f"{OUTDIR_CREATE_NET[0]}/{{gene}}/{{gene}}_5thquin_st_adjacency"
+        output_dir = OUTDIR_CREATE_NET,
+        prefix=[f"{{gene}}{i}" for i in DESC_CREATE_NET]
     shell:
         """
         Rscript {params.script} \
             --adjacency-file {input[0]} \
-            --output-dir {params.output_dir_1st} &&\
+            --output-dir {params.output_dir}  \
+            --prefix {params.prefix[0]} &&\
         Rscript {params.script} \
             --adjacency-file {input[1]} \
-            --output-dir {params.output_dir_5th}
+            --output-dir {params.output_dir} \
+            --prefix {params.prefix[1]}
         """
 
 ###########################################
@@ -178,19 +162,18 @@ rule create_network:
 
 rule cal_diff_networks:
     input:
-        tom_1st = f"{OUTDIR_CREATE_NET[0]}/{{gene}}/{{gene}}_1stquin_st_adjacency/modules/tom_matrix.csv",
-        tom_5th = f"{OUTDIR_CREATE_NET[0]}/{{gene}}/{{gene}}_5thquin_st_adjacency/modules/tom_matrix.csv"
+        [f"{OUTDIR_CREATE_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_CREATE_NET]
     output:
-        diff_tom = f"{OUTDIR_DIFF_TOM[0]}/{{gene}}/differential_tom_matrix.csv"
+        [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
     params:
         script="src/scripts/diff_tom/diff_tom.R",
-        output_dir = f"{OUTDIR_DIFF_TOM[0]}/{{gene}}"
+        output_dir = OUTDIR_DIFF_TOM[0]+"/{gene}_diff_tom"
     shell:
         """
         Rscript {params.script} \
-            --tom-1st {input.tom_1st} \
-            --tom-5th {input.tom_5th} \
-            --output-dir {params.output_dir}
+            --tom-1st {input[0]} \
+            --tom-5th {input[1]} \
+            --output-dir {output}
         """
 
 ###########################################
@@ -212,23 +195,8 @@ rule cal_gene_features:
             --output_dir {params.output_dir}
         """
 
-# ###########################################
-# # 7. network features
-# ###########################################
-
-rule :
-    input:
-        lambda wc: outfile("create_network", wc.gene, DESC_CREATE_NET),
-        lambda wc: outfile("cal_diff_networks", wc.gene, DESC_DIFF_NET)
-    output:
-        [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
-    run:
-        print("Wildcard gene:", wildcards.gene)
-        print("Resolved input:", input)
-        shell(f"touch {output}")
-
 ###########################################
-# 8. neighbor features
+# 7. neighbor features
 ###########################################
 
 rule subset_features_neighbors:
