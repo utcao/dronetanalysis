@@ -126,7 +126,7 @@ rule adjacency_matrix:
         Rscript {params.script} \
             --input {input[0]} \
             --output-dir {params.output_dir} &&\
-         Rscript {params.script} \
+        Rscript {params.script} \
             --input {input[1]} \
             --output-dir {params.output_dir} \
         """
@@ -157,7 +157,29 @@ rule create_network:
         """
 
 ###########################################
-# 5. gene features
+# 5. diff_network
+###########################################
+
+rule cal_diff_networks:
+    input:
+        
+    output:
+        [f"{OUTDIR_DIFF_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
+    params:
+        script="src/scripts/diff_tom/diff_tom.R",
+        output_dir = OUTDIR_DIFF_NET[0]+"/{gene}"
+    shell:
+        """
+        Rscript {params.script} \
+            --input {input[0]} \
+            --output-dir {params.output_dir}  &&\
+        Rscript {params.script} \
+            --input {input[1]} \
+            --output-dir {params.output_dir}
+        """
+
+###########################################
+# 6. gene features
 ###########################################
 
 rule cal_gene_features:
@@ -174,20 +196,6 @@ rule cal_gene_features:
             --adjacency_file {input[0]} \
             --output_dir {params.output_dir}
         """
-
-###########################################
-# 6. diff_network
-###########################################
-
-rule cal_diff_networks:
-    input:
-        lambda wc: outfile("create_network", wc.gene, DESC_CREATE_NET)
-    output:
-        [f"{OUTDIR_DIFF_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
-    run:
-        print("Wildcard gene:", wildcards.gene)
-        print("Resolved input:", input)
-        shell(f"touch {output}")
 
 # ###########################################
 # # 7. network features
