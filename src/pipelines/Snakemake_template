@@ -1,5 +1,5 @@
 configfile: "config/config.yaml"
-from logging import config
+
 import os
 # # Get the current working directory
 # current_directory = os.getcwd()
@@ -164,10 +164,10 @@ rule cal_gene_features:
     output:
         [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
     params:
-        script="src/scripts/gene_metrics/gene_level_metrics.R"
+        script="src/scripts/gene_metrics/gene_level_metrics.R",
         output_dir = OUTDIR_GENE_FEATURES
     shell:
-        f"""
+        """
         Rscript {params.script} \
             --adjacency_file {input[0]} \
             --output_dir {params.output_dir}
@@ -196,7 +196,7 @@ rule :
         lambda wc: outfile("create_network", wc.gene, DESC_CREATE_NET),
         lambda wc: outfile("cal_diff_networks", wc.gene, DESC_DIFF_NET)
     output:
-        [f"{OUTDIR_NET_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_NET_FEATURES]
+        [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
     run:
         print("Wildcard gene:", wildcards.gene)
         print("Resolved input:", input)
@@ -208,7 +208,7 @@ rule :
 
 rule subset_features_neighbors:
     input:
-        lambda wc: outfile("cal_network_features", wc.gene, DESC_NET_FEATURES)
+        lambda wc: outfile("cal_network_features", wc.gene, DESC_GENE_FEATURES)
     output:
         [f"{OUTDIR_NEIGHBORS[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_NEIGHBORS]
     shell:
