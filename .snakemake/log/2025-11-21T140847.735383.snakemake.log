@@ -1,0 +1,3 @@
+SyntaxError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 117:
+invalid syntax. Perhaps you forgot a comma?:
+				script = "src/scripts/soft_threshold/adjacency_matrix.R"

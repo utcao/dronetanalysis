@@ -1,0 +1,16 @@
+File path '
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
+            suffix = TAB_SUFFIX),
+         ' ends with whitespace. This is likely unintended. It can also lead to inconsistent results of the file-matching approach used by Snakemake.
+File path '
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
+            suffix = TAB_SUFFIX),
+         ' contains line break. This is likely unintended. It can also lead to inconsistent results of the file-matching approach used by Snakemake.
+Assuming unrestricted shared filesystem usage.
+host: chimi
+Building DAG of jobs...
+WildcardError in rule all in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 47:
+Wildcards in input files cannot be determined from output files: (rule all, line 49, /tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template)
+'outdir'
