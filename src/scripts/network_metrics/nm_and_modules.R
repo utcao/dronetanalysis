@@ -33,6 +33,7 @@ parser$add_argument('--adjacency-file', help = 'Path to soft-thresholded adjacen
                    default = 'results/network_features/soft_threshold/_st_adjacency_matrix.csv')
 parser$add_argument('--output-dir', help = 'Directory to save network metrics and module results', 
                    default = 'results/network_features/features_calc/_adjacency')
+parser$add_argument('--prefix', help = 'Prefix name of results')
 parser$add_argument('--connection-threshold', help = 'Connection threshold for degree calculation', 
                    default = 0.01, type = 'double')
 parser$add_argument('--min-module-size', help = 'Minimum module size for WGCNA', 
@@ -45,6 +46,7 @@ parser$add_argument('--top-n-hubs', help = 'Number of top hub genes to identify 
                    default = 5, type = 'integer')
 args <- parser$parse_args()
 
+prefix <- args$prefix
 output_dir <- args$output_dir
 module_output_dir <- file.path(output_dir)
 
@@ -77,7 +79,7 @@ cat("- Adjacency matrix dimensions:", dim(adjacency_matrix), "\n\n")
 
 cat("Generating threshold analysis plot...\n")
 plot_threshold_analysis(adjacency_matrix, 
-                        output_file = file.path(output_dir, "adjacency_threshold_analysis.pdf"), 
+                        output_file = file.path(output_dir,  paste0(prefix,"_adjacency_threshold_analysis.pdf")), 
                         threshold_range = seq(0.02, 0.4, by = 0.02),
                         matrix_name = "Adjacency Matrix")
 
@@ -99,7 +101,7 @@ summary_stats <- data.frame(
 )
 
 # Save summary statistics
-summary_file <- file.path(output_dir, "network_metrics_summary.csv")
+summary_file <- file.path(output_dir,  paste0(prefix,"_network_metrics_summary.csv"))
 write.csv(summary_stats, file = summary_file, row.names = FALSE)
 
 cat("\n=== Network Summary Statistics ===\n")
@@ -128,8 +130,8 @@ adjacency_hubs <- identify_hubs(
 )
 
 # Save TOM matrices (from the module results)
-tom_file <- file.path(module_output_dir, "tom_matrix.csv")
-tomd_file <- file.path(module_output_dir, "tomd_matrix.csv")
+tom_file <- file.path(module_output_dir,  paste0(prefix,"_tom.csv"))
+tomd_file <- file.path(module_output_dir,  paste0(prefix,"_tomd_matrix.csv"))
 
 write.csv(adjacency_modules$tom_matrix, file = tom_file, row.names = TRUE)
 write.csv(adjacency_modules$tomd_matrix, file = tomd_file, row.names = TRUE)
