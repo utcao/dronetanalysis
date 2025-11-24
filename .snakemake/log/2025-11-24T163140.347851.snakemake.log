@@ -1,0 +1,58 @@
+Assuming unrestricted shared filesystem usage.
+host: chimi
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 5
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+all                   1
+create_network        2
+total                 3
+
+Select jobs to execute...
+Failed to solve scheduling problem with ILP solver, falling back to greedy scheduler. You likely have to fix your ILP solver installation. Error message: PULP_CBC_CMD: Not Available (check permissions on cbc)
+Execute 2 jobs...
+[Mon Nov 24 16:31:40 2025]
+localrule create_network:
+    input: results/gene_wise/adjacency/FBgn0031080_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031080_5thquin_st_adjacency.csv
+    output: results/gene_wise/modules/FBgn0031080_1stquin_tom.csv, results/gene_wise/modules/FBgn0031080_5thquin_tom.csv
+    jobid: 8
+    reason: Missing output files: results/gene_wise/modules/FBgn0031080_1stquin_tom.csv, results/gene_wise/modules/FBgn0031080_5thquin_tom.csv; Params have changed since last execution: Union of exclusive params before and now across all output: before: ['FBgn0031080_1stquin_st_adjacency', 'FBgn0031080_5thquin_st_adjacency'] now: ['FBgn0031080_1stquin_tom', 'FBgn0031080_5thquin_tom'] 
+    wildcards: gene=FBgn0031080
+    resources: tmpdir=/tmp
+[Mon Nov 24 16:31:40 2025]
+localrule create_network:
+    input: results/gene_wise/adjacency/FBgn0031081_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031081_5thquin_st_adjacency.csv
+    output: results/gene_wise/modules/FBgn0031081_1stquin_tom.csv, results/gene_wise/modules/FBgn0031081_5thquin_tom.csv
+    jobid: 7
+    reason: Missing output files: results/gene_wise/modules/FBgn0031081_5thquin_tom.csv, results/gene_wise/modules/FBgn0031081_1stquin_tom.csv
+    wildcards: gene=FBgn0031081
+    resources: tmpdir=/tmp
+Waiting at most 5 seconds for missing files:
+results/gene_wise/modules/FBgn0031080_1stquin_tom.csv (missing locally)
+results/gene_wise/modules/FBgn0031080_5thquin_tom.csv (missing locally)
+MissingOutputException in rule create_network in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 138:
+Job 8  completed successfully, but some output files are missing. Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+results/gene_wise/modules/FBgn0031080_1stquin_tom.csv (missing locally, parent dir contents: FBgn0031081_1stquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031080_1stquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031080_1stquin_st_adjacency_network_metrics_summary.csv, FBgn0031081_1stquin_st_adjacency_network_metrics_summary.csv, gene_dendrogram_modules.pdf, module_eigengene_clustering.pdf, single_hub_genes.csv, top_hub_genes.csv, gene_connectivity.csv, module_membership.csv, module_summary.csv, FBgn0031080_1stquin_st_adjacency_tom.csv, FBgn0031080_1stquin_st_adjacency_tomd_matrix.csv, FBgn0031081_1stquin_st_adjacency_tom.csv, FBgn0031081_1stquin_st_adjacency_tomd_matrix.csv, FBgn0031080_5thquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031080_5thquin_st_adjacency_network_metrics_summary.csv, FBgn0031081_5thquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031081_5thquin_st_adjacency_network_metrics_summary.csv, FBgn0031080_5thquin_st_adjacency_tom.csv, FBgn0031080_5thquin_st_adjacency_tomd_matrix.csv, FBgn0031080_1stquin_tom_adjacency_threshold_analysis.pdf, FBgn0031081_1stquin_tom_adjacency_threshold_analysis.pdf, FBgn0031080_1stquin_tom_network_metrics_summary.csv, FBgn0031081_1stquin_tom_network_metrics_summary.csv, FBgn0031080_1stquin_tom_tom.csv, FBgn0031081_1stquin_tom_tom.csv, FBgn0031080_1stquin_tom_tomd_matrix.csv, FBgn0031081_1stquin_tom_tomd_matrix.csv, FBgn0031080_5thquin_tom_adjacency_threshold_analysis.pdf, FBgn0031081_5thquin_tom_adjacency_threshold_analysis.pdf, FBgn0031080_5thquin_tom_network_metrics_summary.csv, FBgn0031081_5thquin_tom_network_metrics_summary.csv, FBgn0031080_5thquin_tom_tom.csv, FBgn0031080_5thquin_tom_tomd_matrix.csv)
+results/gene_wise/modules/FBgn0031080_5thquin_tom.csv (missing locally, parent dir contents: FBgn0031081_1stquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031080_1stquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031080_1stquin_st_adjacency_network_metrics_summary.csv, FBgn0031081_1stquin_st_adjacency_network_metrics_summary.csv, gene_dendrogram_modules.pdf, module_eigengene_clustering.pdf, single_hub_genes.csv, top_hub_genes.csv, gene_connectivity.csv, module_membership.csv, module_summary.csv, FBgn0031080_1stquin_st_adjacency_tom.csv, FBgn0031080_1stquin_st_adjacency_tomd_matrix.csv, FBgn0031081_1stquin_st_adjacency_tom.csv, FBgn0031081_1stquin_st_adjacency_tomd_matrix.csv, FBgn0031080_5thquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031080_5thquin_st_adjacency_network_metrics_summary.csv, FBgn0031081_5thquin_st_adjacency_adjacency_threshold_analysis.pdf, FBgn0031081_5thquin_st_adjacency_network_metrics_summary.csv, FBgn0031080_5thquin_st_adjacency_tom.csv, FBgn0031080_5thquin_st_adjacency_tomd_matrix.csv, FBgn0031080_1stquin_tom_adjacency_threshold_analysis.pdf, FBgn0031081_1stquin_tom_adjacency_threshold_analysis.pdf, FBgn0031080_1stquin_tom_network_metrics_summary.csv, FBgn0031081_1stquin_tom_network_metrics_summary.csv, FBgn0031080_1stquin_tom_tom.csv, FBgn0031081_1stquin_tom_tom.csv, FBgn0031080_1stquin_tom_tomd_matrix.csv, FBgn0031081_1stquin_tom_tomd_matrix.csv, FBgn0031080_5thquin_tom_adjacency_threshold_analysis.pdf, FBgn0031081_5thquin_tom_adjacency_threshold_analysis.pdf, FBgn0031080_5thquin_tom_network_metrics_summary.csv, FBgn0031081_5thquin_tom_network_metrics_summary.csv, FBgn0031080_5thquin_tom_tom.csv, FBgn0031080_5thquin_tom_tomd_matrix.csv)
+Terminating processes on user request, this might take some time.
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 148:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031081_1stquin_st_adjacency.csv             --output-dir results/gene_wise/modules              --prefix FBgn0031081_1stquin_tom &&        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031081_5thquin_st_adjacency.csv             --output-dir results/gene_wise/modules             --prefix FBgn0031081_5thquin_tom' returned non-zero exit status 1.
+[Mon Nov 24 16:54:45 2025]
+Error in rule create_network:
+    message: None
+    jobid: 7
+    input: results/gene_wise/adjacency/FBgn0031081_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031081_5thquin_st_adjacency.csv
+    output: results/gene_wise/modules/FBgn0031081_1stquin_tom.csv, results/gene_wise/modules/FBgn0031081_5thquin_tom.csv
+    shell:
+        
+        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031081_1stquin_st_adjacency.csv             --output-dir results/gene_wise/modules              --prefix FBgn0031081_1stquin_tom &&        Rscript src/scripts/network_metrics/nm_and_modules.R             --adjacency-file results/gene_wise/adjacency/FBgn0031081_5thquin_st_adjacency.csv             --output-dir results/gene_wise/modules             --prefix FBgn0031081_5thquin_tom
+        
+        (command exited with non-zero exit code)
+Complete log(s): /tmp/global2/gthornes/dronetanalysis/.snakemake/log/2025-11-24T163140.347851.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.
