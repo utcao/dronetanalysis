@@ -71,7 +71,7 @@ adjacency_matrix:
 
 create_network:
   output_dirs: "results/gene_wise/modules"
-  desc_body: ["_1stquin_tom", "_5thquin_tom"]
+  desc_body: ["_1stquin", "_5thquin"]
   suffix: "csv"
 
 cal_diff_networks:
