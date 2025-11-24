@@ -47,7 +47,7 @@ adjacency_file <- args$adjacency_file
 output_dir <- args$output_dir
 matrix_type <- tolower(args$matrix_type)
 threshold <- args$threshold
-adjacency_results_dir <- file.path("results/network_features/features_calc/adjacency/modules")
+adjacency_results_dir <- file.path(args$output_dir, "features_calc/adjacency/modules")
 
 create_directories(output_dir)
 
