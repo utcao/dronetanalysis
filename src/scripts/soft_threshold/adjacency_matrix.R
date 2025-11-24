@@ -68,7 +68,7 @@ df.corr.m <- as.matrix(corr_matrix[,-1, with=FALSE])
 rownames(df.corr.m) <- corr_matrix[[1]]
 
 # ----- 5. Create binary matrix to preserve negative correlations -----
-binary_output_dir <- file.path(output_dir, "binary_matrix")
+binary_output_dir <- file.path(output_dir)
 create_directories(binary_output_dir)
 binary_output_file <- file.path(binary_output_dir, paste0(group, "_binary_signed_matrix.csv"))
 binary_matrix <- create_correlation_sign_matrix(df.corr.m, output_file = binary_output_file)
@@ -78,7 +78,7 @@ cat("Binary sign matrix created and saved to:", binary_output_file, "\n\n")
 adjacency <- abs(df.corr.m)
 
 # Save unsigned adjacency matrix
-unsigned_dir <- file.path(output_dir, "soft_threshold")
+unsigned_dir <- file.path(output_dir)
 create_directories(unsigned_dir)
 unsigned_output_file <- file.path(unsigned_dir, paste0(group, "_unsigned_adjacency_matrix.csv"))
 write.csv(adjacency, unsigned_output_file, row.names = TRUE)
