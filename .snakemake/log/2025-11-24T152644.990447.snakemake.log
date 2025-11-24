@@ -1,0 +1,113 @@
+Assuming unrestricted shared filesystem usage.
+host: chimi
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 10
+Rules claiming more threads will be scaled down.
+Job stats:
+job                          count
+-------------------------  -------
+adjacency_matrix                 4
+all                              1
+calc_spearman_correlation        2
+create_network                   2
+subset_expr_matrix               2
+total                           11
+
+Select jobs to execute...
+Failed to solve scheduling problem with ILP solver, falling back to greedy scheduler. You likely have to fix your ILP solver installation. Error message: PULP_CBC_CMD: Not Available (check permissions on cbc)
+Execute 4 jobs...
+[Mon Nov 24 15:26:45 2025]
+localrule adjacency_matrix:
+    input: results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv
+    output: results/gene_wise/adjacency/FBgn0031080/FBgn0031080_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031080/FBgn0031080_5thquin_st_adjacency.csv
+    jobid: 6
+    reason: Code has changed since last execution
+    wildcards: gene=FBgn0031080
+    resources: tmpdir=/tmp
+[Mon Nov 24 15:26:45 2025]
+localrule subset_expr_matrix:
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031081/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081/FBgn0031081_5thquin_expr.csv
+    jobid: 10
+    reason: Missing output files: results/gene_wise/expr/FBgn0031081/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081/FBgn0031081_5thquin_expr.csv
+    wildcards: gene=FBgn0031081/FBgn0031081
+    resources: tmpdir=/tmp
+[Mon Nov 24 15:26:45 2025]
+localrule subset_expr_matrix:
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031080/FBgn0031080_1stquin_expr.csv, results/gene_wise/expr/FBgn0031080/FBgn0031080_5thquin_expr.csv
+    jobid: 14
+    reason: Missing output files: results/gene_wise/expr/FBgn0031080/FBgn0031080_5thquin_expr.csv, results/gene_wise/expr/FBgn0031080/FBgn0031080_1stquin_expr.csv
+    wildcards: gene=FBgn0031080/FBgn0031080
+    resources: tmpdir=/tmp
+[Mon Nov 24 15:26:45 2025]
+localrule adjacency_matrix:
+    input: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv
+    output: results/gene_wise/adjacency/FBgn0031081/FBgn0031081_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031081/FBgn0031081_5thquin_st_adjacency.csv
+    jobid: 5
+    reason: Code has changed since last execution
+    wildcards: gene=FBgn0031081
+    resources: tmpdir=/tmp
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 78:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031081/FBgn0031081             --output-1st results/gene_wise/expr/FBgn0031081/FBgn0031081_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031081/FBgn0031081_5thquin_expr.csv             --n-bins 5' returned non-zero exit status 1.
+[Mon Nov 24 15:26:46 2025]
+Error in rule subset_expr_matrix:
+    message: None
+    jobid: 10
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031081/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081/FBgn0031081_5thquin_expr.csv
+    shell:
+        
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031081/FBgn0031081             --output-1st results/gene_wise/expr/FBgn0031081/FBgn0031081_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031081/FBgn0031081_5thquin_expr.csv             --n-bins 5
+        
+        (command exited with non-zero exit code)
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 78:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031080/FBgn0031080             --output-1st results/gene_wise/expr/FBgn0031080/FBgn0031080_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031080/FBgn0031080_5thquin_expr.csv             --n-bins 5' returned non-zero exit status 1.
+[Mon Nov 24 15:26:46 2025]
+Error in rule subset_expr_matrix:
+    message: None
+    jobid: 14
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031080/FBgn0031080_1stquin_expr.csv, results/gene_wise/expr/FBgn0031080/FBgn0031080_5thquin_expr.csv
+    shell:
+        
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031080/FBgn0031080             --output-1st results/gene_wise/expr/FBgn0031080/FBgn0031080_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031080/FBgn0031080_5thquin_expr.csv             --n-bins 5
+        
+        (command exited with non-zero exit code)
+Terminating processes on user request, this might take some time.
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 125:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031080 &&        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031080' returned non-zero exit status 1.
+[Mon Nov 24 15:27:45 2025]
+Error in rule adjacency_matrix:
+    message: None
+    jobid: 6
+    input: results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv
+    output: results/gene_wise/adjacency/FBgn0031080/FBgn0031080_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031080/FBgn0031080_5thquin_st_adjacency.csv
+    shell:
+        
+        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031080 &&        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031080         
+        (command exited with non-zero exit code)
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 125:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031081 &&        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031081' returned non-zero exit status 1.
+[Mon Nov 24 15:27:46 2025]
+Error in rule adjacency_matrix:
+    message: None
+    jobid: 5
+    input: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv
+    output: results/gene_wise/adjacency/FBgn0031081/FBgn0031081_1stquin_st_adjacency.csv, results/gene_wise/adjacency/FBgn0031081/FBgn0031081_5thquin_st_adjacency.csv
+    shell:
+        
+        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031081 &&        Rscript src/scripts/soft_threshold/adjacency_matrix.R             --input results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv             --output-dir results/gene_wise/adjacency/FBgn0031081         
+        (command exited with non-zero exit code)
+Complete log(s): /tmp/global2/gthornes/dronetanalysis/.snakemake/log/2025-11-24T152644.990447.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.
