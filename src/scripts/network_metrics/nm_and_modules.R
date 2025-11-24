@@ -46,7 +46,7 @@ parser$add_argument('--top-n-hubs', help = 'Number of top hub genes to identify 
 args <- parser$parse_args()
 
 output_dir <- args$output_dir
-module_output_dir <- file.path(output_dir, "modules")
+module_output_dir <- file.path(output_dir)
 
 cat("=== Network Metrics Analysis ===\n")
 cat("Adjacency file:", args$adjacency_file, "\n")

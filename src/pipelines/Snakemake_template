@@ -53,7 +53,7 @@ rule all:
         expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
             suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
+        expand(f"{outdir}/{gene}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
             suffix = TAB_SUFFIX)
 
@@ -161,10 +161,10 @@ rule cal_gene_features:
     input:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     output:
-        [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
+        [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}" for i in DESC_GENE_FEATURES]
     params:
         script="src/scripts/gene_metrics/gene_level_metrics.R",
-        output_dir = OUTDIR_GENE_FEATURES
+        output_dir = OUTDIR_GENE_FEATURES+"{gene}"
     shell:
         """
         Rscript {params.script} \
