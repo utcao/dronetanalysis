@@ -32,7 +32,6 @@ dataset/test/logCPM_hs_dros_subset.csv
 .snakemake/iocache/latest.pkl
 dag.pdf
 dag.svg
-.snakemake/log
 .snakemake/metadata
 .snakemake/incomplete
 .snakemake/locks

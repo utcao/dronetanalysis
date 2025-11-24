@@ -1,0 +1,77 @@
+Assuming unrestricted shared filesystem usage.
+host: chimi
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 2
+Rules claiming more threads will be scaled down.
+Job stats:
+job                          count
+-------------------------  -------
+all                              1
+calc_spearman_correlation        2
+subset_expr_matrix               2
+total                            5
+
+Select jobs to execute...
+Failed to solve scheduling problem with ILP solver, falling back to greedy scheduler. You likely have to fix your ILP solver installation. Error message: PULP_CBC_CMD: Not Available (check permissions on cbc)
+Execute 2 jobs...
+[Fri Nov 21 14:21:37 2025]
+localrule subset_expr_matrix:
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081_5thquin_expr.csv
+    jobid: 2
+    reason: Missing output files: results/gene_wise/expr/FBgn0031081_5thquin_expr.csv, results/gene_wise/expr/FBgn0031081_1stquin_expr.csv
+    wildcards: gene=FBgn0031081
+    resources: tmpdir=/tmp
+[Fri Nov 21 14:21:37 2025]
+localrule subset_expr_matrix:
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031080_1stquin_expr.csv, results/gene_wise/expr/FBgn0031080_5thquin_expr.csv
+    jobid: 4
+    reason: Missing output files: results/gene_wise/expr/FBgn0031080_5thquin_expr.csv, results/gene_wise/expr/FBgn0031080_1stquin_expr.csv
+    wildcards: gene=FBgn0031080
+    resources: tmpdir=/tmp
+[Fri Nov 21 14:21:41 2025]
+Finished jobid: 2 (Rule: subset_expr_matrix)
+1 of 5 steps (20%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Fri Nov 21 14:21:41 2025]
+localrule calc_spearman_correlation:
+    input: results/gene_wise/expr/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081_5thquin_expr.csv
+    output: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv
+    jobid: 1
+    reason: Missing output files: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv; Input files updated by another job: results/gene_wise/expr/FBgn0031081_5thquin_expr.csv, results/gene_wise/expr/FBgn0031081_1stquin_expr.csv
+    wildcards: gene=FBgn0031081
+    resources: tmpdir=/tmp
+[Fri Nov 21 14:21:42 2025]
+Finished jobid: 4 (Rule: subset_expr_matrix)
+2 of 5 steps (40%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Fri Nov 21 14:21:42 2025]
+localrule calc_spearman_correlation:
+    input: results/gene_wise/expr/FBgn0031080_1stquin_expr.csv, results/gene_wise/expr/FBgn0031080_5thquin_expr.csv
+    output: results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv
+    jobid: 3
+    reason: Missing output files: results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv; Input files updated by another job: results/gene_wise/expr/FBgn0031080_5thquin_expr.csv, results/gene_wise/expr/FBgn0031080_1stquin_expr.csv
+    wildcards: gene=FBgn0031080
+    resources: tmpdir=/tmp
+[Fri Nov 21 16:01:36 2025]
+Finished jobid: 3 (Rule: calc_spearman_correlation)
+3 of 5 steps (60%) done
+[Fri Nov 21 16:04:59 2025]
+Finished jobid: 1 (Rule: calc_spearman_correlation)
+4 of 5 steps (80%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Fri Nov 21 16:04:59 2025]
+localrule all:
+    input: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv
+    jobid: 0
+    reason: Input files updated by another job: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_5thquin_spearman.csv, results/gene_wise/spearman/FBgn0031080_1stquin_spearman.csv
+    resources: tmpdir=/tmp
+[Fri Nov 21 16:04:59 2025]
+Finished jobid: 0 (Rule: all)
+5 of 5 steps (100%) done
+Complete log(s): /tmp/global2/gthornes/dronetanalysis/.snakemake/log/2025-11-21T142137.008637.snakemake.log

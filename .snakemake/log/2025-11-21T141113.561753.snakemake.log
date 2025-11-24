@@ -1,0 +1,69 @@
+Assuming unrestricted shared filesystem usage.
+host: chimi
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 2
+Rules claiming more threads will be scaled down.
+Job stats:
+job                          count
+-------------------------  -------
+all                              1
+calc_spearman_correlation        2
+subset_expr_matrix               1
+total                            4
+
+Select jobs to execute...
+Failed to solve scheduling problem with ILP solver, falling back to greedy scheduler. You likely have to fix your ILP solver installation. Error message: PULP_CBC_CMD: Not Available (check permissions on cbc)
+Execute 2 jobs...
+[Fri Nov 21 14:11:13 2025]
+localrule calc_spearman_correlation:
+    input: results/gene_wise/expr/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081_5thquin_expr.csv
+    output: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv
+    jobid: 1
+    reason: Missing output files: results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv
+    wildcards: gene=FBgn0031081
+    resources: tmpdir=/tmp
+[Fri Nov 21 14:11:13 2025]
+localrule subset_expr_matrix:
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031082_1stquin_expr.csv, results/gene_wise/expr/FBgn0031082_5thquin_expr.csv
+    jobid: 4
+    reason: Missing output files: results/gene_wise/expr/FBgn0031082_5thquin_expr.csv, results/gene_wise/expr/FBgn0031082_1stquin_expr.csv
+    wildcards: gene=FBgn0031082
+    resources: tmpdir=/tmp
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 71:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031082             --output-1st results/gene_wise/expr/FBgn0031082_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031082_5thquin_expr.csv             --n-bins 5' returned non-zero exit status 1.
+[Fri Nov 21 14:11:15 2025]
+Error in rule subset_expr_matrix:
+    message: None
+    jobid: 4
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031082_1stquin_expr.csv, results/gene_wise/expr/FBgn0031082_5thquin_expr.csv
+    shell:
+        
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031082             --output-1st results/gene_wise/expr/FBgn0031082_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031082_5thquin_expr.csv             --n-bins 5
+        
+        (command exited with non-zero exit code)
+Terminating processes on user request, this might take some time.
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 92:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/spearman_corr/spearman_matrix.R             --input results/gene_wise/expr/FBgn0031081_1stquin_expr.csv             --output results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv             --method spearman             --use pairwise.complete.obs
+         Rscript src/scripts/spearman_corr/spearman_matrix.R             --input results/gene_wise/expr/FBgn0031081_5thquin_expr.csv             --output results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv             --method spearman             --use pairwise.complete.obs' returned non-zero exit status 1.
+[Fri Nov 21 14:12:43 2025]
+Error in rule calc_spearman_correlation:
+    message: None
+    jobid: 1
+    input: results/gene_wise/expr/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081_5thquin_expr.csv
+    output: results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv, results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv
+    shell:
+        
+        Rscript src/scripts/spearman_corr/spearman_matrix.R             --input results/gene_wise/expr/FBgn0031081_1stquin_expr.csv             --output results/gene_wise/spearman/FBgn0031081_1stquin_spearman.csv             --method spearman             --use pairwise.complete.obs
+         Rscript src/scripts/spearman_corr/spearman_matrix.R             --input results/gene_wise/expr/FBgn0031081_5thquin_expr.csv             --output results/gene_wise/spearman/FBgn0031081_5thquin_spearman.csv             --method spearman             --use pairwise.complete.obs
+        
+        (command exited with non-zero exit code)
+Complete log(s): /tmp/global2/gthornes/dronetanalysis/.snakemake/log/2025-11-21T141113.561753.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

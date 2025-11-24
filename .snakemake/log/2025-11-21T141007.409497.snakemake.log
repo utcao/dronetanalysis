@@ -1,0 +1,72 @@
+Assuming unrestricted shared filesystem usage.
+host: chimi
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 2
+Rules claiming more threads will be scaled down.
+Job stats:
+job                          count
+-------------------------  -------
+all                              1
+cal_diff_networks                2
+cal_network_features             2
+calc_spearman_correlation        2
+create_network                   2
+subset_expr_matrix               1
+subset_features_neighbors        2
+total                           12
+
+Select jobs to execute...
+Failed to solve scheduling problem with ILP solver, falling back to greedy scheduler. You likely have to fix your ILP solver installation. Error message: PULP_CBC_CMD: Not Available (check permissions on cbc)
+Execute 2 jobs...
+[Fri Nov 21 14:10:07 2025]
+localrule subset_expr_matrix:
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031082_1stquin_expr.csv, results/gene_wise/expr/FBgn0031082_5thquin_expr.csv
+    jobid: 9
+    reason: Missing output files: results/gene_wise/expr/FBgn0031082_1stquin_expr.csv, results/gene_wise/expr/FBgn0031082_5thquin_expr.csv
+    wildcards: gene=FBgn0031082
+    resources: tmpdir=/tmp
+[Fri Nov 21 14:10:07 2025]
+localrule create_network:
+    input: results/gene_wise/expr/FBgn0031081_1stquin_expr.csv, results/gene_wise/expr/FBgn0031081_5thquin_expr.csv
+    output: results/gene_wise/networks/FBgn0031081_1stquin_network.csv, results/gene_wise/networks/FBgn0031081_5thquin_network.csv
+    jobid: 3
+    reason: Missing output files: results/gene_wise/networks/FBgn0031081_5thquin_network.csv, results/gene_wise/networks/FBgn0031081_1stquin_network.csv
+    wildcards: gene=FBgn0031081
+    resources: tmpdir=/tmp
+Select jobs to execute...
+RuleException:
+CalledProcessError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 74:
+Command 'set -euo pipefail;  
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031082             --output-1st results/gene_wise/expr/FBgn0031082_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031082_5thquin_expr.csv             --n-bins 5' returned non-zero exit status 1.
+[Fri Nov 21 14:10:09 2025]
+Error in rule subset_expr_matrix:
+    message: None
+    jobid: 9
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031082_1stquin_expr.csv, results/gene_wise/expr/FBgn0031082_5thquin_expr.csv
+    shell:
+        
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031082             --output-1st results/gene_wise/expr/FBgn0031082_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031082_5thquin_expr.csv             --n-bins 5
+        
+        (command exited with non-zero exit code)
+[Fri Nov 21 14:10:09 2025]
+Finished jobid: 3 (Rule: create_network)
+1 of 12 steps (8%) done
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look below for error messages
+[Fri Nov 21 14:10:09 2025]
+Error in rule subset_expr_matrix:
+    message: None
+    jobid: 9
+    input: dataset/processed/VOOM/voomdataCtrl.txt
+    output: results/gene_wise/expr/FBgn0031082_1stquin_expr.csv, results/gene_wise/expr/FBgn0031082_5thquin_expr.csv
+    shell:
+        
+        Rscript src/scripts/preprocess/subset_expr_by_gene_quintile.R             --expr-matrix dataset/processed/VOOM/voomdataCtrl.txt             --target-gene FBgn0031082             --output-1st results/gene_wise/expr/FBgn0031082_1stquin_expr.csv             --output-5th results/gene_wise/expr/FBgn0031082_5thquin_expr.csv             --n-bins 5
+        
+        (command exited with non-zero exit code)
+Complete log(s): /tmp/global2/gthornes/dronetanalysis/.snakemake/log/2025-11-21T141007.409497.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

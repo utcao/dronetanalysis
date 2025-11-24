@@ -1,0 +1,3 @@
+NameError in file "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 54:
+name 'OUTDIR_SPEARMAN_CAL' is not defined
+  File "/tmp/global2/gthornes/dronetanalysis/src/pipelines/Snakemake_template", line 54, in <module>
