@@ -43,17 +43,19 @@ def outfile(section, gene, desc):
 ###########################################
 # Final rule: build everything
 ###########################################
-
 rule all:
     input:
         # neighbor features
         expand("{outdir}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_SUBSET_EXPR, gene=GENES, desc_body = DESC_SUBSET_EXPR,
+            suffix = TAB_SUFFIX),
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
             suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
             suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
             suffix = TAB_SUFFIX)
 
@@ -117,7 +119,7 @@ rule adjacency_matrix:
     input:
         [f"{OUTDIR_SPEARMAN_COR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SPEARMAN_COR]
     output:
-        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     params:
         script = "src/scripts/soft_threshold/adjacency_matrix.R",
         output_dir = OUTDIR_ADJACENCY_MATRIX[0]+"/{gene}"
@@ -137,7 +139,7 @@ rule adjacency_matrix:
 
 rule create_network:
     input:
-        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     output:
         [f"{OUTDIR_CREATE_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_CREATE_NET]
     params:
@@ -182,7 +184,7 @@ rule cal_diff_networks:
 
 rule cal_gene_features:
     input:
-        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     output:
         [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}" for i in DESC_GENE_FEATURES]
     params:
