@@ -1,4 +1,5 @@
 configfile: "config/config.yaml"
+from logging import config
 import os
 # # Get the current working directory
 # current_directory = os.getcwd()
@@ -22,16 +23,16 @@ DESC_SUBSET_EXPR = as_list(config["subset_expr_matrix"]["desc_body"])
 DESC_SPEARMAN_COR=as_list(config["spearman_correlation"]["desc_body"])
 DESC_ADJACENCY_MATRIX=as_list(config["adjacency_matrix"]["desc_body"])
 DESC_CREATE_NET = as_list(config["create_network"]["desc_body"])
+DESC_GENE_FEATURES = as_list(config["cal_gene_features"]["desc_body"])
 DESC_DIFF_NET = as_list(config["cal_diff_networks"]["desc_body"])
-DESC_NET_FEATURES = as_list(config["cal_network_features"]["desc_body"])
 DESC_NEIGHBORS = as_list(config["subset_features_neighbors"]["desc_body"])
 
 OUTDIR_SUBSET_EXPR = as_list(config["subset_expr_matrix"]['output_dirs'])
 OUTDIR_SPEARMAN_COR=as_list(config["spearman_correlation"]['output_dirs'])
 OUTDIR_ADJACENCY_MATRIX=as_list(config["adjacency_matrix"]['output_dirs'])
 OUTDIR_CREATE_NET = as_list(config["create_network"]['output_dirs'])
+OUTDIR_GENE_FEATURES = as_list(config["cal_gene_features"]['output_dirs'])
 OUTDIR_DIFF_NET = as_list(config["cal_diff_networks"]['output_dirs'])
-OUTDIR_NET_FEATURES = as_list(config["cal_network_features"]['output_dirs'])
 OUTDIR_NEIGHBORS = as_list(config["subset_features_neighbors"]['output_dirs'])
 
 TAB_SUFFIX = "csv"
@@ -109,6 +110,7 @@ rule calc_spearman_correlation:
 ###########################################
 # 3. adjacency matrix
 ###########################################
+
 rule adjacency_matrix:
     input:
         [f"{OUTDIR_SPEARMAN_COR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SPEARMAN_COR]
@@ -126,8 +128,9 @@ rule adjacency_matrix:
             --input {input[1]} \
             --output-dir {params.output_dir} \
         """
+
 ###########################################
-# 4. create_network
+# 4. module and hub calculation
 ###########################################
 
 rule create_network:
@@ -139,17 +142,36 @@ rule create_network:
         script="src/scripts/network_metrics/nm_and_modules.R",
         output_dir = OUTDIR_CREATE_NET
     shell:
-        f"""
+        """
         Rscript {params.script} \
-            -- adjacency-file {input[0]} \
+            --adjacency-file {input[0]} \
             --output-dir {params.output_dir}  &&\
         Rscript {params.script} \
-            -- adjacency-file {input[1]} \
+            --adjacency-file {input[1]} \
             --output-dir {params.output_dir}
         """
 
 ###########################################
-# 5. diff_network
+# 5. gene features
+###########################################
+
+rule cal_gene_features:
+    input:
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
+    output:
+        [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
+    params:
+        script="src/scripts/gene_metrics/gene_level_metrics.R"
+        output_dir = OUTDIR_GENE_FEATURES
+    shell:
+        f"""
+        Rscript {params.script} \
+            --adjacency_file {input[0]} \
+            --output_dir {params.output_dir}
+        """
+
+###########################################
+# 6. diff_network
 ###########################################
 
 rule cal_diff_networks:
@@ -163,10 +185,10 @@ rule cal_diff_networks:
         shell(f"touch {output}")
 
 # ###########################################
-# # 6. network features
+# # 7. network features
 # ###########################################
 
-rule cal_network_features:
+rule :
     input:
         lambda wc: outfile("create_network", wc.gene, DESC_CREATE_NET),
         lambda wc: outfile("cal_diff_networks", wc.gene, DESC_DIFF_NET)
@@ -178,7 +200,7 @@ rule cal_network_features:
         shell(f"touch {output}")
 
 ###########################################
-# 7. neighbor features
+# 8. neighbor features
 ###########################################
 
 rule subset_features_neighbors:

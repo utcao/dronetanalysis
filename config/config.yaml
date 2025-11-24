@@ -48,7 +48,6 @@ spearman_correlation_files:
 network_feature_files:
   soft_threshold_files:
     - "results/network_features/soft_threshold/soft_thresholded_adjacency_matrix.csv"
-    - "results/network_features/soft_threshold/unsigned/unsigned_soft_thresholded_adjacency_matrix.csv"
 
 # arguments for each steps
 genes:
@@ -71,18 +70,18 @@ adjacency_matrix:
   suffix: "csv"
 
 create_network:
-  output_dirs: "results/gene_wise/networks"
-  desc_body: ["_1stquin_network", "_5thquin_network"]
+  output_dirs: "results/gene_wise/modules"
+  desc_body: ["_1stquin_modules", "_5thquin_modules"]
+  suffix: "csv"
+
+cal_gene_features:
+  output_dirs: "results/gene_wise/features"
+  desc_body: ["_feats_diff_network", "_feats_1stquin_network", "_feats_5thquin_network"]
   suffix: "csv"
 
 cal_diff_networks:
   output_dirs: "results/gene_wise/networks"
   desc_body: "_diff_network"
-  suffix: "csv"
-
-cal_network_features:
-  output_dirs: "results/gene_wise/features"
-  desc_body: ["_feats_diff_network", "_feats_1stquin_network", "_feats_5thquin_network"]
   suffix: "csv"
 
 subset_features_neighbors:
