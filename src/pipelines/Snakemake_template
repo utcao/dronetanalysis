@@ -31,7 +31,7 @@ OUTDIR_SPEARMAN_COR=as_list(config["spearman_correlation"]['output_dirs'])
 OUTDIR_ADJACENCY_MATRIX=as_list(config["adjacency_matrix"]['output_dirs'])
 OUTDIR_CREATE_NET = as_list(config["create_network"]['output_dirs'])
 OUTDIR_GENE_FEATURES = as_list(config["cal_gene_features"]['output_dirs'])
-OUTDIR_DIFF_NET = as_list(config["cal_diff_networks"]['output_dirs'])
+OUTDIR_DIFF_TOM = as_list(config["cal_diff_networks"]['output_dirs'])
 OUTDIR_NEIGHBORS = as_list(config["subset_features_neighbors"]['output_dirs'])
 
 TAB_SUFFIX = "csv"
@@ -53,7 +53,7 @@ rule all:
         expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
             suffix = TAB_SUFFIX),
-        expand(f"{outdir}/{gene}/{gene}{desc_body}.{suffix}",
+        expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
             suffix = TAB_SUFFIX)
 
@@ -162,20 +162,18 @@ rule create_network:
 
 rule cal_diff_networks:
     input:
-        
+        [f"{OUTDIR_CREATE_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_CREATE_NET]
     output:
-        [f"{OUTDIR_DIFF_NET[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
+        [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
     params:
         script="src/scripts/diff_tom/diff_tom.R",
-        output_dir = OUTDIR_DIFF_NET[0]+"/{gene}"
+        output_dir = OUTDIR_DIFF_TOM[0]+"/{gene}_diff_tom"
     shell:
         """
         Rscript {params.script} \
-            --input {input[0]} \
-            --output-dir {params.output_dir}  &&\
-        Rscript {params.script} \
-            --input {input[1]} \
-            --output-dir {params.output_dir}
+            --tom-1st {input[0]} \
+            --tom-5th {input[1]} \
+            --output-dir {output}
         """
 
 ###########################################

@@ -74,14 +74,14 @@ create_network:
   desc_body: ["_1stquin_tom", "_5thquin_tom"]
   suffix: "csv"
 
+cal_diff_networks:
+  output_dirs: "results/gene_wise/diff_tom_network"
+  desc_body: ["_diff_tom_network"]
+  suffix: "csv"
+
 cal_gene_features:
   output_dirs: "results/gene_wise/features"
   desc_body: ["_feats_diff_network", "_feats_1stquin_network", "_feats_5thquin_network"]
-  suffix: "csv"
-
-cal_diff_networks:
-  output_dirs: "results/gene_wise/networks"
-  desc_body: "_diff_network"
   suffix: "csv"
 
 subset_features_neighbors:
