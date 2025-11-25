@@ -48,7 +48,17 @@ args <- parser$parse_args()
 
 prefix <- args$prefix
 output_dir <- args$output_dir
-module_output_dir <- file.path(output_dir)
+
+parent_dir <- dirname(output_dir)
+if (str_detect(parent_dir, "modules$")) {
+  tom_basedir <- basename(output_dir)
+  tom_dir <- file.path(parent_dir, tom_basedir)
+  dir_tom_file <- output_dir
+  module_output_dir <- file.path(tom_dir, prefix)
+
+}else{
+  stop("Output directory must be within a 'modules' folder.")
+}
 
 cat("=== Network Metrics Analysis ===\n")
 cat("Adjacency file:", args$adjacency_file, "\n")
@@ -64,8 +74,7 @@ adjacency <- read.csv(args$adjacency_file)
 cat("Adjacency matrix loaded:", nrow(adjacency), "x", ncol(adjacency), "\n\n")
 
 # Create output directory if it doesn't exist
-create_directories(output_dir)
-create_directories(module_output_dir)
+walk(c(output_dir, module_output_dir), create_directories)
 
 # ----- 4. Calculate network-level summary statistics -----
 
@@ -130,8 +139,8 @@ adjacency_hubs <- identify_hubs(
 )
 
 # Save TOM matrices (from the module results)
-tom_file <- file.path(module_output_dir,  paste0(prefix,"_tom.csv"))
-tomd_file <- file.path(module_output_dir,  paste0(prefix,"_tomd_matrix.csv"))
+tom_file <- file.path(tom_dir,  paste0(prefix,"_tom.csv"))
+tomd_file <- file.path(tom_dir,  paste0(prefix,"_tomd.csv"))
 
 write.csv(adjacency_modules$tom_matrix, file = tom_file, row.names = TRUE)
 write.csv(adjacency_modules$tomd_matrix, file = tomd_file, row.names = TRUE)

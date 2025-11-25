@@ -50,7 +50,11 @@ args <- parser$parse_args()
 output_dir <- args$output_dir
 module_output_dir <- file.path(output_dir, "modules")
 
+# Extract gene name from output directory (assumes dir ends with gene name)
+gene_name <- basename(output_dir)
+
 cat("=== Differential TOM Analysis ===\n")
+cat("Target gene:", gene_name, "\n")
 cat("TOM matrix 1 (bottom quintile):", args$tom_1st, "\n")
 cat("TOM matrix 2 (top quintile):", args$tom_5th, "\n")
 cat("Output directory:", output_dir, "\n")
@@ -146,7 +150,7 @@ cat("  Median difference:", round(median(diff_tom[upper.tri(diff_tom)]), 4), "\n
 # ----- 7. Save differential TOM -----
 cat("Saving differential TOM matrix...\n")
 
-diff_tom_file <- file.path(output_dir, "differential_tom_matrix.csv")
+diff_tom_file <- file.path(output_dir, paste0(gene_name, "_diff_tom_matrix.csv"))
 diff_tom_df <- as.data.frame(diff_tom)
 diff_tom_df <- cbind(gene = rownames(diff_tom), diff_tom_df)
 write.csv(diff_tom_df, file = diff_tom_file, row.names = FALSE)
@@ -171,7 +175,7 @@ summary_stats <- data.frame(
 )
 
 # Save summary statistics
-summary_file <- file.path(output_dir, "diff_tom_network_metrics.csv")
+summary_file <- file.path(output_dir, paste0(gene_name, "_diff_tom_network_metrics.csv"))
 write.csv(summary_stats, file = summary_file, row.names = FALSE)
 
 cat("\n=== Differential TOM Network Statistics ===\n")
@@ -223,7 +227,7 @@ gene_diff_metrics$diff_degree <- diff_tom_metrics$degree
 # Sort by mean differential TOM (genes with largest average changes)
 gene_diff_metrics <- gene_diff_metrics[order(-gene_diff_metrics$mean_diff_tom), ]
 
-gene_metrics_file <- file.path(output_dir, "gene_differential_metrics.csv")
+gene_metrics_file <- file.path(output_dir, paste0(gene_name, "_gene_differential_metrics.csv"))
 write.csv(gene_diff_metrics, file = gene_metrics_file, row.names = FALSE)
 
 cat("  Gene-level metrics saved:", gene_metrics_file, "\n")
@@ -238,11 +242,10 @@ cat("  Genes in grey module (no differential pattern):", sum(diff_modules$final_
 cat("  Mean TOM difference:", round(mean(diff_tom[upper.tri(diff_tom)]), 4), "\n\n")
 
 cat("Files generated:\n")
-cat("  1. differential_tom_matrix.csv - Full differential TOM matrix\n")
-cat("  2. diff_tom_network_metrics.csv - Network-level statistics\n")
-cat("  3. gene_differential_metrics.csv - Gene-level differential metrics\n")
-cat("  4. diff_tom_threshold_analysis.pdf - Diagnostic plots\n")
-cat("  5. modules/ - Module detection results and hub genes\n\n")
+cat("  1.", paste0(gene_name, "_differential_tom_matrix.csv"), "- Full differential TOM matrix\n")
+cat("  2.", paste0(gene_name, "_diff_tom_network_metrics.csv"), "- Network-level statistics\n")
+cat("  3.", paste0(gene_name, "_gene_differential_metrics.csv"), "- Gene-level differential metrics\n")
+cat("  4. modules/ - Module detection results and hub genes\n\n")
 
 cat("Interpretation:\n")
 cat("  - Differential TOM shows which genes change their network position\n")

@@ -37,9 +37,10 @@ config <- yaml::read_yaml("config/config.yaml")
 
 # ----- Command-line arguments (override config values) -----
 parser <- ArgumentParser(description = 'Calculate gene-level network metrics')
-parser$add_argument('--adjacency-file', help = 'Path to soft-thresholded adjacency CSV (wide format).', default = config$network_feature_files$soft_threshold_files)
-parser$add_argument('--output-dir', help = 'Directory to write gene metrics output.', default = file.path(config$output_dirs$network_features_dir, 'gene_metrics'))
-parser$add_argument('--matrix-type', help = "Which matrix to process: 'both', 'adjacency', or 'spearman'", default = 'adjacency')
+parser$add_argument('--adjacency_file', help = 'Path to soft-thresholded adjacency CSV (wide format).', default = config$network_feature_files$soft_threshold_files)
+parser$add_argument('--output_dir', help = 'Directory to write gene metrics output.', default = file.path(config$output_dirs$network_features_dir, 'gene_metrics'))
+parser$add_argument('--prefix', help = 'Prefix for output files.', default = 'gene_metrics')
+parser$add_argument('--matrix_type', help = "Which matrix to process: 'both', 'adjacency', or 'spearman'", default = 'adjacency')
 parser$add_argument('--threshold', type = 'double', help = 'Connection threshold for binary metrics (passed to calculate_gene_level_metrics)', default = 0.01)
 args <- parser$parse_args()
 
@@ -47,8 +48,17 @@ adjacency_file <- args$adjacency_file
 output_dir <- args$output_dir
 matrix_type <- tolower(args$matrix_type)
 threshold <- args$threshold
+prefix <- args$prefix
 adjacency_results_dir <- file.path(args$output_dir, "features_calc/adjacency/modules")
+output_dir <- args$output_dir
 
+parent_dir <- dirname(output_dir)
+if (str_detect(parent_dir, "$")) {
+  tom_basedir <- basename(output_dir)
+  tom_dir <- file.path(parent_dir, tom_basedir)
+  dir_tom_file <- output_dir
+  module_output_dir <- file.path(tom_dir, prefix)
+}
 create_directories(output_dir)
 
 # ----- 4. Load matrices -----

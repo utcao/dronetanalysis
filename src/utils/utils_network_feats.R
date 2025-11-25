@@ -1,6 +1,7 @@
 suppressPackageStartupMessages({
     library(purrr)
     library(data.table)
+    library(dplyr)
     library(glue)
     library(stringr)
     library(ggplot2)
