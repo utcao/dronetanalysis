@@ -34,5 +34,6 @@ dag.pdf
 dag.svg
 .snakemake/metadata
 .snakemake/incomplete
+.snakemake/log
 .snakemake/locks
 .snakemake/tmp

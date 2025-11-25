@@ -70,7 +70,7 @@ adjacency_matrix:
   suffix: "csv"
 
 create_network:
-  output_dirs: "results/gene_wise/modules"
+  output_dirs: "results/gene_wise/modules/tom"
   desc_body: ["_1stquin", "_5thquin"]
   suffix: "csv"
 
@@ -80,7 +80,7 @@ cal_diff_networks:
   suffix: "csv"
 
 cal_gene_features:
-  output_dirs: "results/gene_wise/features"
+  output_dirs: "results/gene_wise/gene_metrics"
   desc_body: ["_feats_diff_network", "_feats_1stquin_network", "_feats_5thquin_network"]
   suffix: "csv"
 
