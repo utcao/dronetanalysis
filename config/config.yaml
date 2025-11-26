@@ -79,14 +79,17 @@ cal_diff_networks:
   desc_body: ["_diff_tom_network"]
   suffix: "csv"
 
+cal_diff_networks_adj:
+  output_dirs_adj: "results/gene_wise/diff_adjacency_network"
+  desc_body_adj: ["_diff_adjacency_network"]
+  suffix_adj: "csv"
+
 cal_gene_features:
   output_dirs: "results/gene_wise/gene_metrics"
-  desc_body: ["_feats_diff_network", "_feats_1stquin_network", "_feats_5thquin_network"]
+  desc_body: ["_feats_1stquin_network", "_feats_5thquin_network", "_feats_diff_network"]
   suffix: "csv"
 
-subset_features_neighbors:
-  output_dirs: "results/gene_wise/neighbors"
-  desc_body: ["_feats_1stlayer_diff_network", "_feats_2ndlayer_diff_network",
-              "_feats_1stlayer_1stquin_network", "_feats_2ndlayer_1stquin_network",
-              "_feats_1stlayer_5thquin_network", "_feats_2ndlayer_5thquin_network"]
-  neighbour_layers: [1,2]
+subset_features_neighbours:
+  output_dirs: "results/gene_wise/neighbours"
+  desc_body: ["_layer1_neighbours", "_layer2_neighbours", "_all_layers_neighbours"]
+  neighbour_layers: ["1,2"]

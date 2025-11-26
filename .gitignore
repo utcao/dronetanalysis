@@ -37,3 +37,4 @@ dag.svg
 .snakemake/log
 .snakemake/locks
 .snakemake/tmp
+bashrc_fix

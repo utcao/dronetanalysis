@@ -24,7 +24,8 @@ DESC_ADJACENCY_MATRIX=as_list(config["adjacency_matrix"]["desc_body"])
 DESC_CREATE_NET = as_list(config["create_network"]["desc_body"])
 DESC_GENE_FEATURES = as_list(config["cal_gene_features"]["desc_body"])
 DESC_DIFF_NET = as_list(config["cal_diff_networks"]["desc_body"])
-DESC_NEIGHBORS = as_list(config["subset_features_neighbors"]["desc_body"])
+DESC_DIFF_ADJ = as_list(config["cal_diff_networks_adj"]["desc_body_adj"])
+DESC_NEIGHBOURS = as_list(config["subset_features_neighbours"]["desc_body"])
 
 OUTDIR_SUBSET_EXPR = as_list(config["subset_expr_matrix"]['output_dirs'])
 OUTDIR_SPEARMAN_COR=as_list(config["spearman_correlation"]['output_dirs'])
@@ -32,7 +33,8 @@ OUTDIR_ADJACENCY_MATRIX=as_list(config["adjacency_matrix"]['output_dirs'])
 OUTDIR_CREATE_NET = as_list(config["create_network"]['output_dirs'])
 OUTDIR_GENE_FEATURES = as_list(config["cal_gene_features"]['output_dirs'])
 OUTDIR_DIFF_TOM = as_list(config["cal_diff_networks"]['output_dirs'])
-OUTDIR_NEIGHBORS = as_list(config["subset_features_neighbors"]['output_dirs'])
+OUTDIR_DIFF_ADJ = as_list(config["cal_diff_networks_adj"]['output_dirs_adj'])
+OUTDIR_NEIGHBOURS = as_list(config["subset_features_neighbours"]['output_dirs'])
 
 TAB_SUFFIX = "csv"
 
@@ -46,7 +48,7 @@ def outfile(section, gene, desc):
 
 rule all:
     input:
-        # neighbor features
+        # NEIGHBOUR features
         expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
             suffix = TAB_SUFFIX),
@@ -60,12 +62,18 @@ rule all:
             outdir=OUTDIR_DIFF_TOM, gene=GENES, desc_body = DESC_DIFF_NET,
             suffix = TAB_SUFFIX),
         expand("{outdir}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_DIFF_ADJ, gene=GENES, desc_body = DESC_DIFF_ADJ,
+            suffix = TAB_SUFFIX),
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_GENE_FEATURES, gene=GENES, desc_body = DESC_GENE_FEATURES,
+            suffix = TAB_SUFFIX),
+        expand("{outdir}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_NEIGHBOURS, gene=GENES, desc_body = DESC_NEIGHBOURS,
             suffix = TAB_SUFFIX)
         # [
-        #     f"{OUTDIR_NEIGHBORS[0]}/{gene}{desc}.{TAB_SUFFIX}"
+        #     f"{OUTDIR_NEIGHBOURS[0]}/{gene}{desc}.{TAB_SUFFIX}"
         #     for gene in GENES
-        #     for desc in DESC_NEIGHBORS
+        #     for desc in DESC_NEIGHBOURS
         # ]
         
 ###########################################
@@ -183,23 +191,24 @@ rule cal_diff_tom_networks:
             --output-dir {params.output_dir}
         """
 
-# rule cal_diff_adj_networks:
-#     input:
-#         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
-#     output:
-#         [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
-#     params:
-#         script="src/scripts/diff_matrix/diff_tom.R",
-#         output_dir = OUTDIR_DIFF_TOM[0]+"/{gene}_diff_tom"
-#     log:
-#         f"{OUTDIR_DIFF_TOM[0]}/logs/{{gene}}_diff_tom.log"
-#     shell:
-#         """
-#         Rscript {params.script} \
-#             --tom-1st {input[0]} \
-#             --tom-5th {input[1]} \
-#             --output-dir {output}
-#         """
+rule cal_diff_adj_networks:
+    input:
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
+    output:
+        f"{OUTDIR_DIFF_ADJ[0]}/{{gene}}_diff_adjacency_network.{TAB_SUFFIX}"
+    params:
+        script="src/scripts/diff_matrix/diff_adjacency.R",
+        edge_hard_threshold = 0.1
+    log:
+        f"{OUTDIR_DIFF_ADJ[0]}/logs/{{gene}}_diff_adj.log"
+    shell:
+        """
+        Rscript {params.script} \
+            --adj-1st {input[0]} \
+            --adj-5th {input[1]} \
+            --output {output} \
+            --threshold {params.edge_hard_threshold}
+        """
 
 ###########################################
 # 6. gene features
@@ -207,37 +216,54 @@ rule cal_diff_tom_networks:
 
 rule cal_gene_features:
     input:
-        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
-#        [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
+        [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX],
+        [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
     output:
         [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
     params:
         script="src/scripts/gene_metrics/gene_level_metrics.R",
         output_dir = OUTDIR_GENE_FEATURES[0],
-        prefix=[f"{{gene}}{i}" for i in DESC_GENE_FEATURES]
+        prefix=[f"{{gene}}{i}" for i in DESC_GENE_FEATURES],
+        edge_hard_threshold=0.1
     shell:
         """
         Rscript {params.script} \
             --adjacency_file {input[0]} \
             --output_dir {params.output_dir} \
-            --prefix {params.prefix[0]} &&\
+            --prefix {params.prefix[0]} \
+            --threshold {params.edge_hard_threshold} &&\
         Rscript {params.script} \
             --adjacency_file {input[1]} \
             --output_dir {params.output_dir} \
-            --prefix {params.prefix[1]}
+            --prefix {params.prefix[1]} \
+            --threshold {params.edge_hard_threshold} &&\
+        Rscript {params.script} \
+            --adjacency_file {input[2]} \
+            --output_dir {params.output_dir} \
+            --prefix {params.prefix[2]} \
+            --threshold {params.edge_hard_threshold}    
         """
 
 ###########################################
-# 7. neighbor features
+# 7. Neighbour features
 ###########################################
 
-rule subset_features_neighbors:
+rule subset_features_neighbours:
     input:
-        lambda wc: outfile("cal_network_features", wc.gene, DESC_GENE_FEATURES)
+        diff_adj = f"{OUTDIR_DIFF_ADJ[0]}/{{gene}}_diff_adjacency_network.{TAB_SUFFIX}",
+        metrics_diff = f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}_feats_diff_network.{TAB_SUFFIX}"
     output:
-        [f"{OUTDIR_NEIGHBORS[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_NEIGHBORS]
+        [f"{OUTDIR_NEIGHBOURS[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_NEIGHBOURS]
+    params:
+        script="src/scripts/subset_features/subset_neighbour_features.R",
+        output_dir = OUTDIR_NEIGHBOURS[0],
+        neighbour_layers = ",".join(map(str, as_list(config["subset_features_neighbours"]['neighbour_layers'])))
     shell:
         """
-        echo "Neighbor features {wildcards.gene}"
-        touch {output}
+        Rscript {params.script} \
+            --focal_gene {wildcards.gene} \
+            --diff_adj_matrix {input.diff_adj} \
+            --gene_metrics_diff {input.metrics_diff} \
+            --output_dir {params.output_dir} \
+            --neighbour_layers {params.neighbour_layers}
         """
