@@ -52,13 +52,6 @@ prefix <- args$prefix
 adjacency_results_dir <- file.path(args$output_dir, "features_calc/adjacency/modules")
 output_dir <- args$output_dir
 
-parent_dir <- dirname(output_dir)
-if (str_detect(parent_dir, "$")) {
-  tom_basedir <- basename(output_dir)
-  tom_dir <- file.path(parent_dir, tom_basedir)
-  dir_tom_file <- output_dir
-  module_output_dir <- file.path(tom_dir, prefix)
-}
 create_directories(output_dir)
 
 # ----- 4. Load matrices -----
@@ -108,15 +101,15 @@ if (file.exists(adjacency_connectivity_file)) {
 cat("\n=== Saving Results ===\n")
 
 write.csv(adjacency_gene_metrics, 
-          file.path(output_dir, "adjacency_gene_metrics.csv"),
+          file.path(output_dir, paste0(prefix, ".csv")),
           row.names = FALSE)
     
-save(adjacency_gene_metrics, file = file.path(output_dir, "gene_metrics.RData"))
+save(adjacency_gene_metrics, file = file.path(output_dir, paste0(prefix, ".RData")))
 
 cat("Gene-level metrics saved to:", output_dir, "\n")
 cat("Files created:\n")
-cat("- adjacency_gene_metrics.csv\n")
-cat("- gene_metrics.RData\n")
+cat(paste0("- ", prefix, ".csv\n"))
+cat(paste0("- ", prefix, ".RData\n"))
 
 # ----- 8. Generate summary statistics -----
 cat("\n=== Summary Statistics ===\n")
