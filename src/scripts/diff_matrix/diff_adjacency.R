@@ -22,14 +22,14 @@ suppressPackageStartupMessages({
 
 # Command-line arguments
 parser <- ArgumentParser(description = 'Calculate differential adjacency matrix')
-parser$add_argument('--adj-1st', help = 'Path to first adjacency matrix',
+parser$add_argument('--adj_1st', help = 'Path to first adjacency matrix',
                    required = TRUE)
-parser$add_argument('--adj-5th', help = 'Path to second adjacency matrix',
+parser$add_argument('--adj_5th', help = 'Path to second adjacency matrix',
                    required = TRUE)
 parser$add_argument('--output', help = 'Path to save differential adjacency matrix',
                    required = TRUE)
 parser$add_argument('--threshold', type = 'double', help = 'Hard threshold to apply before differencing',
-                   default = 0.1)
+                   default = 0.01)
 args <- parser$parse_args()
 
 # Load first adjacency matrix
@@ -47,8 +47,8 @@ colnames(adj_5th_mat) <- gene_names
 
 # Apply hard thresholding to both matrices
 hard_threshold <- args$threshold
-adj_1st_mat[adj_1st_mat < hard_threshold] <- 0
-adj_5th_mat[adj_5th_mat < hard_threshold] <- 0
+adj_1st_mat[adj_1st_mat <= hard_threshold] <- 0
+adj_5th_mat[adj_5th_mat <= hard_threshold] <- 0
 
 # Calculate absolute difference
 diff_adj <- abs(adj_5th_mat - adj_1st_mat)

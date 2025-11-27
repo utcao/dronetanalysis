@@ -48,25 +48,25 @@ def outfile(section, gene, desc):
 
 rule all:
     input:
-        # NEIGHBOUR features
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
-            suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
-            suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}{desc_body}_tom.{suffix}",
-            outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
-            suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_DIFF_TOM, gene=GENES, desc_body = DESC_DIFF_NET,
-            suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_DIFF_ADJ, gene=GENES, desc_body = DESC_DIFF_ADJ,
-            suffix = TAB_SUFFIX),
-        expand("{outdir}/{gene}{desc_body}.{suffix}",
-            outdir=OUTDIR_GENE_FEATURES, gene=GENES, desc_body = DESC_GENE_FEATURES,
-            suffix = TAB_SUFFIX),
+        # # NEIGHBOUR features
+        # expand("{outdir}/{gene}{desc_body}.{suffix}",
+        #     outdir=OUTDIR_SPEARMAN_COR, gene=GENES, desc_body = DESC_SPEARMAN_COR,
+        #     suffix = TAB_SUFFIX),
+        # expand("{outdir}/{gene}{desc_body}.{suffix}",
+        #     outdir=OUTDIR_ADJACENCY_MATRIX, gene=GENES, desc_body = DESC_ADJACENCY_MATRIX,
+        #     suffix = TAB_SUFFIX),
+        # expand("{outdir}/{gene}{desc_body}_tom.{suffix}",
+        #     outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
+        #     suffix = TAB_SUFFIX),
+        # expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
+        #     outdir=OUTDIR_DIFF_TOM, gene=GENES, desc_body = DESC_DIFF_NET,
+        #     suffix = TAB_SUFFIX),
+        # expand("{outdir}/{gene}{desc_body}.{suffix}",
+        #     outdir=OUTDIR_DIFF_ADJ, gene=GENES, desc_body = DESC_DIFF_ADJ,
+        #     suffix = TAB_SUFFIX),
+        # expand("{outdir}/{gene}{desc_body}.{suffix}",
+        #     outdir=OUTDIR_GENE_FEATURES, gene=GENES, desc_body = DESC_GENE_FEATURES,
+        #     suffix = TAB_SUFFIX),
         expand("{outdir}/{gene}{desc_body}.{suffix}",
             outdir=OUTDIR_NEIGHBOURS, gene=GENES, desc_body = DESC_NEIGHBOURS,
             suffix = TAB_SUFFIX)
@@ -75,7 +75,7 @@ rule all:
         #     for gene in GENES
         #     for desc in DESC_NEIGHBOURS
         # ]
-        
+
 ###########################################
 # 1. subset_expr_matrix
 ###########################################
@@ -138,10 +138,10 @@ rule adjacency_matrix:
         """
         Rscript {params.script} \
             --input {input[0]} \
-            --output-dir {params.output_dir} &&\
+            --output_dir {params.output_dir} &&\
         Rscript {params.script} \
             --input {input[1]} \
-            --output-dir {params.output_dir} \
+            --output_dir {params.output_dir}
         """
 
 ###########################################
@@ -160,12 +160,12 @@ rule create_network:
     shell:
         """
         Rscript {params.script} \
-            --adjacency-file {input[0]} \
-            --output-dir {params.output_dir}  \
+            --adjacency_file {input[0]} \
+            --output_dir {params.output_dir}  \
             --prefix {params.prefix[0]} &&\
         Rscript {params.script} \
-            --adjacency-file {input[1]} \
-            --output-dir {params.output_dir} \
+            --adjacency_file {input[1]} \
+            --output_dir {params.output_dir} \
             --prefix {params.prefix[1]}
         """
 
@@ -186,9 +186,9 @@ rule cal_diff_tom_networks:
     shell:
         """
         Rscript {params.script} \
-            --tom-1st {input[0]} \
-            --tom-5th {input[1]} \
-            --output-dir {params.output_dir}
+            --tom_1st {input[0]} \
+            --tom_5th {input[1]} \
+            --output_dir {params.output_dir}
         """
 
 rule cal_diff_adj_networks:
@@ -198,14 +198,14 @@ rule cal_diff_adj_networks:
         f"{OUTDIR_DIFF_ADJ[0]}/{{gene}}_diff_adjacency_network.{TAB_SUFFIX}"
     params:
         script="src/scripts/diff_matrix/diff_adjacency.R",
-        edge_hard_threshold = 0.1
+        edge_hard_threshold=0.05
     log:
         f"{OUTDIR_DIFF_ADJ[0]}/logs/{{gene}}_diff_adj.log"
     shell:
         """
         Rscript {params.script} \
-            --adj-1st {input[0]} \
-            --adj-5th {input[1]} \
+            --adj_1st {input[0]} \
+            --adj_5th {input[1]} \
             --output {output} \
             --threshold {params.edge_hard_threshold}
         """
@@ -224,7 +224,7 @@ rule cal_gene_features:
         script="src/scripts/gene_metrics/gene_level_metrics.R",
         output_dir = OUTDIR_GENE_FEATURES[0],
         prefix=[f"{{gene}}{i}" for i in DESC_GENE_FEATURES],
-        edge_hard_threshold=0.1
+        edge_hard_threshold=0.05
     shell:
         """
         Rscript {params.script} \
