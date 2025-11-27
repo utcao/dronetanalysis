@@ -31,15 +31,15 @@ library(yaml)
 parser <- ArgumentParser(description = 'Create adjacency matrices and apply soft threshold')
 parser$add_argument('--input', type="character", default = "results/spearman_correlation/spearman_matrices/HS_spearman_correlation_matrix.csv",
                    help='Input correlation matrix file path')
-parser$add_argument('--output-dir', type="character", default = "results/network_features",
+parser$add_argument('--output_dir', type="character", default = "results/network_features",
                    help='Output directory for adjacency matrices and plots')
-parser$add_argument('--power-range', type="character", default="1:20",
+parser$add_argument('--power_range', type="character", default="1:20",
                    help='Power range for soft thresholding (e.g. "1:20")')
-parser$add_argument('--network-type', type="character", default="unsigned",
+parser$add_argument('--network_type', type="character", default="unsigned",
                    help='Network type (unsigned or signed)')
-parser$add_argument('--r2-threshold', type="double", default=0.9,
+parser$add_argument('--r2_threshold', type="double", default=0.9,
                    help='R^2 threshold for scale-free topology fit (default: 0.9)')
-parser$add_argument('--mean-k-threshold', type="double", default=100,
+parser$add_argument('--mean_k_threshold', type="double", default=100,
                    help='Maximum mean connectivity threshold (default: 100)')
 
 args <- parser$parse_args()

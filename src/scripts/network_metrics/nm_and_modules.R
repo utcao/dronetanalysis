@@ -29,20 +29,20 @@ source("src/utils/utils_network_feats.R")
 
 # ----- 3. Command-line arguments -----
 parser <- ArgumentParser(description = 'Calculate network features and identify modules from adjacency matrix')
-parser$add_argument('--adjacency-file', help = 'Path to soft-thresholded adjacency matrix CSV file',
+parser$add_argument('--adjacency_file', help = 'Path to soft-thresholded adjacency matrix CSV file',
                    default = 'results/network_features/soft_threshold/_st_adjacency_matrix.csv')
-parser$add_argument('--output-dir', help = 'Directory to save network metrics and module results', 
+parser$add_argument('--output_dir', help = 'Directory to save network metrics and module results', 
                    default = 'results/network_features/features_calc/_adjacency')
 parser$add_argument('--prefix', help = 'Prefix name of results')
-parser$add_argument('--connection-threshold', help = 'Connection threshold for degree calculation', 
+parser$add_argument('--connection_threshold', help = 'Connection threshold for degree calculation', 
                    default = 0.01, type = 'double')
-parser$add_argument('--min-module-size', help = 'Minimum module size for WGCNA', 
+parser$add_argument('--min_module_size', help = 'Minimum module size for WGCNA', 
                    default = 20, type = 'integer')
-parser$add_argument('--merge-threshold', help = 'Module merge threshold (height to merge similar modules)', 
+parser$add_argument('--merge_threshold', help = 'Module merge threshold (height to merge similar modules)', 
                    default = 0.15, type = 'double')
-parser$add_argument('--deep-split', help = 'Deep split parameter for module detection (0-4)', 
+parser$add_argument('--deep_split', help = 'Deep split parameter for module detection (0-4)', 
                    default = 3, type = 'integer')
-parser$add_argument('--top-n-hubs', help = 'Number of top hub genes to identify per module', 
+parser$add_argument('--top_n_hubs', help = 'Number of top hub genes to identify per module', 
                    default = 5, type = 'integer')
 args <- parser$parse_args()
 

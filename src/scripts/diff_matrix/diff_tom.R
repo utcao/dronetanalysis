@@ -29,21 +29,21 @@ source("src/utils/utils_network_feats.R")
 
 # ----- 3. Command-line arguments -----
 parser <- ArgumentParser(description = 'Calculate differential TOM and identify modules')
-parser$add_argument('--tom-1st', help = 'Path to first TOM matrix (bottom quintile)',
+parser$add_argument('--tom_1st', help = 'Path to first TOM matrix (bottom quintile)',
                    required = TRUE)
-parser$add_argument('--tom-5th', help = 'Path to second TOM matrix (top quintile)',
+parser$add_argument('--tom_5th', help = 'Path to second TOM matrix (top quintile)',
                    required = TRUE)
-parser$add_argument('--output-dir', help = 'Directory to save differential TOM results',
+parser$add_argument('--output_dir', help = 'Directory to save differential TOM results',
                    required = TRUE)
-parser$add_argument('--connection-threshold', help = 'Connection threshold for network metrics',
-                   default = 0.1, type = 'double')
-parser$add_argument('--min-module-size', help = 'Minimum module size for WGCNA',
+parser$add_argument('--connection_threshold', help = 'Connection threshold for network metrics',
+                   default = 0.01, type = 'double')
+parser$add_argument('--min_module_size', help = 'Minimum module size for WGCNA',
                    default = 20, type = 'integer')
-parser$add_argument('--merge-threshold', help = 'Module merge threshold',
+parser$add_argument('--merge_threshold', help = 'Module merge threshold',
                    default = 0.15, type = 'double')
-parser$add_argument('--deep-split', help = 'Deep split parameter for module detection (0-4)',
+parser$add_argument('--deep_split', help = 'Deep split parameter for module detection (0-4)',
                    default = 3, type = 'integer')
-parser$add_argument('--top-n-hubs', help = 'Number of top hub genes per module',
+parser$add_argument('--top_n_hubs', help = 'Number of top hub genes per module',
                    default = 5, type = 'integer')
 args <- parser$parse_args()
 

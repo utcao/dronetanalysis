@@ -51,8 +51,12 @@ network_feature_files:
 
 # arguments for each steps
 genes:
-- FBgn0031081
-- FBgn0031080
+# - FBgn0031081
+# - FBgn0031080
+  - FBgn0001233 # Hsp83
+  - FBgn0034720 # Liprin-γ
+  - FBgn0262739 # Arg1
+  - FBgn0037921 # Zaf1
 
 subset_expr_matrix:
   output_dirs: "results/gene_wise/expr"
@@ -76,7 +80,7 @@ create_network:
 
 cal_diff_networks:
   output_dirs: "results/gene_wise/diff_tom_network"
-  desc_body: ["_diff_tom_network"]
+  desc_body: ["_diff_tom_matrix"]
   suffix: "csv"
 
 cal_diff_networks_adj:
