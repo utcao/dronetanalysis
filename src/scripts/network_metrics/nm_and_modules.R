@@ -35,7 +35,7 @@ parser$add_argument('--output_dir', help = 'Directory to save network metrics an
                    default = 'results/network_features/features_calc/_adjacency')
 parser$add_argument('--prefix', help = 'Prefix name of results')
 parser$add_argument('--connection_threshold', help = 'Connection threshold for degree calculation', 
-                   default = 0.01, type = 'double')
+                   default = 0.05, type = 'double')
 parser$add_argument('--min_module_size', help = 'Minimum module size for WGCNA', 
                    default = 20, type = 'integer')
 parser$add_argument('--merge_threshold', help = 'Module merge threshold (height to merge similar modules)', 

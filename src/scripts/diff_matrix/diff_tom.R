@@ -36,7 +36,7 @@ parser$add_argument('--tom_5th', help = 'Path to second TOM matrix (top quintile
 parser$add_argument('--output_dir', help = 'Directory to save differential TOM results',
                    required = TRUE)
 parser$add_argument('--connection_threshold', help = 'Connection threshold for network metrics',
-                   default = 0.01, type = 'double')
+                   default = 0.07, type = 'double')
 parser$add_argument('--min_module_size', help = 'Minimum module size for WGCNA',
                    default = 20, type = 'integer')
 parser$add_argument('--merge_threshold', help = 'Module merge threshold',
