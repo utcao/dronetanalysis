@@ -58,9 +58,9 @@ rule all:
         # expand("{outdir}/{gene}{desc_body}_tom.{suffix}",
         #     outdir=OUTDIR_CREATE_NET, gene=GENES, desc_body = DESC_CREATE_NET,
         #     suffix = TAB_SUFFIX),
-        # expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
-        #     outdir=OUTDIR_DIFF_TOM, gene=GENES, desc_body = DESC_DIFF_NET,
-        #     suffix = TAB_SUFFIX),
+        expand("{outdir}/{gene}/{gene}{desc_body}.{suffix}",
+            outdir=OUTDIR_DIFF_TOM, gene=GENES, desc_body = DESC_DIFF_NET,
+            suffix = TAB_SUFFIX),
         # expand("{outdir}/{gene}{desc_body}.{suffix}",
         #     outdir=OUTDIR_DIFF_ADJ, gene=GENES, desc_body = DESC_DIFF_ADJ,
         #     suffix = TAB_SUFFIX),
@@ -148,7 +148,7 @@ rule adjacency_matrix:
 # 4. module and hub calculation
 ###########################################
 
-rule create_network:
+rule network_summary_modules:
     input:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     output:
@@ -156,17 +156,20 @@ rule create_network:
     params:
         script="src/scripts/network_metrics/nm_and_modules.R",
         output_dir = OUTDIR_CREATE_NET,
-        prefix=[f"{{gene}}{i}" for i in DESC_CREATE_NET]
+        prefix=[f"{{gene}}{i}" for i in DESC_CREATE_NET],
+        edge_hard_threshold=0.07
     shell:
         """
         Rscript {params.script} \
             --adjacency_file {input[0]} \
             --output_dir {params.output_dir}  \
-            --prefix {params.prefix[0]} &&\
+            --prefix {params.prefix[0]} \
+            --connection_threshold {params.edge_hard_threshold} &&\
         Rscript {params.script} \
             --adjacency_file {input[1]} \
             --output_dir {params.output_dir} \
-            --prefix {params.prefix[1]}
+            --prefix {params.prefix[1]} \
+            --connection_threshold {params.edge_hard_threshold}
         """
 
 ###########################################
@@ -180,7 +183,8 @@ rule cal_diff_tom_networks:
         [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
     params:
         script="src/scripts/diff_matrix/diff_tom.R",
-        output_dir = OUTDIR_DIFF_TOM[0]+"/{gene}"
+        output_dir = OUTDIR_DIFF_TOM[0]+"/{gene}",
+        edge_hard_threshold=0
     log:
         f"{OUTDIR_DIFF_TOM[0]}/logs/{{gene}}_diff_tom.log"
     shell:
@@ -188,7 +192,8 @@ rule cal_diff_tom_networks:
         Rscript {params.script} \
             --tom_1st {input[0]} \
             --tom_5th {input[1]} \
-            --output_dir {params.output_dir}
+            --output_dir {params.output_dir} \
+            --connection_threshold {params.edge_hard_threshold}
         """
 
 rule cal_diff_adj_networks:
@@ -198,7 +203,7 @@ rule cal_diff_adj_networks:
         f"{OUTDIR_DIFF_ADJ[0]}/{{gene}}_diff_adjacency_network.{TAB_SUFFIX}"
     params:
         script="src/scripts/diff_matrix/diff_adjacency.R",
-        edge_hard_threshold=0.05
+        edge_hard_threshold=0.07
     log:
         f"{OUTDIR_DIFF_ADJ[0]}/logs/{{gene}}_diff_adj.log"
     shell:
@@ -217,31 +222,31 @@ rule cal_diff_adj_networks:
 rule cal_gene_features:
     input:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX],
-        [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
+        f"{OUTDIR_DIFF_ADJ[0]}/{{gene}}_diff_adjacency_network.{TAB_SUFFIX}"
     output:
         [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
     params:
         script="src/scripts/gene_metrics/gene_level_metrics.R",
         output_dir = OUTDIR_GENE_FEATURES[0],
         prefix=[f"{{gene}}{i}" for i in DESC_GENE_FEATURES],
-        edge_hard_threshold=0.05
+        edge_hard_threshold=[0.07,0]
     shell:
         """
         Rscript {params.script} \
             --adjacency_file {input[0]} \
             --output_dir {params.output_dir} \
             --prefix {params.prefix[0]} \
-            --threshold {params.edge_hard_threshold} &&\
+            --threshold {params.edge_hard_threshold[0]} &&\
         Rscript {params.script} \
             --adjacency_file {input[1]} \
             --output_dir {params.output_dir} \
             --prefix {params.prefix[1]} \
-            --threshold {params.edge_hard_threshold} &&\
+            --threshold {params.edge_hard_threshold[0]} &&\
         Rscript {params.script} \
             --adjacency_file {input[2]} \
             --output_dir {params.output_dir} \
             --prefix {params.prefix[2]} \
-            --threshold {params.edge_hard_threshold}    
+            --threshold {params.edge_hard_threshold[1]}    
         """
 
 ###########################################

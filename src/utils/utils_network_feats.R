@@ -390,7 +390,7 @@ create_modules <- function(adjacency_matrix,
     }
     
     # Step 6: Plot module eigengene clustering if requested
-    if (save_plots && !is.null(output_dir) && !is.null(METree)) {
+    if (save_plots && !is.null(output_dir) && inherits(METree, "hclust") && !is.null(METree$height) && length(METree$height) > 1 && length(unique(module_colours)) > 1) {
         cat("Step 5: Saving module eigengene clustering plot...\n")
         pdf(file = file.path(output_dir, "module_eigengene_clustering.pdf"), 
             width = 10, height = 6)
@@ -402,8 +402,8 @@ create_modules <- function(adjacency_matrix,
              labels = paste("Merge threshold =", merge_threshold), 
              col = "red", cex = 0.8)
         dev.off()
-    } else if (is.null(METree)) {
-        cat("Skipping module eigengene clustering plot (no modules detected).\n")
+    } else {
+        cat("Skipping module eigengene clustering plot (no valid modules detected or dendrogram is degenerate).\n")
     }
     
     # Step 7: Merge close modules
