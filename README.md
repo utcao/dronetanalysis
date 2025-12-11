@@ -3,31 +3,50 @@ Identifying global modifiers using co-expression network analysis
 WGCNA pipeline script order:
 
 1. Preprocess data
-scr/preprocess/FinalProcessedDatasets.R
+src/scripts/preprocess/FinalProcessedDatasets.R
 
-2. Subset dataset
-scr/subset/01subset_dataset.R
+2. Subset dataset for testing (optional)
+src/scripts/subset/01subset_dataset.R
 
 3. Spearman correlation matrix generation
-scr/spearman_corr/spearman_matrix.R
+src/scripts/spearman_corr/spearman_matrix.R
 
 4. Adjacency thresholding
-scr/soft_threshold/adjacency_matrix.R
+src/scripts/soft_threshold/adjacency_matrix.R
 
-6. Calculate network-level features
-scr/network_metrics/network_metrics.R
+6. Calculate network-level features and WGCNA modules
+src/scripts/network_metrics/nm_and_modules.R
 
 7. Calculate gene-level features
-scr/gene_metrics/gene_level_metrics.R
+src/scripts/gene_metrics/gene_level_metrics.R
 
 8. Concatenate with expression data
-scr/gene_metrics/add_expression_data.R
+src/scripts/gene_metrics/add_expression_data.R
 
 9. Compare gene metrics between diets
-scr/analysis/compare_conditions.R
+src/scripts/analysis/compare_conditions.R
 
 10. Perform GO enrichment analysis
-scr/analysis/module_enrichment.R
+src/scripts/analysis/module_enrichment.R
 
 11. Visualise the networks with igraph
-scr/analysis/visualise_network.R
+src/scripts/analysis/visualise_network.R
+
+12. NetRep module preservation
+src/scripts/diff_matrix/module_preservation_netrep.R
+
+Quintile analysis-specific scripts:
+
+13 Subsetting of samples by gene expression
+src/scripts/preprocess/subset_expr_by_gene_quintile.R
+
+14.a) Adjacency difference matrix
+src/scripts/diff_matrix/diff_adjacency.R
+14.b) TOM difference matrix
+src/scripts/diff_matrix/diff_TOM.R
+
+15. Subset neighbours based on focal gene features
+src/scripts/subset_features/subset_neighbour_features.R
+
+16. Snakemake pipeline for quintile analysis
+src/pipelines/Snakemake_template
