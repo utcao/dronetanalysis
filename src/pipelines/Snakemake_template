@@ -86,7 +86,7 @@ rule subset_expr_matrix:
     output:
         [f"{OUTDIR_SUBSET_EXPR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SUBSET_EXPR]
     params:
-        script = "src/scripts/preprocess/subset_expr_by_gene_quintile.R"
+        script = "src/scripts/00preprocess/subset_expr_by_gene_quintile.R"
     shell:
         """
         Rscript {params.script} \
@@ -107,7 +107,7 @@ rule calc_spearman_correlation:
     output:
         [f"{OUTDIR_SPEARMAN_COR[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_SPEARMAN_COR]
     params:
-        script = "src/scripts/spearman_corr/spearman_matrix.R"
+        script = "src/scripts/10spearman_corr/spearman_matrix.R"
     shell:
         """
         Rscript {params.script} \
@@ -132,7 +132,7 @@ rule adjacency_matrix:
     output:
         [f"{OUTDIR_ADJACENCY_MATRIX[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_ADJACENCY_MATRIX]
     params:
-        script = "src/scripts/soft_threshold/adjacency_matrix.R",
+        script = "src/scripts/10WGCNA/adjacency_matrix.R",
         output_dir = OUTDIR_ADJACENCY_MATRIX[0]
     shell:
         """
@@ -154,7 +154,7 @@ rule network_summary_modules:
     output:
         [f"{OUTDIR_CREATE_NET[0]}/{{gene}}{i}_tom.{TAB_SUFFIX}" for i in DESC_CREATE_NET]
     params:
-        script="src/scripts/network_metrics/nm_and_modules.R",
+        script="src/scripts/12network_metrics/nm_and_modules.R",
         output_dir = OUTDIR_CREATE_NET,
         prefix=[f"{{gene}}{i}" for i in DESC_CREATE_NET],
         edge_hard_threshold=0.07
@@ -182,7 +182,7 @@ rule cal_diff_tom_networks:
     output:
         [f"{OUTDIR_DIFF_TOM[0]}/{{gene}}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_DIFF_NET]
     params:
-        script="src/scripts/diff_matrix/diff_tom.R",
+        script="src/scripts/11diff_matrix/diff_tom.R",
         output_dir = OUTDIR_DIFF_TOM[0]+"/{gene}",
         edge_hard_threshold=0
     log:
@@ -202,7 +202,7 @@ rule cal_diff_adj_networks:
     output:
         f"{OUTDIR_DIFF_ADJ[0]}/{{gene}}_diff_adjacency_network.{TAB_SUFFIX}"
     params:
-        script="src/scripts/diff_matrix/diff_adjacency.R",
+        script="src/scripts/11diff_matrix/diff_adjacency.R",
         edge_hard_threshold=0.07
     log:
         f"{OUTDIR_DIFF_ADJ[0]}/logs/{{gene}}_diff_adj.log"
@@ -226,7 +226,7 @@ rule cal_gene_features:
     output:
         [f"{OUTDIR_GENE_FEATURES[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_GENE_FEATURES]
     params:
-        script="src/scripts/gene_metrics/gene_level_metrics.R",
+        script="src/scripts/13gene_metrics/gene_level_metrics.R",
         output_dir = OUTDIR_GENE_FEATURES[0],
         prefix=[f"{{gene}}{i}" for i in DESC_GENE_FEATURES],
         edge_hard_threshold=[0.07,0]
@@ -260,7 +260,7 @@ rule subset_features_neighbours:
     output:
         [f"{OUTDIR_NEIGHBOURS[0]}/{{gene}}{i}.{TAB_SUFFIX}" for i in DESC_NEIGHBOURS]
     params:
-        script="src/scripts/subset_features/subset_neighbour_features.R",
+        script="src/scripts/14subset_features/subset_neighbour_features.R",
         output_dir = OUTDIR_NEIGHBOURS[0],
         neighbour_layers = ",".join(map(str, as_list(config["subset_features_neighbours"]['neighbour_layers'])))
     shell:
