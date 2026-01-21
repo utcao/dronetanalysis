@@ -57,10 +57,10 @@ create_directories(c(rawdata_dir, processed_data_dir, test_data_dir))
 #####################
 
 # VST processed files
-vst_files <- config$processed_files$vst_processed_files
+vst_files <- config$processed_files$vst_files
 
 # VOOM processed files
-voom_files <- config$processed_files$voom_processed_files
+voom_files <- config$processed_files$voom_files
 
 # Output files for subsets
 subset_vst_ctrl_file <- file.path(subset_data_dir, "VSTdataCtrl_subset.txt")
