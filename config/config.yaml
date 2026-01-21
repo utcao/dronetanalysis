@@ -39,10 +39,12 @@ processed_files:
     - "dataset/processed/VOOM/voomdataCtrl.txt"
     - "dataset/processed/VOOM/voomdataHS.txt"
   vst_files:
-    - "dataset/subset/VSTdataCtrl_subset.txt"
-    - "dataset/subset/VSTdataHS_subset.txt"
+    - "dataset/dataset/processed/VST/VSTdataCtrl.txt"
+    - "dataset/dataset/processed/VST/VSTdataHS.txt"
 test_files:
   vst_files:
+    - "dataset/subset/VSTdataCtrl_subset.txt"
+    - "dataset/subset/VSTdataHS_subset.txt"
     
 
 spearman_correlation_files:
