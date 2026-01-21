@@ -4,7 +4,7 @@
 .Rproj.user
 *.Rout
 # project folds
-src/test  # for test data or scripts without synchronization
+src/test/  # for test data or scripts without synchronization
 dataset/
 manuscript/
 planning/
@@ -13,23 +13,13 @@ archives
 logs
 
 # gthornes
-results
 Rplots.pdf
-dataset/
 
 # files
 src/test.r
 *.pkl
 
 # yu-tao
-results/spearman_correlation/shuffle/
-results/spearman_correlation/permutation_test/
-dataset/processed/logCPM_ct_dros_subset.csv
-dataset/processed/logCPM_hs_dros_subset.csv
-dataset/raw/logCPM_Ctrl_Dros.csv
-dataset/raw/logCPM_HS_Dros.csv
-dataset/test/logCPM_ct_dros_subset.csv
-dataset/test/logCPM_hs_dros_subset.csv
 .snakemake/iocache/latest.pkl
 dag.pdf
 dag.svg
