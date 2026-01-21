@@ -4,6 +4,7 @@
 .Rproj.user
 *.Rout
 # project folds
+src/test  # for test data or scripts without synchronization
 dataset/
 manuscript/
 planning/
