@@ -1,7 +1,7 @@
 # conda env packages
 # conda activate dronetanalysis
 conda_env_path=/tmp/global2/caoyt/miniforge3/envs/dronetanalysis
-conda create -p $conda_env_path r-base=4.3 python=3.12 -y
+# conda create -p $conda_env_path r-base=4.3 python=3.12 -y
 
 # Install R packages
 micromamba install -p $conda_env_path \
@@ -11,4 +11,4 @@ micromamba install -p $conda_env_path \
 
 # Install Python packages
 micromamba install -p $conda_env_path \
-    numpy pandas scikit-learn matplotlib jupyter biopython -y
+    numpy pandas scikit-learn matplotlib jupyter biopython statsmodels -y
