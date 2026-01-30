@@ -11,4 +11,4 @@ micromamba install -p $conda_env_path \
 
 # Install Python packages
 micromamba install -p $conda_env_path \
-    numpy pandas scikit-learn matplotlib jupyter biopython statsmodels -y
+    numpy pandas scikit-learn matplotlib jupyter biopython statsmodels h5py -y
