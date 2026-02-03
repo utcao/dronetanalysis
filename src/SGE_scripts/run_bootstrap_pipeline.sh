@@ -93,14 +93,14 @@ echo "=============================================="
 # Stage 1 – bootstrap indices (single job, no dependency)
 # ---------------------------------------------------------------------------
 if [[ "$TOY" == true ]]; then
-    STAGE1_CMD="python src/scripts/01subset/01subset_bootstrap.py \
+    STAGE1_CMD="python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
         --toy \
         --out-h5 $INDICES_H5 \
         --low-frac $LOW_FRAC --high-frac $HIGH_FRAC \
         --n-bootstrap $N_BOOTSTRAP --bootstrap-frac $BOOTSTRAP_FRAC \
         --seed $SEED"
 else
-    STAGE1_CMD="python src/scripts/01subset/01subset_bootstrap.py \
+    STAGE1_CMD="python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
         --in-tsv $EXPR_TSV \
         --out-h5 $INDICES_H5 \
         --low-frac $LOW_FRAC --high-frac $HIGH_FRAC \
@@ -130,13 +130,13 @@ echo "  Stage 1 JID = $STAGE1_JID"
 # Stage 2 – per-gene correlation array (holds on Stage 1)
 # ---------------------------------------------------------------------------
 if [[ "$TOY" == true ]]; then
-    STAGE2_CMD="python src/scripts/10spearman_corr/02run_bootstrap_corr.py \
+    STAGE2_CMD="python src/scripts/10spearman_corr/02calc_corr_edge_bootstrap_corr.py \
         --toy \
         --gene-id \$((SGE_TASK_ID - 1)) \
         --indices-h5 $INDICES_H5 \
         --out-dir $CORR_DIR"
 else
-    STAGE2_CMD="python src/scripts/10spearman_corr/02run_bootstrap_corr.py \
+    STAGE2_CMD="python src/scripts/10spearman_corr/02calc_corr_edge_bootstrap_corr.py \
         --gene-id \$((SGE_TASK_ID - 1)) \
         --indices-h5 $INDICES_H5 \
         --expr-tsv $EXPR_TSV \

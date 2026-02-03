@@ -5,7 +5,7 @@ Spearman upper-triangle correlations for every replicate.
 
 Pipeline position
 -----------------
-Stage 1  01subset/01subset_bootstrap.py   →  bootstrap_indices.h5   (one job)
+Stage 1  01subset/01get_extreme_pop_bootstrap.py   →  bootstrap_indices.h5   (one job)
 Stage 2  THIS SCRIPT                      →  corr/gene_XXXXX.h5     (one job per gene)
 
 I/O per gene
@@ -26,12 +26,12 @@ Output  corr/gene_XXXXX.h5      (one file per gene)
 Design choices
 --------------
 * rank_zscore_rows is copied locally so that the digit-prefixed
-  01cal_corr_edge.py is never imported (importlib dance, heavy statsmodels).
+  01calc_corr_edge.py is never imported (importlib dance, heavy statsmodels).
 * Bootstrap subsets are small (k_resample ~ 0.8 * 0.2 * N_samples), so a single
   matmul without block-tiling stays comfortably in L2/L3 cache.
 * corr_triu is extracted via np.triu_indices, which produces the same row-major
-  upper-triangle order as TriuIndex in 01cal_corr_edge.py.
-* --toy uses the identical 5 × 50 RNG seed as 01subset_bootstrap.py --toy so
+  upper-triangle order as TriuIndex in 01calc_corr_edge.py.
+* --toy uses the identical 5 × 50 RNG seed as 01get_extreme_pop_bootstrap.py --toy so
   that the two stages are compatible for end-to-end smoke tests.
 """
 
@@ -47,7 +47,7 @@ from scipy.stats import rankdata
 
 
 # ---------------------------------------------------------------------------
-# Local rank-zscore (mirrors 01cal_corr_edge.py:rank_zscore_rows exactly)
+# Local rank-zscore (mirrors 01calc_corr_edge.py:rank_zscore_rows exactly)
 # ---------------------------------------------------------------------------
 def rank_zscore_rows(x: np.ndarray, ddof: int = 1) -> np.ndarray:
     """Rank each row, then z-score with the given ddof."""
@@ -203,7 +203,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--toy",
         action="store_true",
-        help="Use the same 5×50 toy matrix as 01subset_bootstrap.py --toy.",
+        help="Use the same 5×50 toy matrix as 01get_extreme_pop_bootstrap.py --toy.",
     )
     return parser.parse_args()
 
@@ -223,7 +223,7 @@ def main() -> None:
 
     # --- load expression matrix ---
     if args.toy:
-        # MUST match 01subset_bootstrap.py --toy exactly: seed=1, shape (5, 50)
+        # MUST match 01get_extreme_pop_bootstrap.py --toy exactly: seed=1, shape (5, 50)
         expr = np.random.default_rng(1).normal(size=(5, 50)).astype(np.float32)
         indices_h5_path = Path(args.indices_h5) if args.indices_h5 else Path("results/bootstrap_indices.h5")
     else:
