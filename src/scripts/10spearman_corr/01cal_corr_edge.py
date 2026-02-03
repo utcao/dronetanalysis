@@ -89,6 +89,9 @@ class Progress:
 class TriuIndex:
     """Index mapping for upper-triangle (excluding diagonal) stored as 1D.
 
+    This TriuIndex likely uses np.triu_indices internally to generate the
+    mapping between 2D indices (i,j) and 1D index k.
+
     Order:
     (0,1)(0,2)...(0,N-1)(1,2)...(N-2,N-1)
 
