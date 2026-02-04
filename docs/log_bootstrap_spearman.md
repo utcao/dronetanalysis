@@ -2,7 +2,7 @@ Here is a summary of every change and the terminal examples.
 
 # Changes made
 
-## 01subset_bootstrap.py
+## 01get_extreme_pop_bootstrap.py
 
 Added `import argparse`, a `parse_args()`, and a `main()` that replaces the old `_toy()`. The argument set mirrors the fields of GradientParams exactly — nothing extra, nothing missing:
 
@@ -18,7 +18,7 @@ Added `import argparse`, a `parse_args()`, and a `main()` that replaces the old 
 |toy|	use 5×50 random matrix|	—|
 
 
-## 01cal_corr_edge.py
+## 01calc_corr_edge.py
 
 Added `--skip-pval`. When set, three things are removed from each job:
 
@@ -34,7 +34,7 @@ The output difference is visible in the test above: full mode writes 10 datasets
 
 ```bash
 # From real data
-python src/scripts/01subset/01subset_bootstrap.py \
+python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
     --in-tsv dataset/voomdataCtrl.txt \
     --out-h5 results/bootstrap_indices.h5 \
     --low-frac 0.2 --high-frac 0.2 \
@@ -42,7 +42,7 @@ python src/scripts/01subset/01subset_bootstrap.py \
     --seed 42
 
 # Quick smoke test (no input file needed)
-python src/scripts/01subset/01subset_bootstrap.py \
+python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
     --toy --out-h5 results/test_indices.h5
 Stage 2 — per-replicate correlations (one SGE array task per gene, --skip-pval on):
 ```
@@ -51,18 +51,18 @@ Stage 2 — per-replicate correlations (one SGE array task per gene, --skip-pval
 
 ```bash
 # Single replicate, manually (what each SGE task will do)
-python src/scripts/10spearman_corr/01cal_corr_edge.py \
+python src/scripts/10spearman_corr/01calc_corr_edge.py \
     --in-tsv subset_gene0_boot3_low.tsv \
     --out-h5 results/corr/gene0_boot3_low.h5 \
     --skip-pval \
     --block-size 1024
 
 # Full pipeline toy test (pval included, for validation)
-python src/scripts/10spearman_corr/01cal_corr_edge.py \
+python src/scripts/10spearman_corr/01calc_corr_edge.py \
     --toy --out-h5 results/test_edge.h5 --validate-toy
 
 # Same toy, but in bootstrap-replicate mode (no pval, faster)
-python src/scripts/10spearman_corr/01cal_corr_edge.py \
+python src/scripts/10spearman_corr/01calc_corr_edge.py \
     --toy --out-h5 results/test_edge_nopval.h5 --skip-pval
 SGE job array template (Stage 2 depends on Stage 1):
 ```
@@ -85,7 +85,7 @@ wrap="...":
 ```bash
 qsub -N bootstrap_indices -l mem=8G \
     -hold_jid 0 \  # no dependency for stage 1
-    wrap="python src/scripts/01subset/01subset_bootstrap.py \
+    wrap="python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
           --in-tsv dataset/voomdataCtrl.txt \
           --out-h5 results/bootstrap_indices.h5 \
           --n-bootstrap 50 --seed 42"
@@ -97,15 +97,14 @@ qsub -N bootstrap_indices -l mem=8G \
 ```bash
 # Each task reads its gene's indices from the shared HDF5,
 # subsets the expression, writes its own output HDF5.
-qsub -N corr_array -t 0-<N_GENES> \
+qsub -N corr_array -t 1-<N_GENES> \
     -hold_jid bootstrap_indices \
     -l mem=16G \
-    wrap="python src/scripts/10spearman_corr/run_one_gene.py \
-          --gene-id \$SGE_TASK_ID \
+    -b y "python src/scripts/10spearman_corr/02calc_corr_edge_bootstrap_corr.py \
+          --gene-id \$((SGE_TASK_ID - 1)) \
           --indices-h5 results/bootstrap_indices.h5 \
           --expr-tsv dataset/voomdataCtrl.txt \
-          --out-dir results/corr \
-          --skip-pval"
+          --out-dir results/corr"
 ```
 
-The `run_one_gene.py` wrapper (not yet written) would: read indices/low_boot[gene_id] and indices/high_boot[gene_id] from the shared HDF5, loop over replicates, column-subset the expression, and call compute_and_store(..., skip_pval=True) for each. That is the natural next piece once you are ready to wire the two stages together.
+SGE task IDs are 1-based; `$((SGE_TASK_ID - 1))` converts back to the 0-based gene index used in the HDF5. The full two-stage submission is now handled by `src/SGE_scripts/run_bootstrap_pipeline.sh`.
