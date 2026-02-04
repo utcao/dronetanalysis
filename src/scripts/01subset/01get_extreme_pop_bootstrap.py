@@ -17,6 +17,8 @@ Output HDF5 layout (all datasets int32):
 Each dataset is chunked along the gene axis (chunk size 1) so that a single
 SGE job can read one gene's indices with one HDF5 chunk read.
 
+**UPDATED**: Can now read from HDF5 expression files for faster loading.
+
 """
 
 from __future__ import annotations
@@ -130,6 +132,12 @@ def parse_args() -> argparse.Namespace:
         help="Input TSV (genes as rows, samples as columns).",
     )
     parser.add_argument(
+        "--in-h5",
+        type=str,
+        default=None,
+        help="Input HDF5 expression file (alternative to --in-tsv). Use /expr dataset.",
+    )
+    parser.add_argument(
         "--out-h5", type=str, required=True, help="Output HDF5 path for indices."
     )
     parser.add_argument(
@@ -171,12 +179,20 @@ def main() -> None:
     if args.toy:
         expr = np.random.default_rng(1).normal(size=(5, 50)).astype(np.float32)
     else:
-        if args.in_tsv is None:
-            raise SystemExit("Provide --in-tsv or use --toy.")
-        import pandas as pd  # local import; optional dependency
-
-        df = pd.read_csv(args.in_tsv, sep="\t", index_col=0)
-        expr = df.to_numpy(dtype=np.float32)
+        # *** UPDATED: Support both TSV and HDF5 input ***
+        if args.in_h5:
+            print(f"Loading expression from HDF5: {args.in_h5}")
+            with h5py.File(args.in_h5, "r") as f:
+                expr = f["expr"][:]
+            print(f"  Loaded {expr.shape[0]} genes × {expr.shape[1]} samples")
+        elif args.in_tsv:
+            print(f"Loading expression from TSV: {args.in_tsv}")
+            import pandas as pd
+            df = pd.read_csv(args.in_tsv, sep="\t", index_col=0)
+            expr = df.to_numpy(dtype=np.float32)
+            print(f"  Loaded {expr.shape[0]} genes × {expr.shape[1]} samples")
+        else:
+            raise SystemExit("Provide --in-tsv, --in-h5, or use --toy.")
 
     params = GradientParams(
         low_frac=args.low_frac,
