@@ -3,6 +3,7 @@
 .RData
 .Rproj.user
 *.Rout
+results*
 # project folds
 dataset/
 manuscript/

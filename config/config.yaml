@@ -39,8 +39,8 @@ processed_files:
     - "dataset/processed/VOOM/voomdataCtrl.txt"
     - "dataset/processed/VOOM/voomdataHS.txt"
   vst_files:
-    - "dataset/dataset/processed/VST/VSTdataCtrl.txt"
-    - "dataset/dataset/processed/VST/VSTdataHS.txt"
+    - "dataset/processed/VST/VSTdataCtrl.txt"
+    - "dataset/processed/VST/VSTdataHS.txt"
 test_files:
   vst_files:
     - "dataset/subset/VSTdataCtrl_subset.txt"
