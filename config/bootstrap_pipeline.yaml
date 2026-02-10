@@ -1,0 +1,38 @@
+# =============================================================================
+# Bootstrap Differential Co-expression Pipeline Configuration
+# =============================================================================
+#
+# Usage:
+#   snakemake -s src/pipelines/Snakefile_bootstrap --configfile config/bootstrap_pipeline.yaml -j 10
+#
+#   # Toy mode:
+#   snakemake -s src/pipelines/Snakefile_bootstrap --config toy=true -j 4
+#
+#   # SGE cluster:
+#   snakemake -s src/pipelines/Snakefile_bootstrap --profile config/sge_profile -j 100
+# =============================================================================
+
+# --- Input ---
+# Provide ONE of: expr_tsv, expr_h5, or toy=true
+# expr_tsv: "dataset/processed/VOOM/voomdataCtrl.txt"
+# expr_h5: "dataset/expression.h5"
+toy: true
+
+# --- Output ---
+out_dir: "results"
+
+# --- Bootstrap parameters ---
+low_frac: 0.2
+high_frac: 0.2
+n_bootstrap: 50
+bootstrap_frac: 0.8
+seed: 42
+
+# --- Significance ---
+fdr_alpha: 0.05
+edge_selection: "sig_edges"   # sig_edges | sig_differential
+no_ci_filter: false
+
+# --- Thresholds ---
+min_effect: 0.0
+corr_threshold: 0.0001

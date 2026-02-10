@@ -1,0 +1,262 @@
+# =============================================================================
+# Snakefile_bootstrap
+# Differential co-expression pipeline via bootstrap resampling.
+#
+# Pipeline DAG:
+#
+#   [expr_tsv] ──► preprocess ──► expression.h5 ──► bootstrap_indices ──►
+#       or                              │               bootstrap_indices.h5
+#   [expr_h5] ─────────────────────────►│                    │
+#       or                              │                    │
+#   [--config toy=true] ───────────────►│                    ▼
+#                                       │         ┌── base_correlations (per gene)
+#                                       └────────►│         │
+#                                                 │         ▼
+#                                                 └── bootstrap_significant (per gene)
+#                                                           │
+#                                                           ▼
+#                                                   collect_networks (single)
+#                                                     │           │
+#                                              summary.h5    rewiring_hubs.tsv
+#
+# Usage:
+#   # Toy (local, 4 cores):
+#   snakemake -s src/pipelines/Snakefile_bootstrap --config toy=true -j 4
+#
+#   # Real data from TSV:
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/bootstrap_pipeline.yaml \
+#       --config expr_tsv=dataset/processed/VOOM/voomdataCtrl.txt \
+#       -j 20
+#
+#   # Real data from HDF5 (skip conversion):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/bootstrap_pipeline.yaml \
+#       --config expr_h5=dataset/expression.h5 \
+#       -j 20
+#
+#   # SGE cluster (with a Snakemake cluster profile):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/bootstrap_pipeline.yaml \
+#       --profile config/sge_profile -j 100
+#
+#   # Dry run (show what would be done):
+#   snakemake -s src/pipelines/Snakefile_bootstrap --config toy=true -n
+# =============================================================================
+
+import h5py
+
+# ---------------------------------------------------------------------------
+# Configuration with defaults
+# ---------------------------------------------------------------------------
+OUT        = config.get("out_dir", "results")
+TOY        = config.get("toy", False)
+EXPR_TSV   = config.get("expr_tsv", "")
+EXPR_H5    = config.get("expr_h5", "")
+
+LOW_FRAC       = config.get("low_frac", 0.2)
+HIGH_FRAC      = config.get("high_frac", 0.2)
+N_BOOTSTRAP    = config.get("n_bootstrap", 50)
+BOOTSTRAP_FRAC = config.get("bootstrap_frac", 0.8)
+SEED           = config.get("seed", 42)
+FDR_ALPHA      = config.get("fdr_alpha", 0.05)
+EDGE_SEL       = config.get("edge_selection", "sig_edges")
+NO_CI_FILTER   = config.get("no_ci_filter", False)
+MIN_EFFECT     = config.get("min_effect", 0.0)
+CORR_THRESH    = config.get("corr_threshold", 0.0001)
+
+# Fixed paths derived from OUT
+EXPR_H5_FINAL = EXPR_H5 if EXPR_H5 else f"{OUT}/expression.h5"
+INDICES_H5    = f"{OUT}/bootstrap_indices.h5"
+BASE_DIR      = f"{OUT}/base_correlations"
+BOOT_DIR      = f"{OUT}/bootstrap_significant"
+SUMMARY_H5    = f"{OUT}/differential_network_summary.h5"
+SUMMARY_TSV   = f"{OUT}/rewiring_hubs.tsv"
+
+
+# ---------------------------------------------------------------------------
+# Gene discovery (after checkpoint resolves)
+# ---------------------------------------------------------------------------
+def _read_gene_names(h5_path):
+    """Read gene names from expression.h5."""
+    with h5py.File(h5_path, "r") as f:
+        if "gene_names" in f:
+            return [
+                x.decode() if isinstance(x, bytes) else x
+                for x in f["gene_names"][:]
+            ]
+        n = f["expr"].shape[0]
+        return [f"gene_{i}" for i in range(n)]
+
+
+def all_base_corr_files(wildcards):
+    """Aggregate function: list all per-gene base_correlations files."""
+    h5_path = checkpoints.preprocess.get(**wildcards).output[0]
+    names = _read_gene_names(h5_path)
+    return [f"{BASE_DIR}/{i:04d}_{name}.h5" for i, name in enumerate(names)]
+
+
+def all_boot_sig_files(wildcards):
+    """Aggregate function: list all per-gene bootstrap_significant files."""
+    h5_path = checkpoints.preprocess.get(**wildcards).output[0]
+    names = _read_gene_names(h5_path)
+    return [f"{BOOT_DIR}/{i:04d}_{name}.h5" for i, name in enumerate(names)]
+
+
+# ---------------------------------------------------------------------------
+# Wildcard constraints: {gi} is always exactly 4 digits
+# ---------------------------------------------------------------------------
+wildcard_constraints:
+    gi = r"\d{4}",
+
+
+# ---------------------------------------------------------------------------
+# Target rule
+# ---------------------------------------------------------------------------
+rule all:
+    input:
+        SUMMARY_H5,
+        SUMMARY_TSV,
+
+
+# ---------------------------------------------------------------------------
+# Stage 0: Preprocess — TSV → HDF5 or generate toy data
+#
+# This is a CHECKPOINT because downstream rules need to read expression.h5
+# to discover gene names (which determine per-gene output filenames).
+# ---------------------------------------------------------------------------
+checkpoint preprocess:
+    output:
+        EXPR_H5_FINAL,
+    resources:
+        mem_mb = 16000,
+        runtime = 120,
+    run:
+        if TOY:
+            shell(
+                "python src/scripts/00preprocess/00convert_expr_to_hdf5.py "
+                "--toy --out-h5 {output}"
+            )
+        elif EXPR_H5:
+            # User provided an existing HDF5 — nothing to do.
+            # The file already exists at EXPR_H5_FINAL.
+            pass
+        elif EXPR_TSV:
+            shell(
+                "python src/scripts/00preprocess/00convert_expr_to_hdf5.py "
+                "--expr-tsv {EXPR_TSV} --out-h5 {output} "
+                "--compression gzip --compression-level 4"
+            )
+        else:
+            raise ValueError("Provide expr_tsv, expr_h5, or toy=true in config.")
+
+
+# ---------------------------------------------------------------------------
+# Stage 1: Generate bootstrap indices (single job)
+# ---------------------------------------------------------------------------
+rule bootstrap_indices:
+    input:
+        expr = EXPR_H5_FINAL,
+    output:
+        INDICES_H5,
+    resources:
+        mem_mb = 8000,
+        runtime = "1:00:00",
+    shell:
+        """
+        python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
+            --in-h5 {input.expr} \
+            --out-h5 {output} \
+            --low-frac {LOW_FRAC} --high-frac {HIGH_FRAC} \
+            --n-bootstrap {N_BOOTSTRAP} --bootstrap-frac {BOOTSTRAP_FRAC} \
+            --seed {SEED}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 2a: Base correlations + FDR significance (per gene)
+#
+# Wildcard {gi} = zero-padded gene index, {gene_id} = gene name.
+# Each gene produces one file: {BASE_DIR}/{gi}_{gene_id}.h5
+# ---------------------------------------------------------------------------
+rule base_correlations:
+    input:
+        expr    = EXPR_H5_FINAL,
+        indices = INDICES_H5,
+    output:
+        f"{BASE_DIR}/{{gi}}_{{gene_id}}.h5",
+    params:
+        gene_index = lambda wc: int(wc.gi),
+    resources:
+        mem_mb  = 32000,
+        runtime = "4:00:00",
+    shell:
+        """
+        python src/scripts/10spearman_corr/02a_calc_base_correlations.py \
+            --expr-h5 {input.expr} \
+            --indices-h5 {input.indices} \
+            --out-h5 {output} \
+            --gene-index {params.gene_index} \
+            --fdr-alpha {FDR_ALPHA}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 2b: Bootstrap significant edges (per gene)
+#
+# Reads the matching base_correlations file for this gene.
+# ---------------------------------------------------------------------------
+rule bootstrap_significant:
+    input:
+        expr    = EXPR_H5_FINAL,
+        indices = INDICES_H5,
+        base    = f"{BASE_DIR}/{{gi}}_{{gene_id}}.h5",
+    output:
+        f"{BOOT_DIR}/{{gi}}_{{gene_id}}.h5",
+    params:
+        gene_index = lambda wc: int(wc.gi),
+    resources:
+        mem_mb  = 16000,
+        runtime = "2:00:00",
+    shell:
+        """
+        python src/scripts/10spearman_corr/02b_bootstrap_significant_edges.py \
+            --expr-h5 {input.expr} \
+            --indices-h5 {input.indices} \
+            --base-h5 {input.base} \
+            --out-h5 {output} \
+            --gene-index {params.gene_index} \
+            --edge-selection {EDGE_SEL}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: Collect per-gene networks into summary (single job)
+#
+# Waits for ALL per-gene files via the aggregate input functions,
+# then runs the collection script in directory mode.
+# ---------------------------------------------------------------------------
+rule collect_networks:
+    input:
+        base_files = all_base_corr_files,
+        boot_files = all_boot_sig_files,
+    output:
+        h5  = SUMMARY_H5,
+        tsv = SUMMARY_TSV,
+    params:
+        ci_flag = "--no-ci-filter" if NO_CI_FILTER else "",
+    resources:
+        mem_mb  = 16000,
+        runtime = "1:00:00",
+    shell:
+        """
+        python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
+            --base-dir {BASE_DIR} \
+            --boot-dir {BOOT_DIR} \
+            --out-h5 {output.h5} \
+            --out-tsv {output.tsv} \
+            --edge-selection {EDGE_SEL} \
+            --min-effect {MIN_EFFECT} \
+            --corr-threshold {CORR_THRESH} \
+            {params.ci_flag}
+        """
