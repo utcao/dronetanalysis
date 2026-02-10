@@ -17,6 +17,41 @@ Added `import argparse`, a `parse_args()`, and a `main()` that replaces the old 
 |seed|	GradientParams.seed|	0|
 |toy|	use 5×50 random matrix|	—|
 
+Key Features Implemented
+
+|Script|	Purpose|
+|---|---|
+|02a_calc_base_correlations.py|	Compute base correlations + 3 significance tests|
+|02b_bootstrap_significant_edges.py|	Bootstrap ONLY significant edges|
+|03_reconstruct_diff_network.py|	Final filtering + network reconstruction|
+
+Stage 2a outputs significance masks:
+
+- sig_low          = low_qval < 0.05
+- sig_high         = high_qval < 0.05
+- sig_individual   = sig_low | sig_high           # at least one significant
+- sig_differential = diff_qval < 0.05             # significant difference
+- sig_edges        = sig_individual & sig_differential  # both criteria
+
+Stage 2b computes:
+
+Bootstrap delta for each significant edge
+Confidence intervals (CI)
+Bootstrap bias: bias = delta_boot_mean - delta_base
+Stage 3 supports:
+
+- `--edge-selection` sig_edges (default) or `--edge-selection` sig_differential
+- Effect size filter: --min-effect 0.1
+- CI filter: require CI excludes 0 (default, disable with `--no-ci-filter`)
+- Sparse matrix reconstruction for network visualization
+- Optional TSV output
+
+Efficiency Gain
+
+|Metric	Old Pipeline|	New Pipeline|
+|---|---|
+|Bootstrap computations|	40M × 50 × 2|	~400K × 50 × 2|
+|Speedup|	1×|	~100×|
 
 ## 01calc_corr_edge.py
 
