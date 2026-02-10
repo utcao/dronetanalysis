@@ -21,7 +21,7 @@ rm(list = ls())
 
 subset_sample_size <- NULL
 subset_gene_size   <- NULL
-test_sample_size   <- 30
+test_sample_size   <- 930
 test_gene_size     <- 30
 
 #################################

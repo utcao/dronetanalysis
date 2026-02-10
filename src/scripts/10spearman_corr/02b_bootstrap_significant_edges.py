@@ -25,7 +25,7 @@ Output HDF5 layout
         n_sig_edges, n_bootstrap, edge_selection_mode
     edges/
         indices         (n_sig_edges,) - flat indices in triu array
-        gene_i          (n_sig_edges,) - gene i for each edge
+        gene_i          (n_sig_edges,) - gene i for each edge; (gene_i, gene_j) pairs
         gene_j          (n_sig_edges,) - gene j for each edge
     base/
         delta           (n_sig_edges,) - original delta (high - low)
@@ -160,11 +160,34 @@ def bootstrap_significant_edges(
         corr_high_base = h5["high/corr_triu"][:][sig_indices]
         delta_base = corr_high_base - corr_low_base
 
+        # Propagate gene names
+        if "gene_names" in h5:
+            gene_names = [x.decode() if isinstance(x, bytes) else x for x in h5["gene_names"][:]]
+        else:
+            gene_names = None
+
     n_sig_edges = len(sig_indices)
     print(f"  Found {n_sig_edges:,} significant edges ({edge_selection})")
 
     if n_sig_edges == 0:
-        print("  No significant edges to bootstrap!")
+        print("  No significant edges to bootstrap — writing empty output.")
+        out_h5_path.parent.mkdir(parents=True, exist_ok=True)
+        with h5py.File(out_h5_path, "w") as h5:
+            meta = h5.create_group("meta")
+            meta.attrs["n_sig_edges"] = 0
+            meta.attrs["n_bootstrap"] = 0
+            meta.attrs["edge_selection_mode"] = edge_selection
+            meta.attrs["ci_alpha"] = ci_alpha
+            meta.attrs["gene_index_used"] = gene_index
+            h5.create_dataset("edges/indices", data=np.array([], dtype=np.int32))
+            h5.create_dataset("edges/gene_i", data=np.array([], dtype=np.int32))
+            h5.create_dataset("edges/gene_j", data=np.array([], dtype=np.int32))
+            h5.create_dataset("base/delta", data=np.array([], dtype=np.float32))
+            h5.create_dataset("base/r_low", data=np.array([], dtype=np.float32))
+            h5.create_dataset("base/r_high", data=np.array([], dtype=np.float32))
+            if gene_names is not None:
+                h5.create_dataset("gene_names", data=gene_names, dtype=h5py.string_dtype())
+        print(f"  Wrote {out_h5_path}")
         return
 
     # Convert flat indices to gene pairs
@@ -265,6 +288,10 @@ def bootstrap_significant_edges(
         pval_grp = h5.create_group("pval")
         pval_grp.create_dataset("bootstrap_pval", data=pval, compression="gzip", compression_opts=4)
 
+        # Gene names (propagated from base_correlations.h5)
+        if gene_names is not None:
+            h5.create_dataset("gene_names", data=gene_names, dtype=h5py.string_dtype())
+
     print("Done!")
 
 
@@ -275,8 +302,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--expr-h5",
         type=str,
-        required=True,
-        help="Path to expression HDF5 file.",
+        default=None,
+        help="Path to expression HDF5 file (required unless --toy is used).",
     )
     parser.add_argument(
         "--indices-h5",
@@ -287,14 +314,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--base-h5",
         type=str,
-        required=True,
-        help="Path to base_correlations.h5 from Stage 2a.",
+        default=None,
+        help="Path to base_correlations.h5 from Stage 2a (single-file mode).",
+    )
+    parser.add_argument(
+        "--base-dir",
+        type=str,
+        default=None,
+        help="Directory of per-gene base_correlations from Stage 2a. Finds file by gene-index prefix.",
     )
     parser.add_argument(
         "--out-h5",
         type=str,
-        default="results/bootstrap_significant.h5",
-        help="Output HDF5 path.",
+        default=None,
+        help="Output HDF5 path (single-file mode).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default=None,
+        help="Output directory for per-gene mode. Filename: {index:04d}_{gene_id}.h5",
     )
     parser.add_argument(
         "--gene-index",
@@ -323,26 +362,59 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _find_gene_file(directory: Path, gene_index: int) -> Path:
+    """Find per-gene h5 file by index prefix (e.g. '0003_*.h5')."""
+    prefix = f"{gene_index:04d}_"
+    matches = list(directory.glob(f"{prefix}*.h5"))
+    if len(matches) != 1:
+        raise FileNotFoundError(
+            f"Expected exactly 1 file matching {prefix}*.h5 in {directory}, found {len(matches)}"
+        )
+    return matches[0]
+
+
 def main() -> None:
     args = parse_args()
 
     if args.toy:
         expr = np.random.default_rng(1).normal(size=(5, 50)).astype(np.float32)
-        indices_h5_path = Path(args.indices_h5) if args.indices_h5 else Path("results/bootstrap_indices.h5")
-        base_h5_path = Path(args.base_h5) if args.base_h5 else Path("results/base_correlations.h5")
+        gene_names = None
     else:
+        if args.expr_h5 is None:
+            raise SystemExit("ERROR: --expr-h5 is required when not using --toy.")
         print(f"Loading expression from {args.expr_h5}...")
         with h5py.File(args.expr_h5, "r") as f:
             expr = f["expr"][:]
+            if "gene_names" in f:
+                gene_names = [x.decode() if isinstance(x, bytes) else x for x in f["gene_names"][:]]
+            else:
+                gene_names = None
         print(f"  Shape: {expr.shape[0]} genes × {expr.shape[1]} samples")
-        indices_h5_path = Path(args.indices_h5)
+
+    # Resolve base input path
+    if args.base_dir:
+        base_h5_path = _find_gene_file(Path(args.base_dir), args.gene_index)
+    elif args.base_h5:
         base_h5_path = Path(args.base_h5)
+    else:
+        raise SystemExit("ERROR: provide --base-h5 or --base-dir.")
+
+    # Resolve output path
+    if args.out_dir:
+        out_dir = Path(args.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        gene_id = gene_names[args.gene_index] if gene_names else f"gene_{args.gene_index}"
+        out_h5_path = out_dir / f"{args.gene_index:04d}_{gene_id}.h5"
+    elif args.out_h5:
+        out_h5_path = Path(args.out_h5)
+    else:
+        raise SystemExit("ERROR: provide --out-h5 or --out-dir.")
 
     bootstrap_significant_edges(
         expr=expr,
-        indices_h5_path=indices_h5_path,
+        indices_h5_path=Path(args.indices_h5),
         base_h5_path=base_h5_path,
-        out_h5_path=Path(args.out_h5),
+        out_h5_path=out_h5_path,
         gene_index=args.gene_index,
         edge_selection=args.edge_selection,
         ci_alpha=args.ci_alpha,

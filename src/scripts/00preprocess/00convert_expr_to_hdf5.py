@@ -4,7 +4,7 @@ Preprocessing: Convert expression TSV to HDF5 for fast array-job access.
 
 Usage
 -----
-    python 00convert_expr_to_hdf5.py --expr-tsv data/expression.tsv --out-h5 data/expression.h5
+    python 00convert_expr_to_hdf5.py --expr-tsv data/test/voomdataCtrl_test.txt --out-h5 data/expression.h5
 
 Benefits
 --------
@@ -107,6 +107,102 @@ def convert_tsv_to_hdf5(
     print(f"{'='*60}")
 
 
+def generate_toy_data(h5_path: Path, n_genes: int = 10, n_samples: int = 60, seed: int = 42) -> None:
+    """
+    Generate toy expression data with known differential co-expression structure.
+
+    Design (samples split by gene 0 expression, low/high 20%):
+      - Gene 0: gradient gene (defines the low/high split)
+      - Genes 1-2: correlated (r~0.8) in LOW, uncorrelated in HIGH  -> "disappear"
+      - Genes 3-4: uncorrelated in LOW, correlated (r~0.8) in HIGH  -> "new"
+      - Genes 5-6: positive in LOW, negative in HIGH                -> "sign_change"
+      - Genes 7-8: weakly correlated in both                        -> "unchanged"
+      - Gene 9: noise
+    """
+    rng = np.random.default_rng(seed)
+    expr = np.zeros((n_genes, n_samples), dtype=np.float32)
+
+    # Gene 0: gradient (sorted so low=first 20%, high=last 20%)
+    expr[0] = np.linspace(-3, 3, n_samples) + rng.normal(0, 0.1, n_samples)
+
+    # Determine low/high sample boundaries (20% each)
+    k_low = int(n_samples * 0.2)   # 12 samples
+    k_high = int(n_samples * 0.2)  # 12 samples
+    low_idx = np.arange(k_low)
+    high_idx = np.arange(n_samples - k_high, n_samples)
+    mid_idx = np.arange(k_low, n_samples - k_high)
+
+    # Helper: generate correlated pair for a subset
+    def corr_pair(idx, r=0.8):
+        n = len(idx)
+        z = rng.normal(size=n)
+        a = z
+        b = r * z + np.sqrt(1 - r**2) * rng.normal(size=n)
+        return a.astype(np.float32), b.astype(np.float32)
+
+    # Genes 1-2: correlated in LOW, uncorrelated in HIGH
+    expr[1] = rng.normal(size=n_samples)
+    expr[2] = rng.normal(size=n_samples)
+    a, b = corr_pair(low_idx, r=0.85)
+    expr[1, low_idx] = a
+    expr[2, low_idx] = b
+
+    # Genes 3-4: uncorrelated in LOW, correlated in HIGH
+    expr[3] = rng.normal(size=n_samples)
+    expr[4] = rng.normal(size=n_samples)
+    a, b = corr_pair(high_idx, r=0.85)
+    expr[3, high_idx] = a
+    expr[4, high_idx] = b
+
+    # Genes 5-6: positive in LOW (r~0.7), negative in HIGH (r~-0.7)
+    expr[5] = rng.normal(size=n_samples)
+    expr[6] = rng.normal(size=n_samples)
+    a, b = corr_pair(low_idx, r=0.7)
+    expr[5, low_idx] = a
+    expr[6, low_idx] = b
+    a, b = corr_pair(high_idx, r=-0.7)
+    expr[5, high_idx] = a
+    expr[6, high_idx] = b
+
+    # Genes 7-8: weakly correlated in both (r~0.3)
+    a_all, b_all = corr_pair(np.arange(n_samples), r=0.3)
+    expr[7] = a_all
+    expr[8] = b_all
+
+    # Gene 9: pure noise
+    expr[9] = rng.normal(size=n_samples).astype(np.float32)
+
+    # Fill remaining genes if n_genes > 10
+    for i in range(10, n_genes):
+        expr[i] = rng.normal(size=n_samples).astype(np.float32)
+
+    gene_names = [f"toy_gene_{i}" for i in range(n_genes)]
+    sample_names = [f"sample_{i}" for i in range(n_samples)]
+
+    # Write HDF5
+    h5_path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(h5_path, "w") as f:
+        ds = f.create_dataset("expr", data=expr, dtype=np.float32)
+        ds.attrs["n_genes"] = n_genes
+        ds.attrs["n_samples"] = n_samples
+        ds.attrs["gene_names"] = gene_names
+        ds.attrs["sample_names"] = sample_names
+        f.create_dataset("gene_names", data=gene_names, dtype=h5py.string_dtype())
+        f.create_dataset("sample_names", data=sample_names, dtype=h5py.string_dtype())
+
+    print(f"Generated toy data: {n_genes} genes x {n_samples} samples")
+    print(f"  Expected edges: (1,2)=disappear, (3,4)=new, (5,6)=sign_change, (7,8)=unchanged")
+    print(f"  Saved to {h5_path}")
+
+    # Also write TSV for inspection
+    tsv_path = h5_path.with_suffix(".tsv")
+    import pandas as pd
+    df = pd.DataFrame(expr, index=gene_names, columns=sample_names)
+    df.index.name = "gene_id"
+    df.to_csv(tsv_path, sep="\t")
+    print(f"  Also saved TSV: {tsv_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Convert expression TSV to HDF5 for fast parallel access."
@@ -114,8 +210,8 @@ def main():
     parser.add_argument(
         "--expr-tsv",
         type=str,
-        required=True,
-        help="Input expression TSV (genes as rows, samples as columns)",
+        default=None,
+        help="Input expression TSV (genes as rows, samples as columns).",
     )
     parser.add_argument(
         "--out-h5",
@@ -137,25 +233,30 @@ def main():
         choices=range(1, 10),
         help="GZIP compression level 1-9 (default: 4). Lower=faster, higher=smaller.",
     )
-    
-    args = parser.parse_args()
-    
-    tsv_path = Path(args.expr_tsv)
-    h5_path = Path(args.out_h5)
-    
-    if not tsv_path.exists():
-        raise FileNotFoundError(f"TSV not found: {tsv_path}")
-    
-    # Create output directory if needed
-    h5_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Convert
-    convert_tsv_to_hdf5(
-        tsv_path=tsv_path,
-        h5_path=h5_path,
-        compression=args.compression,
-        compression_opts=args.compression_level if args.compression == "gzip" else None,
+    parser.add_argument(
+        "--toy",
+        action="store_true",
+        help="Generate toy data with known differential edges (10 genes, 60 samples).",
     )
+
+    args = parser.parse_args()
+    h5_path = Path(args.out_h5)
+
+    if args.toy:
+        generate_toy_data(h5_path)
+    elif args.expr_tsv:
+        tsv_path = Path(args.expr_tsv)
+        if not tsv_path.exists():
+            raise FileNotFoundError(f"TSV not found: {tsv_path}")
+        h5_path.parent.mkdir(parents=True, exist_ok=True)
+        convert_tsv_to_hdf5(
+            tsv_path=tsv_path,
+            h5_path=h5_path,
+            compression=args.compression,
+            compression_opts=args.compression_level if args.compression == "gzip" else None,
+        )
+    else:
+        raise SystemExit("ERROR: provide --expr-tsv or use --toy.")
 
 
 if __name__ == "__main__":
