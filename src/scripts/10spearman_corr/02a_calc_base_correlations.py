@@ -147,6 +147,7 @@ def compute_base_correlations(
     out_h5_path: Path,
     fdr_alpha: float = 0.05,
     gene_index: int = 0,
+    gene_names: list = None,
 ) -> None:
     """
     Compute base correlations and significance tests.
@@ -158,6 +159,7 @@ def compute_base_correlations(
     out_h5_path : output path
     fdr_alpha : FDR threshold for significance
     gene_index : which gene's indices to use (default: 0, uses first gene)
+    gene_names : list of gene name strings (propagated from expression.h5)
     """
     n_genes, n_samples_total = expr.shape
     n_tests = n_genes * (n_genes - 1) // 2
@@ -292,6 +294,10 @@ def compute_base_correlations(
         grp_sig.attrs["n_sig_differential"] = int(sig_differential.sum())
         grp_sig.attrs["n_sig_edges"] = int(sig_edges.sum())
 
+        # Gene names (propagated from expression.h5)
+        if gene_names is not None:
+            h5.create_dataset("gene_names", data=gene_names, dtype=h5py.string_dtype())
+
     print("Done!")
 
 
@@ -302,8 +308,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--expr-h5",
         type=str,
-        required=True,
-        help="Path to expression HDF5 file.",
+        default=None,
+        help="Path to expression HDF5 file (required unless --toy is used).",
     )
     parser.add_argument(
         "--indices-h5",
@@ -314,8 +320,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out-h5",
         type=str,
-        default="results/base_correlations.h5",
-        help="Output HDF5 path.",
+        default=None,
+        help="Output HDF5 path (single-file mode).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default=None,
+        help="Output directory for per-gene mode. Filename: {index:04d}_{gene_id}.h5",
     )
     parser.add_argument(
         "--fdr-alpha",
@@ -343,21 +355,42 @@ def main() -> None:
     if args.toy:
         # Toy data: 5 genes, 50 samples (matches Stage 1 --toy)
         expr = np.random.default_rng(1).normal(size=(5, 50)).astype(np.float32)
-        indices_h5_path = Path(args.indices_h5) if args.indices_h5 else Path("results/bootstrap_indices.h5")
+        gene_names = None
+        indices_h5_path = Path(args.indices_h5)
     else:
+        if args.expr_h5 is None:
+            raise SystemExit("ERROR: --expr-h5 is required when not using --toy.")
         # Load expression from HDF5
         print(f"Loading expression from {args.expr_h5}...")
         with h5py.File(args.expr_h5, "r") as f:
             expr = f["expr"][:]
+            if "gene_names" in f:
+                gene_names = [x.decode() if isinstance(x, bytes) else x for x in f["gene_names"][:]]
+            else:
+                gene_names = None
         print(f"  Shape: {expr.shape[0]} genes × {expr.shape[1]} samples")
+        if gene_names:
+            print(f"  Gene names: {gene_names[0]} ... {gene_names[-1]}")
         indices_h5_path = Path(args.indices_h5)
+
+    # Resolve output path
+    if args.out_dir:
+        out_dir = Path(args.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        gene_id = gene_names[args.gene_index] if gene_names else f"gene_{args.gene_index}"
+        out_h5_path = out_dir / f"{args.gene_index:04d}_{gene_id}.h5"
+    elif args.out_h5:
+        out_h5_path = Path(args.out_h5)
+    else:
+        raise SystemExit("ERROR: provide --out-h5 or --out-dir.")
 
     compute_base_correlations(
         expr=expr,
         indices_h5_path=indices_h5_path,
-        out_h5_path=Path(args.out_h5),
+        out_h5_path=out_h5_path,
         fdr_alpha=args.fdr_alpha,
         gene_index=args.gene_index,
+        gene_names=gene_names,
     )
 
 
