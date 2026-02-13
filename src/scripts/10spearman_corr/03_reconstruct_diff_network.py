@@ -735,23 +735,45 @@ def load_and_process(
         else:
             gene_names = None
 
+        # Detect storage format for backwards compatibility
+        storage_mode = h5["meta"].attrs.get("storage_mode", "full")  # Default to full for legacy files
+
         # Load significance masks
         if edge_selection == "sig_differential":
             base_sig_mask = h5["significant/sig_differential"][:]
         else:
-            base_sig_mask = h5["significant/sig_edges"][:]
+            # For sparse formats, sig_edges may not exist
+            if "significant/sig_edges" in h5:
+                base_sig_mask = h5["significant/sig_edges"][:]
+            else:
+                # Fallback to sig_differential (minimal mode)
+                base_sig_mask = h5["significant/sig_differential"][:]
 
         # Load full arrays for qualitative analysis
         sig_low_full = h5["significant/sig_low"][:]
         sig_high_full = h5["significant/sig_high"][:]
 
-        # Load correlations for significant edges
+        # Get indices of selected edges
         sig_indices = np.where(base_sig_mask)[0]
-        corr_low = h5["low/corr_triu"][:][sig_indices]
-        corr_high = h5["high/corr_triu"][:][sig_indices]
-        pval_diff = h5["diff/pval_triu"][:][sig_indices]
-        qval_diff = h5["diff/qval_triu"][:][sig_indices]
-        delta_base = h5["diff/delta_triu"][:][sig_indices]
+
+        # Load correlations based on storage format
+        if storage_mode == "full":
+            # Legacy full format: dense arrays, index into them
+            corr_low = h5["low/corr_triu"][:][sig_indices]
+            corr_high = h5["high/corr_triu"][:][sig_indices]
+            pval_diff = h5["diff/pval_triu"][:][sig_indices]
+            qval_diff = h5["diff/qval_triu"][:][sig_indices]
+            delta_base = h5["diff/delta_triu"][:][sig_indices]
+        else:
+            # Sparse format: data already filtered to significant edges
+            stored_indices = h5["significant/indices"][:]
+            # Find which stored edges match our sig_indices
+            mask_in_stored = np.isin(stored_indices, sig_indices)
+            corr_low = h5["low/corr_sig"][:][mask_in_stored]
+            corr_high = h5["high/corr_sig"][:][mask_in_stored]
+            pval_diff = h5["diff/pval_sig"][:][mask_in_stored]
+            qval_diff = h5["diff/qval_sig"][:][mask_in_stored]
+            delta_base = h5["diff/delta_sig"][:][mask_in_stored]
 
         # Significance for selected edges
         sig_low = sig_low_full[sig_indices]
