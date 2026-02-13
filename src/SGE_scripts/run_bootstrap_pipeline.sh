@@ -48,9 +48,9 @@ EXPR_H5=""
 OUT_DIR="results"
 LOW_FRAC=0.2
 HIGH_FRAC=0.2
-N_BOOTSTRAP=50
+N_BOOTSTRAP=500
 BOOTSTRAP_FRAC=0.8
-FDR_ALPHA=0.5
+FDR_ALPHA=0.9
 SEED=42
 TOY=false
 LOCAL=false
@@ -58,6 +58,7 @@ SKIP_PREPROCESS=false
 SKIP_STAGE4=true  # Stage 4 is for per-gene networks, skip by default
 CALC_PER_GENE_METRICS=false
 NO_CI_FILTER=false
+BATCH_SIZE=""  # Batch size for Stage 1 (empty = vectorized mode)
 
 # ---------------------------------------------------------------------------
 # parse arguments
@@ -73,6 +74,7 @@ while [[ $# -gt 0 ]]; do
         --bootstrap-frac) BOOTSTRAP_FRAC="$2";  shift 2 ;;
         --fdr-alpha)      FDR_ALPHA="$2";       shift 2 ;;
         --seed)           SEED="$2";            shift 2 ;;
+        --batch-size)     BATCH_SIZE="$2";      shift 2 ;;
         --toy)            TOY=true;             shift   ;;
         --local)          LOCAL=true;           shift   ;;
         --with-stage4)    SKIP_STAGE4=false;    shift   ;;
@@ -190,8 +192,6 @@ run_job() {
             -l h_rt=$runtime \
             -q long.q \
             -j y \
-            -m beas \
-            -M yutao.cao@tuebingen.mpg.de \
             -o logs/${job_name}.\$JOB_ID.out \
             -e logs/${job_name}.\$JOB_ID.err \
             -S /bin/bash \
@@ -245,7 +245,6 @@ run_array_job() {
             -l h_rt=$runtime \
             -q long.q \
             -j y \
-            -m beas \
             -o logs/${job_name}.\$JOB_ID.\$TASK_ID.out \
             -e logs/${job_name}.\$JOB_ID.\$TASK_ID.err \
             -S /bin/bash \
@@ -316,7 +315,17 @@ STAGE1_CMD="python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
     --n-bootstrap $N_BOOTSTRAP --bootstrap-frac $BOOTSTRAP_FRAC \
     --seed $SEED"
 
-STAGE1_JID=$(run_job "stage1_indices" "$STAGE0_JID" "$STAGE1_CMD" "8G" "1:0:0")
+# Add batch-size parameter if specified
+if [[ -n "$BATCH_SIZE" ]]; then
+    STAGE1_CMD="$STAGE1_CMD --batch-size $BATCH_SIZE"
+    STAGE1_MEM="12G"  # Batch mode needs less memory
+    echo "  (Batch mode enabled: $BATCH_SIZE genes per batch, memory: $STAGE1_MEM)"
+else
+    STAGE1_MEM="30G"  # Vectorized mode needs more memory
+    echo "  (Vectorized mode: faster but needs more memory: $STAGE1_MEM)"
+fi
+
+STAGE1_JID=$(run_job "stage1_indices" "$STAGE0_JID" "$STAGE1_CMD" "$STAGE1_MEM" "1:0:0")
 
 # ---------------------------------------------------------------------------
 # Stage 2a - Base correlations + significance tests (per-gene array job)
@@ -345,9 +354,9 @@ STAGE2B_CMD="python src/scripts/10spearman_corr/02b_bootstrap_significant_edges.
     --base-dir $BASE_CORR_DIR \
     --out-dir $BOOT_SIG_DIR \
     --gene-index GENE_INDEX \
-    --edge-selection sig_edges"
+    --edge-selection sig_differential"
 
-STAGE2B_JID=$(run_array_job "stage2b_boot" "$STAGE2A_JID" "$STAGE2B_CMD" "$N_GENES" "16G" "2:0:0")
+STAGE2B_JID=$(run_array_job "stage2b_boot" "$STAGE2A_JID" "$STAGE2B_CMD" "$N_GENES" "20G" "2:0:0")
 
 # ---------------------------------------------------------------------------
 # Stage 3 - Collect per-gene networks into summary
@@ -359,8 +368,8 @@ STAGE3_CMD="python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
     --base-dir $BASE_CORR_DIR \
     --boot-dir $BOOT_SIG_DIR \
     --out-h5 $DIFF_NET_H5 \
-    --out-tsv $DIFF_NET_TSV \
-    --edge-selection sig_edges"
+    --out-focus-tsv $DIFF_NET_TSV \
+    --edge-selection sig_differential"
 
 if [[ "$NO_CI_FILTER" == true ]]; then
     STAGE3_CMD="$STAGE3_CMD --no-ci-filter"
