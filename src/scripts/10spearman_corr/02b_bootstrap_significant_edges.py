@@ -345,7 +345,7 @@ def parse_args() -> argparse.Namespace:
         "--edge-selection",
         type=str,
         choices=["sig_edges", "sig_differential"],
-        default="sig_edges",
+        default="sig_differential",
         help="Which edges to bootstrap: 'sig_edges' (individual & differential) or 'sig_differential' only.",
     )
     parser.add_argument(
