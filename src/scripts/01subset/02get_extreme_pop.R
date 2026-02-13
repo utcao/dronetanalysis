@@ -21,9 +21,21 @@ rm(list = ls())
 
 subset_sample_size <- NULL
 subset_gene_size   <- NULL
-test_sample_size   <- 930
-test_gene_size     <- 30
+test_sample_size   <- 939
+test_gene_size     <- 500
 
+# Gene IDs that MUST be included in subsets (NULL = no requirement).
+# These genes are included first, then random selection fills the rest.
+# Genes not found in the dataset are reported as warnings.
+# Can be a character vector, e.g.: c("FBgn0000014", "FBgn0000015")
+# or read from a file, e.g.: readLines("config/required_genes.txt")
+# Dicer 1 & 2:  FBgn0039016, FBgn0034246
+# Chaperon
+# Hsp83, Trap1, FBgn0026761, FBgn0001233,
+# DnaJ-1: FBgn0263106 
+# Kinase_ids <- readLines("dataset/flybase/FlyBase_IDs_KIN_KINASES.txt")
+hsp_ids <- readLines("dataset/flybase/FlyBase_IDs_HSP_HEAT_SHOCK_PROTEINS.txt")
+required_gene_ids  <- c("FBgn0039016", "FBgn0034246", hsp_ids)
 #################################
 ##### Packages and Setup ########
 #################################
@@ -127,11 +139,13 @@ subset_configs <- list(
 
 # Create subsets for VST data
 cat("Creating VST subsets...\n")
-vst_subsets <- create_multiple_subsets(vst_data_list, subset_configs, seed = 1234)
+vst_subsets <- create_multiple_subsets(vst_data_list, subset_configs, seed = 1234,
+                                      required_gene_ids = required_gene_ids)
 
-# Create subsets for VOOM data  
+# Create subsets for VOOM data
 cat("Creating VOOM subsets...\n")
-voom_subsets <- create_multiple_subsets(voom_data_list, subset_configs, seed = 1234)
+voom_subsets <- create_multiple_subsets(voom_data_list, subset_configs, seed = 1234,
+                                       required_gene_ids = required_gene_ids)
 
 # Write VST subsets
 cat("Writing VST subsets...\n")
