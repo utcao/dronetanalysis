@@ -8,7 +8,6 @@ to produce final differential network with:
 - Qualitative changes (disappear, new, sign_change)
 - Global topological features for LOW, HIGH, and DIFF networks
 - Focus gene neighborhood analysis (1st and 2nd layer partners)
-- Optional: per-gene metrics (controlled by --calc-per-gene-metrics)
 
 Pipeline position
 -----------------
@@ -37,8 +36,6 @@ Output HDF5 layout
         global_low/    - Low network: n_nodes, n_edges, density, avg_degree, ...
         global_high/   - High network: n_nodes, n_edges, density, avg_degree, ...
         global_diff/   - Differential network: n_nodes, n_edges, density, avg_degree, ...
-        per_gene/      - (Optional, --calc-per-gene-metrics)
-            degree, degree_low, degree_high, n_disappear, n_new, n_sign_change, rewiring_score
     focus_gene/
         gene_index
         direct_partners      (n_direct,) - 1st layer neighbors
@@ -56,6 +53,7 @@ from collections import defaultdict
 import h5py
 import numpy as np
 from scipy import sparse
+from scipy import stats as scipy_stats
 
 
 # =============================================================================
@@ -150,6 +148,107 @@ def classify_qualitative_change(
 # Topological Features
 # =============================================================================
 
+def _edge_key(i: int, j: int) -> tuple:
+    """Return canonical edge key (smaller index first)."""
+    return (min(i, j), max(i, j))
+
+
+def compute_scale_free_metrics(degrees: np.ndarray) -> dict:
+    """
+    Test if network follows scale-free topology.
+    Biological networks typically have gamma = 2-3.
+    """
+    active_degrees = degrees[degrees > 0]
+    if len(active_degrees) < 10:
+        return {"power_law_exponent": float("nan"), "power_law_r_squared": float("nan"), "is_scale_free": False}
+
+    unique_degrees, counts = np.unique(active_degrees, return_counts=True)
+    mask = counts >= 2
+    if mask.sum() < 5:
+        return {"power_law_exponent": float("nan"), "power_law_r_squared": float("nan"), "is_scale_free": False}
+
+    log_k = np.log10(unique_degrees[mask].astype(float))
+    log_p = np.log10(counts[mask].astype(float))
+
+    slope, intercept, r_value, _, _ = scipy_stats.linregress(log_k, log_p)
+    gamma = -slope
+
+    is_scale_free = (2.0 <= gamma <= 3.5) and (r_value**2 > 0.8)
+
+    return {
+        "power_law_exponent": float(gamma),
+        "power_law_r_squared": float(r_value**2),
+        "is_scale_free": bool(is_scale_free),
+    }
+
+
+def compute_clustering_coefficient(adj: dict, n_genes: int) -> float:
+    """
+    Compute global clustering coefficient (average of local clustering).
+    High clustering = functional modules/pathways.
+    """
+    local_clustering = []
+    for node in range(n_genes):
+        neighbors = list(adj.get(node, set()))
+        k = len(neighbors)
+        if k < 2:
+            continue
+        triangles = sum(
+            1 for i_idx, n1 in enumerate(neighbors)
+            for n2 in neighbors[i_idx + 1:]
+            if n2 in adj.get(n1, set())
+        )
+        possible = k * (k - 1) / 2
+        local_clustering.append(triangles / possible)
+
+    return float(np.mean(local_clustering)) if local_clustering else 0.0
+
+
+def compute_connected_components(adj: dict, n_genes: int) -> dict:
+    """Find disconnected subnetworks using BFS."""
+    from collections import deque
+
+    visited = set()
+    components = []
+
+    for start in range(n_genes):
+        if start in visited or len(adj.get(start, set())) == 0:
+            continue
+        component = set()
+        queue = deque([start])
+        while queue:
+            node = queue.popleft()
+            if node in visited:
+                continue
+            visited.add(node)
+            component.add(node)
+            queue.extend(n for n in adj.get(node, set()) if n not in visited)
+        components.append(len(component))
+
+    components = sorted(components, reverse=True)
+    return {
+        "n_components": len(components),
+        "largest_component_size": components[0] if components else 0,
+        "largest_component_fraction": float(components[0] / n_genes) if components else 0.0,
+    }
+
+
+def compute_assortativity(gene_i: np.ndarray, gene_j: np.ndarray, degrees: np.ndarray) -> float:
+    """
+    Pearson correlation of degrees at edge endpoints.
+    r > 0: hubs connect to hubs (assortative)
+    r < 0: hubs connect to periphery (disassortative)
+    """
+    if len(gene_i) < 2:
+        return 0.0
+    deg_i = degrees[gene_i].astype(float)
+    deg_j = degrees[gene_j].astype(float)
+    if np.std(deg_i) == 0 or np.std(deg_j) == 0:
+        return 0.0
+    r, _ = scipy_stats.pearsonr(deg_i, deg_j)
+    return float(r)
+
+
 def compute_global_topology(
     gene_i: np.ndarray,
     gene_j: np.ndarray,
@@ -176,17 +275,31 @@ def compute_global_topology(
     gi, gj = gene_i[mask], gene_j[mask]
     n_edges = len(gi)
 
+    _empty = {
+        "n_nodes_total": n_genes,
+        "n_nodes_active": 0,
+        "fraction_active": 0.0,
+        "n_edges": 0,
+        "density": 0.0,
+        "avg_degree": 0.0,
+        "max_degree": 0,
+        "min_degree": 0,
+        "median_degree": 0.0,
+        "std_degree": 0.0,
+        "degree_p25": 0.0, "degree_p50": 0.0, "degree_p75": 0.0,
+        "degree_p90": 0.0, "degree_p95": 0.0, "degree_p99": 0.0,
+        "power_law_exponent": float("nan"),
+        "power_law_r_squared": float("nan"),
+        "is_scale_free": False,
+        "global_clustering": 0.0,
+        "n_components": 0,
+        "largest_component_size": 0,
+        "largest_component_fraction": 0.0,
+        "assortativity": 0.0,
+        "degrees": np.zeros(n_genes, dtype=np.int32),
+    }
     if n_edges == 0:
-        return {
-            "n_nodes_total": n_genes,
-            "n_nodes_active": 0,
-            "n_edges": 0,
-            "density": 0.0,
-            "avg_degree": 0.0,
-            "max_degree": 0,
-            "median_degree": 0.0,
-            "degrees": np.zeros(n_genes, dtype=np.int32),
-        }
+        return _empty
 
     # Build adjacency list
     adj = defaultdict(set)
@@ -201,21 +314,57 @@ def compute_global_topology(
     # Degree distribution
     degrees = np.array([len(adj[g]) for g in range(n_genes)], dtype=np.int32)
 
-    # Global metrics
+    # Basic metrics
     density = 2 * n_edges / (n_genes * (n_genes - 1)) if n_genes > 1 else 0
     avg_degree = 2 * n_edges / n_genes if n_genes > 0 else 0
 
-    # Degree statistics (only for nodes with edges)
     active_degrees = degrees[degrees > 0]
+    max_degree = int(degrees.max()) if len(degrees) > 0 else 0
+    min_degree = int(active_degrees.min()) if len(active_degrees) > 0 else 0
+    median_degree = float(np.median(active_degrees)) if len(active_degrees) > 0 else 0
+    std_degree = float(active_degrees.std()) if len(active_degrees) > 0 else 0
+
+    # Degree percentiles
+    percentiles = {}
+    if len(active_degrees) > 0:
+        for p in [25, 50, 75, 90, 95, 99]:
+            percentiles[f"degree_p{p}"] = float(np.percentile(active_degrees, p))
+    else:
+        for p in [25, 50, 75, 90, 95, 99]:
+            percentiles[f"degree_p{p}"] = 0.0
+
+    # Scale-free properties
+    scale_free = compute_scale_free_metrics(degrees)
+
+    # Clustering coefficient
+    global_clustering = compute_clustering_coefficient(adj, n_genes)
+
+    # Connected components
+    components = compute_connected_components(adj, n_genes)
+
+    # Assortativity
+    assortativity = compute_assortativity(gi, gj, degrees)
 
     return {
         "n_nodes_total": n_genes,
         "n_nodes_active": n_nodes,
+        "fraction_active": float(n_nodes / n_genes) if n_genes > 0 else 0.0,
         "n_edges": n_edges,
         "density": density,
         "avg_degree": avg_degree,
-        "max_degree": int(degrees.max()) if len(degrees) > 0 else 0,
-        "median_degree": float(np.median(active_degrees)) if len(active_degrees) > 0 else 0,
+        "max_degree": max_degree,
+        "min_degree": min_degree,
+        "median_degree": median_degree,
+        "std_degree": std_degree,
+        **percentiles,
+        "power_law_exponent": scale_free["power_law_exponent"],
+        "power_law_r_squared": scale_free["power_law_r_squared"],
+        "is_scale_free": scale_free["is_scale_free"],
+        "global_clustering": global_clustering,
+        "n_components": components["n_components"],
+        "largest_component_size": components["largest_component_size"],
+        "largest_component_fraction": components["largest_component_fraction"],
+        "assortativity": assortativity,
         "degrees": degrees,
     }
 
@@ -266,6 +415,8 @@ def compute_per_gene_metrics(
     n_weaken = np.zeros(n_genes, dtype=np.int32)
     sum_delta = np.zeros(n_genes, dtype=np.float32)
     sum_abs_delta = np.zeros(n_genes, dtype=np.float32)
+    sum_r_low = np.zeros(n_genes, dtype=np.float32)
+    sum_r_high = np.zeros(n_genes, dtype=np.float32)
 
     for idx, (i, j) in enumerate(zip(gene_i, gene_j)):
         # Both genes get this edge
@@ -275,8 +426,10 @@ def compute_per_gene_metrics(
             # Count by presence in low/high
             if np.abs(r_low[idx]) >= corr_threshold:
                 degree_low[g] += 1
+                sum_r_low[g] += np.abs(r_low[idx])
             if np.abs(r_high[idx]) >= corr_threshold:
                 degree_high[g] += 1
+                sum_r_high[g] += np.abs(r_high[idx])
 
             # Count by qualitative category
             if qual_score[idx] == QUAL_DISAPPEAR:
@@ -298,6 +451,11 @@ def compute_per_gene_metrics(
     # Rewiring score: total qualitative changes (excluding strengthen/weaken)
     rewiring_score = n_disappear + n_new + n_sign_change
 
+    # Mean metrics (avoid divide-by-zero)
+    mean_r_low = np.where(degree_low > 0, sum_r_low / degree_low, 0.0).astype(np.float32)
+    mean_r_high = np.where(degree_high > 0, sum_r_high / degree_high, 0.0).astype(np.float32)
+    mean_abs_delta = np.where(degree > 0, sum_abs_delta / degree, 0.0).astype(np.float32)
+
     return {
         "degree": degree,
         "degree_low": degree_low,
@@ -310,6 +468,11 @@ def compute_per_gene_metrics(
         "rewiring_score": rewiring_score,
         "sum_delta": sum_delta,
         "sum_abs_delta": sum_abs_delta,
+        "sum_r_low": sum_r_low,
+        "sum_r_high": sum_r_high,
+        "mean_r_low": mean_r_low,
+        "mean_r_high": mean_r_high,
+        "mean_abs_delta": mean_abs_delta,
     }
 
 
@@ -326,89 +489,177 @@ def analyze_focus_gene(
     r_high: np.ndarray,
     delta: np.ndarray,
     n_genes: int,
+    sig_low: np.ndarray | None = None,
+    sig_high: np.ndarray | None = None,
+    corr_threshold: float = 0.0001,
 ) -> dict:
     """
-    Analyze neighborhood of the focus gene (1st and 2nd layer).
+    Analyze neighborhood of the focus gene (1st and 2nd layer)
+    across all three networks: low, high, and differential.
 
     Returns
     -------
-    results : dict with direct partners, indirect partners, and statistics
+    results : dict with direct partners, indirect partners, statistics,
+              low/high network stats, and L1/L2 two-layer metrics with ratios
     """
-    # Build adjacency list
-    adj = defaultdict(set)
+    # Build THREE adjacency lists + edge map
+    adj_diff = defaultdict(set)  # differential network (all sig edges)
+    adj_low = defaultdict(set)   # low network (|r_low| >= threshold)
+    adj_high = defaultdict(set)  # high network (|r_high| >= threshold)
     edge_map = {}  # (i, j) -> edge index
-    for idx, (i, j) in enumerate(zip(gene_i, gene_j)):
-        adj[i].add(j)
-        adj[j].add(i)
-        edge_map[(min(i, j), max(i, j))] = idx
+    r_low_map = {}  # edge_key -> r_low value
+    r_high_map = {}  # edge_key -> r_high value
+    delta_map = {}  # edge_key -> delta value
 
-    # 1st layer: direct partners
-    direct_partners = sorted(adj[focus_gene])
+    for idx, (i, j) in enumerate(zip(gene_i, gene_j)):
+        adj_diff[i].add(j)
+        adj_diff[j].add(i)
+        key = _edge_key(i, j)
+        edge_map[key] = idx
+        r_low_map[key] = r_low[idx]
+        r_high_map[key] = r_high[idx]
+        delta_map[key] = delta[idx]
+
+        # "Present" = significant AND |r| >= threshold (consistent with classify_qualitative_change)
+        is_sig_low = sig_low[idx] if sig_low is not None else True
+        is_sig_high = sig_high[idx] if sig_high is not None else True
+        if is_sig_low and abs(r_low[idx]) >= corr_threshold:
+            adj_low[i].add(j)
+            adj_low[j].add(i)
+        if is_sig_high and abs(r_high[idx]) >= corr_threshold:
+            adj_high[i].add(j)
+            adj_high[j].add(i)
+
+    # 1st layer: direct partners (in diff network)
+    direct_partners = sorted(adj_diff[focus_gene])
 
     # 2nd layer: partners of partners (excluding focus gene and direct partners)
+    direct_set = set(direct_partners)
     indirect_partners = set()
     for partner in direct_partners:
-        for second in adj[partner]:
-            if second != focus_gene and second not in direct_partners:
+        for second in adj_diff[partner]:
+            if second != focus_gene and second not in direct_set:
                 indirect_partners.add(second)
     indirect_partners = sorted(indirect_partners)
 
     # Get edges involving focus gene (1st layer edges)
     direct_edges = []
     for partner in direct_partners:
-        key = (min(focus_gene, partner), max(focus_gene, partner))
+        key = _edge_key(focus_gene, partner)
         if key in edge_map:
             direct_edges.append(edge_map[key])
-
     direct_edges = np.array(direct_edges, dtype=np.int32)
 
     # Get edges in 2-layer neighborhood (1st + edges between 1st layer)
-    two_layer_edges = set(direct_edges)
-    for i, p1 in enumerate(direct_partners):
-        for p2 in direct_partners[i+1:]:
-            key = (min(p1, p2), max(p1, p2))
+    two_layer_edges = set(direct_edges.tolist())
+    for i_idx, p1 in enumerate(direct_partners):
+        for p2 in direct_partners[i_idx + 1:]:
+            key = _edge_key(p1, p2)
             if key in edge_map:
                 two_layer_edges.add(edge_map[key])
-
     two_layer_edges = np.array(sorted(two_layer_edges), dtype=np.int32)
 
-    # Statistics for direct edges (1st layer)
+    # Get FULL two-layer edge set (focus→L1 + L1↔L1 + L1→L2)
+    # This extends two_layer_edges with edges from L1 partners to L2-only partners
+    indirect_set = set(indirect_partners)
+    full_two_layer_edges = set(two_layer_edges.tolist())
+    for p1 in direct_partners:
+        for p2 in indirect_set:
+            key = _edge_key(p1, p2)
+            if key in edge_map:
+                full_two_layer_edges.add(edge_map[key])
+    full_two_layer_edges = np.array(sorted(full_two_layer_edges), dtype=np.int32)
+
+    # Statistics for edge subsets (L1, L2, full two-layer)
     def compute_edge_stats(edge_indices):
         if len(edge_indices) == 0:
             return {
                 "n_edges": 0,
-                "n_disappear": 0,
-                "n_new": 0,
-                "n_sign_change": 0,
-                "mean_delta": 0.0,
+                "n_disappear": 0, "n_new": 0, "n_sign_change": 0,
+                "n_strengthen": 0, "n_weaken": 0,
                 "mean_abs_delta": 0.0,
-                "mean_r_low": 0.0,
-                "mean_r_high": 0.0,
-                "n_strengthen": 0,
-                "n_weaken": 0,
+                "sum_abs_delta": 0.0, "str_low": 0.0, "str_high": 0.0,
             }
-
         qs = qual_score[edge_indices]
+        rl = np.abs(r_low[edge_indices])
+        rh = np.abs(r_high[edge_indices])
+
+        # Qualitative counts from qual_score
+        n_disappear = int(np.sum(qs == QUAL_DISAPPEAR))
+        n_new = int(np.sum(qs == QUAL_NEW))
+        n_sign_change = int(np.sum(qs == QUAL_SIGN_CHANGE))
+
+        # Strengthen/weaken INDEPENDENT of sign_change:
+        # For all "both present" edges, compare |r_high| vs |r_low|
+        mask_both = ((qs == QUAL_SIGN_CHANGE) | (qs == QUAL_STRENGTHEN) | (qs == QUAL_WEAKEN))
+        n_strengthen = int(np.sum(mask_both & (rh > rl)))
+        n_weaken = int(np.sum(mask_both & (rh < rl)))
+
+        # str_low / str_high: sum|r| only for "present" edges
+        if sig_low is not None:
+            present_low = sig_low[edge_indices] & (rl >= corr_threshold)
+            present_high = sig_high[edge_indices] & (rh >= corr_threshold)
+        else:
+            present_low = rl >= corr_threshold
+            present_high = rh >= corr_threshold
+        str_low = float(np.sum(rl[present_low]))
+        str_high = float(np.sum(rh[present_high]))
+
         return {
             "n_edges": len(edge_indices),
-            "n_disappear": int(np.sum(qs == QUAL_DISAPPEAR)),
-            "n_new": int(np.sum(qs == QUAL_NEW)),
-            "n_sign_change": int(np.sum(qs == QUAL_SIGN_CHANGE)),
-            "mean_delta": float(np.mean(delta[edge_indices])),
+            "n_disappear": n_disappear,
+            "n_new": n_new,
+            "n_sign_change": n_sign_change,
+            "n_strengthen": n_strengthen,
+            "n_weaken": n_weaken,
             "mean_abs_delta": float(np.mean(np.abs(delta[edge_indices]))),
-            "mean_r_low": float(np.mean(r_low[edge_indices])),
-            "mean_r_high": float(np.mean(r_high[edge_indices])),
-            "n_strengthen": int(np.sum(qs == QUAL_STRENGTHEN)),
-            "n_weaken": int(np.sum(qs == QUAL_WEAKEN)),
+            "sum_abs_delta": float(np.sum(np.abs(delta[edge_indices]))),
+            "str_low": str_low,
+            "str_high": str_high,
         }
 
     direct_stats = compute_edge_stats(direct_edges)
     two_layer_stats = compute_edge_stats(two_layer_edges)
+    full_two_layer_stats = compute_edge_stats(full_two_layer_edges)
+
+    # --- L1/L2 degree in diff network ---
+    L1_deg_diff = len(adj_diff.get(focus_gene, set()))
+    # L2 = L1 + partners-of-L1-partners (combined neighborhood size)
+    L1_set = set(adj_diff.get(focus_gene, set()))
+    L2_set = set()
+    for p in L1_set:
+        L2_set.update(adj_diff.get(p, set()))
+    L2_set.discard(focus_gene)
+    L2_deg_diff = len(L2_set)  # all unique nodes in L1+L2
+
+    # --- Rewiring scores (disappear + new + sign_change) ---
+    L1_rewire = (direct_stats["n_disappear"] + direct_stats["n_new"]
+                 + direct_stats["n_sign_change"])
+    L2_rewire = (full_two_layer_stats["n_disappear"] + full_two_layer_stats["n_new"]
+                 + full_two_layer_stats["n_sign_change"])
+
+    # --- Strength metrics ---
+    L1_str_low = direct_stats["str_low"]
+    L1_str_high = direct_stats["str_high"]
+    L1_str_diff = direct_stats["sum_abs_delta"]
+    L1_mean_abs_dr = direct_stats["mean_abs_delta"]
+    L2_str_low = full_two_layer_stats["str_low"]
+    L2_str_high = full_two_layer_stats["str_high"]
+    L2_str_diff = full_two_layer_stats["sum_abs_delta"]
+
+    # --- L2/L1 expansion ratios (diff network) ---
+    L2L1_deg = L2_deg_diff / L1_deg_diff if L1_deg_diff > 0 else 0.0
+    L2L1_rewire = L2_rewire / L1_rewire if L1_rewire > 0 else 0.0
+    L2L1_str = L2_str_diff / L1_str_diff if L1_str_diff > 0 else 0.0
+
+    # --- High/Low condition strength ratios ---
+    HL_str_L1 = L1_str_high / L1_str_low if L1_str_low > 0 else 0.0
+    HL_str_L2 = L2_str_high / L2_str_low if L2_str_low > 0 else 0.0
 
     # Per-partner breakdown for direct partners
     partner_details = []
     for partner in direct_partners:
-        key = (min(focus_gene, partner), max(focus_gene, partner))
+        key = _edge_key(focus_gene, partner)
         if key in edge_map:
             idx = edge_map[key]
             partner_details.append({
@@ -428,7 +679,30 @@ def analyze_focus_gene(
         "indirect_partners": np.array(indirect_partners, dtype=np.int32),
         "direct_stats": direct_stats,
         "two_layer_stats": two_layer_stats,
+        "full_two_layer_stats": full_two_layer_stats,
         "partner_details": partner_details,
+        # --- Flat metrics for TSV collection ---
+        "L1_deg_diff": L1_deg_diff,
+        "L1_n_disappear": direct_stats["n_disappear"],
+        "L1_n_new": direct_stats["n_new"],
+        "L1_n_sign_chg": direct_stats["n_sign_change"],
+        "L1_n_strengthen": direct_stats["n_strengthen"],
+        "L1_n_weaken": direct_stats["n_weaken"],
+        "L1_rewire": L1_rewire,
+        "L1_str_low": float(L1_str_low),
+        "L1_str_high": float(L1_str_high),
+        "L1_str_diff": float(L1_str_diff),
+        "L1_mean_abs_dr": float(L1_mean_abs_dr),
+        "L2_deg_diff": L2_deg_diff,
+        "L2_rewire": L2_rewire,
+        "L2_str_low": float(L2_str_low),
+        "L2_str_high": float(L2_str_high),
+        "L2_str_diff": float(L2_str_diff),
+        "L2L1_deg": float(L2L1_deg),
+        "L2L1_rewire": float(L2L1_rewire),
+        "L2L1_str": float(L2L1_str),
+        "HL_str_L1": float(HL_str_L1),
+        "HL_str_L2": float(HL_str_L2),
     }
 
 
@@ -439,7 +713,7 @@ def analyze_focus_gene(
 def load_and_process(
     base_h5_path: Path,
     boot_h5_path: Path,
-    edge_selection: str = "sig_edges",
+    edge_selection: str = "sig_differential",
     min_effect: float = 0.0,
     require_ci_exclude_zero: bool = True,
     corr_threshold: float = 0.0001,
@@ -511,8 +785,13 @@ def load_and_process(
             bias = np.array([], dtype=np.float32)
             pval_boot = np.array([], dtype=np.float32)
             ci_alpha = h5["meta"].attrs["ci_alpha"]
-            # Error bug: no gene_index_used
-            gene_index_used = h5["meta"].attrs.get("gene_index_used", 0)
+            # Read gene_index_used with warning if missing
+            if "meta" in h5 and "gene_index_used" in h5["meta"].attrs:
+                gene_index_used = h5["meta"].attrs["gene_index_used"]
+            else:
+                print("  WARNING: gene_index_used not found in bootstrap file!")
+                print("  Defaulting to gene_index=0. This may indicate a Stage 2b issue.")
+                gene_index_used = 0
             sig_indices = np.array([], dtype=np.int32)
         else:
             # Verify indices match
@@ -542,7 +821,13 @@ def load_and_process(
             bias = h5["boot/bias"][:]
             pval_boot = h5["pval/bootstrap_pval"][:]
             ci_alpha = h5["meta"].attrs["ci_alpha"]
-            gene_index_used = h5["meta"].attrs.get("gene_index_used", 0)
+            # Read gene_index_used with warning if missing
+            if "meta" in h5 and "gene_index_used" in h5["meta"].attrs:
+                gene_index_used = h5["meta"].attrs["gene_index_used"]
+            else:
+                print("  WARNING: gene_index_used not found in bootstrap file!")
+                print("  Defaulting to gene_index=0. This may indicate a Stage 2b issue.")
+                gene_index_used = 0
 
     print(f"  {len(gene_i):,} edges with bootstrap data")
 
@@ -616,10 +901,8 @@ def load_and_process(
 def save_results(
     results: dict,
     all_topo: dict,
-    per_gene: dict | None,
     focus_analysis: dict,
     out_h5_path: Path,
-    out_tsv_path: Path = None,
     gene_ids: list = None,
 ) -> None:
     """Save all results to HDF5."""
@@ -657,22 +940,29 @@ def save_results(
 
         # Global topology for low, high, diff networks
         topo = h5.create_group("topology")
+        global_topo_attrs = [
+            "n_nodes_total", "n_nodes_active", "fraction_active",
+            "n_edges", "density",
+            "avg_degree", "max_degree", "min_degree", "median_degree", "std_degree",
+            "degree_p25", "degree_p50", "degree_p75", "degree_p90", "degree_p95", "degree_p99",
+            "power_law_exponent", "power_law_r_squared", "is_scale_free",
+            "global_clustering",
+            "n_components", "largest_component_size", "largest_component_fraction",
+            "assortativity",
+        ]
         for net_name in ["low", "high", "diff"]:
             net_topo = all_topo[net_name]
             grp = topo.create_group(f"global_{net_name}")
-            for key in ["n_nodes_total", "n_nodes_active", "n_edges", "density",
-                        "avg_degree", "max_degree", "median_degree"]:
-                grp.attrs[key] = net_topo[key]
+            for key in global_topo_attrs:
+                val = net_topo.get(key)
+                if val is not None:
+                    # Handle NaN for HDF5 attrs
+                    if isinstance(val, float) and np.isnan(val):
+                        grp.attrs[key] = float("nan")
+                    else:
+                        grp.attrs[key] = val
             # Also save degree array for each network
             grp.create_dataset("degrees", data=net_topo["degrees"], compression="gzip")
-
-        # Per-gene metrics (optional)
-        if per_gene is not None:
-            per_gene_grp = topo.create_group("per_gene")
-            for key in ["degree", "degree_low", "degree_high", "n_disappear", "n_new",
-                        "n_sign_change", "n_strengthen", "n_weaken", "rewiring_score",
-                        "sum_delta", "sum_abs_delta"]:
-                per_gene_grp.create_dataset(key, data=per_gene[key], compression="gzip")
 
         # Focus gene analysis
         if focus_analysis is not None:
@@ -684,15 +974,21 @@ def save_results(
             focus.create_dataset("direct_partners", data=focus_analysis["direct_partners"])
             focus.create_dataset("indirect_partners", data=focus_analysis["indirect_partners"])
 
-            # Direct stats
+            # Direct stats (L1)
             direct_grp = focus.create_group("direct_stats")
             for key, val in focus_analysis["direct_stats"].items():
                 direct_grp.attrs[key] = val
 
-            # Two-layer stats
+            # Two-layer stats (L1+L1↔L1)
             two_layer_grp = focus.create_group("two_layer_stats")
             for key, val in focus_analysis["two_layer_stats"].items():
                 two_layer_grp.attrs[key] = val
+
+            # Flat metrics (L1/L2/ratios)
+            flat_keys = [k for k in focus_analysis if k.startswith(("L1_", "L2_", "L2L1_", "HL_"))]
+            metrics_grp = focus.create_group("metrics")
+            for key in flat_keys:
+                metrics_grp.attrs[key] = focus_analysis[key]
 
         # Sparse matrix for reconstruction
         if results["n_significant"] > 0:
@@ -712,51 +1008,6 @@ def save_results(
 
     print(f"  Saved {results['n_significant']:,} edges")
 
-    # Save rewiring hub table (TSV) - only if per-gene metrics computed
-    if out_tsv_path is not None and per_gene is not None:
-        save_rewiring_hub_table(per_gene, out_tsv_path, gene_ids)
-    elif out_tsv_path is not None:
-        print(f"  Skipping TSV output (per-gene metrics not computed)")
-
-
-def save_rewiring_hub_table(per_gene: dict, out_path: Path, gene_ids: list = None) -> None:
-    """Save per-gene rewiring metrics as TSV."""
-    print(f"Saving rewiring hub table to {out_path}...")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    n_genes = len(per_gene["degree"])
-
-    with open(out_path, "w") as f:
-        # Header
-        f.write("gene_idx\tgene_id\tdegree\tdegree_low\tdegree_high\t"
-                "n_disappear\tn_new\tn_sign_change\tn_strengthen\tn_weaken\t"
-                "rewiring_score\tsum_delta\tsum_abs_delta\n")
-
-        # Sort by rewiring score (descending)
-        sort_idx = np.argsort(per_gene["rewiring_score"])[::-1]
-
-        for i in sort_idx:
-            # Skip genes with no edges
-            if per_gene["degree"][i] == 0:
-                continue
-
-            gene_id = gene_ids[i] if gene_ids else f"gene_{i}"
-            f.write(f"{i}\t{gene_id}\t"
-                   f"{per_gene['degree'][i]}\t"
-                   f"{per_gene['degree_low'][i]}\t"
-                   f"{per_gene['degree_high'][i]}\t"
-                   f"{per_gene['n_disappear'][i]}\t"
-                   f"{per_gene['n_new'][i]}\t"
-                   f"{per_gene['n_sign_change'][i]}\t"
-                   f"{per_gene['n_strengthen'][i]}\t"
-                   f"{per_gene['n_weaken'][i]}\t"
-                   f"{per_gene['rewiring_score'][i]}\t"
-                   f"{per_gene['sum_delta'][i]:.4f}\t"
-                   f"{per_gene['sum_abs_delta'][i]:.4f}\n")
-
-    n_with_edges = np.sum(per_gene["degree"] > 0)
-    print(f"  Saved {n_with_edges:,} genes with edges")
-
 
 # =============================================================================
 # Per-Gene Collection (directory mode)
@@ -773,7 +1024,7 @@ def collect_per_gene_networks(
     base_dir: Path,
     boot_dir: Path,
     out_h5_path: Path,
-    out_tsv_path: Path | None = None,
+    out_focus_tsv_path: Path | None = None,
     edge_selection: str = "sig_edges",
     min_effect: float = 0.0,
     require_ci_exclude_zero: bool = True,
@@ -819,18 +1070,41 @@ def collect_per_gene_networks(
     # Initialize per-reference-gene summary arrays
     summary = {
         "gene_index": np.array(gene_indices, dtype=np.int32),
-        "n_sig_edges": np.zeros(n_ref_genes, dtype=np.int32),
+        "n_sig_total": np.zeros(n_ref_genes, dtype=np.int32),
         "n_after_filter": np.zeros(n_ref_genes, dtype=np.int32),
+        # Whole-network qualitative counts
         "n_disappear": np.zeros(n_ref_genes, dtype=np.int32),
         "n_new": np.zeros(n_ref_genes, dtype=np.int32),
         "n_sign_change": np.zeros(n_ref_genes, dtype=np.int32),
         "n_strengthen": np.zeros(n_ref_genes, dtype=np.int32),
         "n_weaken": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_edges_low": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_edges_high": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_edges_diff": np.zeros(n_ref_genes, dtype=np.int32),
         "mean_abs_delta": np.zeros(n_ref_genes, dtype=np.float32),
         "max_abs_delta": np.zeros(n_ref_genes, dtype=np.float32),
+        # Focus gene L1 metrics
+        "L1_deg_diff": np.zeros(n_ref_genes, dtype=np.int32),
+        "L1_n_disappear": np.zeros(n_ref_genes, dtype=np.int32),
+        "L1_n_new": np.zeros(n_ref_genes, dtype=np.int32),
+        "L1_n_sign_chg": np.zeros(n_ref_genes, dtype=np.int32),
+        "L1_n_strengthen": np.zeros(n_ref_genes, dtype=np.int32),
+        "L1_n_weaken": np.zeros(n_ref_genes, dtype=np.int32),
+        "L1_rewire": np.zeros(n_ref_genes, dtype=np.int32),
+        "L1_str_low": np.zeros(n_ref_genes, dtype=np.float32),
+        "L1_str_high": np.zeros(n_ref_genes, dtype=np.float32),
+        "L1_str_diff": np.zeros(n_ref_genes, dtype=np.float32),
+        "L1_mean_abs_dr": np.zeros(n_ref_genes, dtype=np.float32),
+        # Focus gene L2 metrics
+        "L2_deg_diff": np.zeros(n_ref_genes, dtype=np.int32),
+        "L2_rewire": np.zeros(n_ref_genes, dtype=np.int32),
+        "L2_str_low": np.zeros(n_ref_genes, dtype=np.float32),
+        "L2_str_high": np.zeros(n_ref_genes, dtype=np.float32),
+        "L2_str_diff": np.zeros(n_ref_genes, dtype=np.float32),
+        # L2/L1 expansion ratios (diff network)
+        "L2L1_deg": np.zeros(n_ref_genes, dtype=np.float32),
+        "L2L1_rewire": np.zeros(n_ref_genes, dtype=np.float32),
+        "L2L1_str": np.zeros(n_ref_genes, dtype=np.float32),
+        # High/Low condition strength ratios
+        "HL_str_L1": np.zeros(n_ref_genes, dtype=np.float32),
+        "HL_str_L2": np.zeros(n_ref_genes, dtype=np.float32),
     }
 
     # Process each reference gene
@@ -846,24 +1120,28 @@ def collect_per_gene_networks(
             print(f"  [{ref_idx+1}/{n_ref_genes}] Gene {g_idx} ({g_name})...")
 
         # Use existing load_and_process iterating for each .h5/gene
-        results = load_and_process(
-            base_h5_path=base_path,
-            boot_h5_path=boot_path,
-            edge_selection=edge_selection,
-            min_effect=min_effect,
-            require_ci_exclude_zero=require_ci_exclude_zero,
-            corr_threshold=corr_threshold,
-        )
+        try:
+            results = load_and_process(
+                base_h5_path=base_path,
+                boot_h5_path=boot_path,
+                edge_selection=edge_selection,
+                min_effect=min_effect,
+                require_ci_exclude_zero=require_ci_exclude_zero,
+                corr_threshold=corr_threshold,
+            )
+        except (ValueError, KeyError) as e:
+            print(f"  [{ref_idx+1}/{n_ref_genes}] Gene {g_idx} ({g_name}): ERROR - {e}, skipping")
+            continue
 
         n_sig = results["n_significant"]
-        summary["n_sig_edges"][ref_idx] = n_sig
+        summary["n_sig_total"][ref_idx] = n_sig
 
         if n_sig == 0:
             continue
 
         summary["n_after_filter"][ref_idx] = n_sig
 
-        # Qualitative counts
+        # Whole-network qualitative counts
         qs = results["qual_score"]
         summary["n_disappear"][ref_idx] = int(np.sum(qs == QUAL_DISAPPEAR))
         summary["n_new"][ref_idx] = int(np.sum(qs == QUAL_NEW))
@@ -871,20 +1149,34 @@ def collect_per_gene_networks(
         summary["n_strengthen"][ref_idx] = int(np.sum(qs == QUAL_STRENGTHEN))
         summary["n_weaken"][ref_idx] = int(np.sum(qs == QUAL_WEAKEN))
 
-        # Topology counts
-        topo = compute_all_global_topologies(
-            results["gene_i"], results["gene_j"],
-            results["r_low"], results["r_high"], results["delta_base"],
-            n_genes, corr_threshold,
-        )
-        summary["n_edges_low"][ref_idx] = topo["low"]["n_edges"]
-        summary["n_edges_high"][ref_idx] = topo["high"]["n_edges"]
-        summary["n_edges_diff"][ref_idx] = topo["diff"]["n_edges"]
-
         # Delta stats
         abs_delta = np.abs(results["delta_base"])
         summary["mean_abs_delta"][ref_idx] = float(np.mean(abs_delta))
         summary["max_abs_delta"][ref_idx] = float(np.max(abs_delta))
+
+        # Focus gene analysis (reference gene = focus gene)
+        fa = analyze_focus_gene(
+            focus_gene=g_idx,
+            gene_i=results["gene_i"],
+            gene_j=results["gene_j"],
+            qual_score=results["qual_score"],
+            r_low=results["r_low"],
+            r_high=results["r_high"],
+            delta=results["delta_base"],
+            n_genes=n_genes,
+            sig_low=results["sig_low"],
+            sig_high=results["sig_high"],
+            corr_threshold=corr_threshold,
+        )
+
+        # Copy flat metrics from analyze_focus_gene into summary arrays
+        for key in ["L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+                     "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+                     "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
+                     "L2_deg_diff", "L2_rewire", "L2_str_low", "L2_str_high", "L2_str_diff",
+                     "L2L1_deg", "L2L1_rewire", "L2L1_str",
+                     "HL_str_L1", "HL_str_L2"]:
+            summary[key][ref_idx] = fa[key]
 
     # Write summary HDF5
     print(f"\nSaving summary to {out_h5_path}...")
@@ -912,59 +1204,131 @@ def collect_per_gene_networks(
         )
 
     # Print summary
-    n_with_edges = np.sum(summary["n_sig_edges"] > 0)
+    n_with_edges = np.sum(summary["n_sig_total"] > 0)
     print(f"\n{'='*60}")
     print(f"PER-GENE NETWORK COLLECTION SUMMARY")
     print(f"{'='*60}")
     print(f"  Reference genes processed: {n_ref_genes}")
     print(f"  Reference genes with edges: {n_with_edges}")
-    print(f"  Total sig edges across all genes: {summary['n_sig_edges'].sum():,}")
+    print(f"  Total sig edges across all genes: {summary['n_sig_total'].sum():,}")
     if n_with_edges > 0:
-        active = summary["n_sig_edges"] > 0
-        print(f"  Mean sig edges per active gene: {summary['n_sig_edges'][active].mean():.1f}")
-        print(f"  Max sig edges: {summary['n_sig_edges'].max():,}")
+        active = summary["n_sig_total"] > 0
+        print(f"  Mean sig edges per active gene: {summary['n_sig_total'][active].mean():.1f}")
+        print(f"  Max sig edges: {summary['n_sig_total'].max():,}")
         print(f"  Mean |Δr| (active genes): {summary['mean_abs_delta'][active].mean():.4f}")
 
-    # Top rewiring genes
+    # Top genes by L2L1_deg
     if n_with_edges > 0:
-        rewiring = summary["n_disappear"] + summary["n_new"] + summary["n_sign_change"]
-        top_idx = np.argsort(rewiring)[::-1][:min(20, n_ref_genes)]
-        print(f"\n  Top rewirinwsdg reference genes:")
-        print(f"  {'Idx':>6} {'Gene':>20} {'SigEdges':>10} {'Disappear':>10} {'New':>6} {'SignChg':>8}")
+        top_idx = np.argsort(summary["L2L1_deg"])[::-1][:min(20, n_ref_genes)]
+        print(f"\n  Top genes by L2/L1 degree ratio (diff network):")
+        print(f"  {'Idx':>6} {'Gene':>20} {'SigTotal':>10} {'L1_deg':>7} {'L2_deg':>7} "
+              f"{'L2L1':>7} {'L1_rew':>7} {'L2_rew':>7}")
         for i in top_idx:
-            if summary["n_sig_edges"][i] > 0:
+            if summary["n_sig_total"][i] > 0:
                 print(f"  {summary['gene_index'][i]:>6} {gene_file_names[i]:>20} "
-                      f"{summary['n_sig_edges'][i]:>10} {summary['n_disappear'][i]:>10} "
-                      f"{summary['n_new'][i]:>6} {summary['n_sign_change'][i]:>8}")
+                      f"{summary['n_sig_total'][i]:>10} {summary['L1_deg_diff'][i]:>7} "
+                      f"{summary['L2_deg_diff'][i]:>7} {summary['L2L1_deg'][i]:>7.2f} "
+                      f"{summary['L1_rewire'][i]:>7} {summary['L2_rewire'][i]:>7}")
 
-    # Write TSV
-    if out_tsv_path:
-        print(f"\nSaving TSV to {out_tsv_path}...")
-        out_tsv_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(out_tsv_path, "w") as f:
-            f.write("gene_idx\tgene_id\tn_sig_edges\tn_disappear\tn_new\tn_sign_change\t"
-                    "n_strengthen\tn_weaken\tn_edges_low\tn_edges_high\tn_edges_diff\t"
-                    "mean_abs_delta\tmax_abs_delta\n")
-            sort_idx = np.argsort(summary["n_sig_edges"])[::-1]
+    # Write focus gene TSV (sorted by L2L1_deg descending)
+    if out_focus_tsv_path:
+        print(f"\nSaving focus gene TSV to {out_focus_tsv_path}...")
+        out_focus_tsv_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # TSV columns (order matches revised plan)
+        focus_tsv_cols = [
+            "gene_idx", "gene_id", "n_sig_total",
+            "L1_deg_diff",
+            "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+            "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+            "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
+            "L2_deg_diff", "L2_rewire",
+            "L2_str_low", "L2_str_high", "L2_str_diff",
+            "L2L1_deg", "L2L1_rewire", "L2L1_str",
+            "HL_str_L1", "HL_str_L2",
+        ]
+
+        # Sort by L2L1_deg descending
+        sort_idx = np.argsort(summary["L2L1_deg"])[::-1]
+
+        # Integer columns (no decimal formatting)
+        int_cols = {"gene_idx", "n_sig_total", "L1_deg_diff",
+                    "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+                    "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+                    "L2_deg_diff", "L2_rewire"}
+
+        with open(out_focus_tsv_path, "w") as f:
+            f.write("\t".join(focus_tsv_cols) + "\n")
             for i in sort_idx:
-                if summary["n_sig_edges"][i] == 0:
+                if summary["n_sig_total"][i] == 0:
                     continue
-                f.write(f"{summary['gene_index'][i]}\t{gene_file_names[i]}\t"
-                       f"{summary['n_sig_edges'][i]}\t{summary['n_disappear'][i]}\t"
-                       f"{summary['n_new'][i]}\t{summary['n_sign_change'][i]}\t"
-                       f"{summary['n_strengthen'][i]}\t{summary['n_weaken'][i]}\t"
-                       f"{summary['n_edges_low'][i]}\t{summary['n_edges_high'][i]}\t"
-                       f"{summary['n_edges_diff'][i]}\t"
-                       f"{summary['mean_abs_delta'][i]:.4f}\t"
-                       f"{summary['max_abs_delta'][i]:.4f}\n")
-        print(f"  Saved {n_with_edges} genes to TSV")
+                vals = []
+                for col in focus_tsv_cols:
+                    if col == "gene_idx":
+                        vals.append(str(summary["gene_index"][i]))
+                    elif col == "gene_id":
+                        vals.append(gene_file_names[i])
+                    elif col in int_cols:
+                        vals.append(str(summary[col][i]))
+                    else:
+                        vals.append(f"{summary[col][i]:.4f}")
+                f.write("\t".join(vals) + "\n")
+        print(f"  Saved {n_with_edges} genes to focus gene TSV")
 
 
 # =============================================================================
 # Summary Printing
 # =============================================================================
 
-def print_summary(results: dict, all_topo: dict, per_gene: dict | None, focus_analysis: dict) -> None:
+def _fmt_val(val) -> str:
+    """Format a metric value for display."""
+    if val is None or (isinstance(val, float) and np.isnan(val)):
+        return "N/A"
+    elif isinstance(val, bool):
+        return "Yes" if val else "No"
+    elif isinstance(val, float):
+        if abs(val) < 0.01 and val != 0:
+            return f"{val:.2e}"
+        return f"{val:.4f}"
+    elif isinstance(val, (int, np.integer)):
+        return f"{val:,}"
+    return str(val)
+
+
+def _print_network_topology(label: str, t: dict) -> None:
+    """Print comprehensive topology for one network."""
+    print(f"\n[GLOBAL TOPOLOGY - {label}]")
+    print(f"  Nodes: {t['n_nodes_active']:,} / {t['n_nodes_total']:,} "
+          f"({100*t.get('fraction_active', 0):.1f}% active)")
+    print(f"  Edges: {t['n_edges']:,}, Density: {t['density']:.6f}")
+    print(f"  Degree: avg={t['avg_degree']:.2f}, median={t['median_degree']:.1f}, "
+          f"max={t['max_degree']}, std={t.get('std_degree', 0):.2f}")
+    clustering = t.get("global_clustering", 0)
+    print(f"  Clustering: {clustering:.4f}", end="")
+    if clustering > 0.3:
+        print(" (highly modular)")
+    elif clustering > 0.1:
+        print(" (moderate)")
+    else:
+        print(" (sparse)")
+    n_comp = t.get("n_components", 0)
+    lc_frac = t.get("largest_component_fraction", 0)
+    print(f"  Components: {n_comp}, largest={100*lc_frac:.1f}% of genes")
+    gamma = t.get("power_law_exponent", float("nan"))
+    r2 = t.get("power_law_r_squared", float("nan"))
+    sf = t.get("is_scale_free", False)
+    print(f"  Scale-free: {_fmt_val(sf)} (gamma={_fmt_val(gamma)}, R2={_fmt_val(r2)})")
+    assort = t.get("assortativity", 0)
+    print(f"  Assortativity: {assort:+.4f}", end="")
+    if assort > 0.3:
+        print(" (hubs connect to hubs)")
+    elif assort < -0.3:
+        print(" (hubs connect to periphery)")
+    else:
+        print(" (neutral)")
+
+
+def print_summary(results: dict, all_topo: dict, focus_analysis: dict) -> None:
     """Print comprehensive summary."""
     print("\n" + "=" * 70)
     print("DIFFERENTIAL CO-EXPRESSION NETWORK ANALYSIS SUMMARY")
@@ -976,25 +1340,11 @@ def print_summary(results: dict, all_topo: dict, per_gene: dict | None, focus_an
     print(f"  Significant differential edges: {results['n_significant']:,} "
           f"({100 * results['n_significant'] / results['n_tests']:.4f}%)")
 
-    print(f"\n[GLOBAL TOPOLOGY - LOW NETWORK]")
-    topo_low = all_topo["low"]
-    print(f"  Active nodes: {topo_low['n_nodes_active']:,}, Edges: {topo_low['n_edges']:,}")
-    print(f"  Density: {topo_low['density']:.6f}, Avg degree: {topo_low['avg_degree']:.2f}")
-    print(f"  Max degree: {topo_low['max_degree']}, Median degree: {topo_low['median_degree']:.1f}")
+    _print_network_topology("LOW NETWORK", all_topo["low"])
+    _print_network_topology("HIGH NETWORK", all_topo["high"])
+    _print_network_topology("DIFFERENTIAL NETWORK", all_topo["diff"])
 
-    print(f"\n[GLOBAL TOPOLOGY - HIGH NETWORK]")
-    topo_high = all_topo["high"]
-    print(f"  Active nodes: {topo_high['n_nodes_active']:,}, Edges: {topo_high['n_edges']:,}")
-    print(f"  Density: {topo_high['density']:.6f}, Avg degree: {topo_high['avg_degree']:.2f}")
-    print(f"  Max degree: {topo_high['max_degree']}, Median degree: {topo_high['median_degree']:.1f}")
-
-    print(f"\n[GLOBAL TOPOLOGY - DIFFERENTIAL NETWORK]")
-    topo_diff = all_topo["diff"]
-    print(f"  Active nodes: {topo_diff['n_nodes_active']:,}, Edges: {topo_diff['n_edges']:,}")
-    print(f"  Density: {topo_diff['density']:.6f}, Avg degree: {topo_diff['avg_degree']:.2f}")
-    print(f"  Max degree: {topo_diff['max_degree']}, Median degree: {topo_diff['median_degree']:.1f}")
-
-    print(f"\n[QUALITATIVE CHANGES] (low → high)")
+    print(f"\n[QUALITATIVE CHANGES] (low -> high)")
     for code, label in QUAL_LABELS.items():
         count = np.sum(results["qual_score"] == code)
         if count > 0:
@@ -1002,25 +1352,10 @@ def print_summary(results: dict, all_topo: dict, per_gene: dict | None, focus_an
             print(f"  {label:12s}: {count:>8,} ({pct:5.1f}%)")
 
     print(f"\n[QUANTITATIVE CHANGES]")
-    print(f"  Mean Δr: {np.mean(results['delta_base']):+.4f}")
-    print(f"  Mean |Δr|: {np.mean(np.abs(results['delta_base'])):.4f}")
-    print(f"  Max |Δr|: {np.max(np.abs(results['delta_base'])):.4f}")
+    print(f"  Mean dr: {np.mean(results['delta_base']):+.4f}")
+    print(f"  Mean |dr|: {np.mean(np.abs(results['delta_base'])):.4f}")
+    print(f"  Max |dr|: {np.max(np.abs(results['delta_base'])):.4f}")
     print(f"  Mean bootstrap bias: {np.mean(results['bias']):.4f}")
-
-    if per_gene is not None:
-        print(f"\n[TOP REWIRING HUBS]")
-        top_idx = np.argsort(per_gene["rewiring_score"])[::-1][:10]
-        print(f"  {'Gene':>8} {'Degree':>8} {'Disappear':>10} {'New':>6} {'SignChg':>8} {'RewireScore':>12}")
-        for i in top_idx:
-            if per_gene["degree"][i] > 0:
-                print(f"  {i:>8} {per_gene['degree'][i]:>8} "
-                      f"{per_gene['n_disappear'][i]:>10} "
-                      f"{per_gene['n_new'][i]:>6} "
-                      f"{per_gene['n_sign_change'][i]:>8} "
-                      f"{per_gene['rewiring_score'][i]:>12}")
-    else:
-        print(f"\n[PER-GENE METRICS]")
-        print(f"  Skipped (use --calc-per-gene-metrics to enable)")
 
     if focus_analysis is not None:
         fg = focus_analysis["focus_gene"]
@@ -1029,20 +1364,31 @@ def print_summary(results: dict, all_topo: dict, per_gene: dict | None, focus_an
         print(f"  Indirect partners (2nd layer): {focus_analysis['n_indirect_partners']}")
 
         ds = focus_analysis["direct_stats"]
-        print(f"\n  1st Layer Stats:")
-        print(f"    Edges: {ds['n_edges']}")
-        print(f"    Disappear: {ds['n_disappear']}, New: {ds['n_new']}, Sign change: {ds['n_sign_change']}")
-        print(f"    Mean Δr: {ds['mean_delta']:+.4f}, Mean |Δr|: {ds['mean_abs_delta']:.4f}")
-        print(f"    Mean r_low: {ds['mean_r_low']:.4f}, Mean r_high: {ds['mean_r_high']:.4f}")
+        fa = focus_analysis
+        print(f"\n  L1 (Direct) Metrics:")
+        print(f"    Degree (diff): {fa['L1_deg_diff']}")
+        print(f"    Disappear: {ds['n_disappear']}, New: {ds['n_new']}, "
+              f"Sign change: {ds['n_sign_change']}")
+        print(f"    Strengthen: {ds['n_strengthen']}, Weaken: {ds['n_weaken']}")
+        print(f"    Rewiring: {fa['L1_rewire']}")
+        print(f"    str_low: {fa['L1_str_low']:.4f}, str_high: {fa['L1_str_high']:.4f}, "
+              f"str_diff: {fa['L1_str_diff']:.4f}")
+        print(f"    Mean |Δr|: {fa['L1_mean_abs_dr']:.4f}")
 
-        ts = focus_analysis["two_layer_stats"]
-        print(f"\n  1st + 2nd Layer Stats:")
-        print(f"    Edges: {ts['n_edges']}")
-        print(f"    Disappear: {ts['n_disappear']}, New: {ts['n_new']}, Sign change: {ts['n_sign_change']}")
+        print(f"\n  L2 (Full Two-Layer) Metrics:")
+        print(f"    Degree (diff): {fa['L2_deg_diff']}")
+        print(f"    Rewiring: {fa['L2_rewire']}")
+        print(f"    str_low: {fa['L2_str_low']:.4f}, str_high: {fa['L2_str_high']:.4f}, "
+              f"str_diff: {fa['L2_str_diff']:.4f}")
+
+        print(f"\n  Ratios:")
+        print(f"    L2/L1 deg: {fa['L2L1_deg']:.2f}, rewire: {fa['L2L1_rewire']:.2f}, "
+              f"str: {fa['L2L1_str']:.2f}")
+        print(f"    H/L str L1: {fa['HL_str_L1']:.4f}, L2: {fa['HL_str_L2']:.4f}")
 
         if focus_analysis["partner_details"]:
             print(f"\n  Direct Partner Details:")
-            print(f"    {'Partner':>8} {'r_low':>8} {'r_high':>8} {'Δr':>8} {'Category':>12}")
+            print(f"    {'Partner':>8} {'r_low':>8} {'r_high':>8} {'dr':>8} {'Category':>12}")
             for pd in focus_analysis["partner_details"][:10]:  # Show top 10
                 print(f"    {pd['partner']:>8} {pd['r_low']:>8.3f} {pd['r_high']:>8.3f} "
                       f"{pd['delta']:>+8.3f} {pd['qual_label']:>12}")
@@ -1079,8 +1425,8 @@ def parse_args() -> argparse.Namespace:
         help="Output HDF5 path.",
     )
     parser.add_argument(
-        "--out-tsv", type=str, default=None,
-        help="Output TSV path for rewiring hub table.",
+        "--out-focus-tsv", type=str, default=None,
+        help="Output TSV path for focus gene metrics table (per-gene mode).",
     )
     parser.add_argument(
         "--edge-selection", type=str, choices=["sig_edges", "sig_differential"],
@@ -1107,10 +1453,6 @@ def parse_args() -> argparse.Namespace:
         "--gene-ids", type=str, default=None,
         help="Path to file with gene IDs (one per line) for labeling.",
     )
-    parser.add_argument(
-        "--calc-per-gene-metrics", action="store_true",
-        help="Calculate per-gene metrics for ALL genes (expensive, default: False).",
-    )
     return parser.parse_args()
 
 
@@ -1123,7 +1465,7 @@ def main() -> None:
             base_dir=Path(args.base_dir),
             boot_dir=Path(args.boot_dir),
             out_h5_path=Path(args.out_h5),
-            out_tsv_path=Path(args.out_tsv) if args.out_tsv else None,
+            out_focus_tsv_path=Path(args.out_focus_tsv) if args.out_focus_tsv else None,
             edge_selection=args.edge_selection,
             min_effect=args.min_effect,
             require_ci_exclude_zero=not args.no_ci_filter,
@@ -1170,18 +1512,6 @@ def main() -> None:
         results["n_genes"], args.corr_threshold
     )
 
-    # Compute per-gene metrics (optional - expensive for large networks)
-    per_gene = None
-    if args.calc_per_gene_metrics:
-        print("Computing per-gene metrics for all genes...")
-        per_gene = compute_per_gene_metrics(
-            results["gene_i"], results["gene_j"],
-            results["qual_score"], results["r_low"], results["r_high"],
-            results["n_genes"]
-        )
-    else:
-        print("Skipping per-gene metrics (use --calc-per-gene-metrics to enable)")
-
     # Focus gene analysis (always computed)
     focus_gene = args.focus_gene if args.focus_gene is not None else results["gene_index_used"]
     print(f"Analyzing focus gene {focus_gene}...")
@@ -1189,7 +1519,10 @@ def main() -> None:
         focus_gene,
         results["gene_i"], results["gene_j"],
         results["qual_score"], results["r_low"], results["r_high"],
-        results["delta_base"], results["n_genes"]
+        results["delta_base"], results["n_genes"],
+        sig_low=results["sig_low"],
+        sig_high=results["sig_high"],
+        corr_threshold=args.corr_threshold,
     )
 
     # Gene IDs: prefer propagated names from HDF5 chain, fall back to --gene-ids file
@@ -1200,14 +1533,13 @@ def main() -> None:
 
     # Save results
     save_results(
-        results, all_topo, per_gene, focus_analysis,
+        results, all_topo, focus_analysis,
         out_h5_path=Path(args.out_h5),
-        out_tsv_path=Path(args.out_tsv) if args.out_tsv else None,
         gene_ids=gene_ids,
     )
 
     # Print summary
-    print_summary(results, all_topo, per_gene, focus_analysis)
+    print_summary(results, all_topo, focus_analysis)
 
 
 if __name__ == "__main__":
