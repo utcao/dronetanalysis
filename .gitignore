@@ -4,6 +4,7 @@
 .Rproj.user
 *.Rout
 results*
+test*
 # project folds
 dataset/
 manuscript/

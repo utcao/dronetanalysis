@@ -234,6 +234,12 @@ migrate_h5_file('data/old_expression.h5', 'data/expression.h5')
 - HDF5 attribute size limit: https://github.com/h5py/h5py/issues/1269
 - HDF5 documentation on attributes vs datasets: https://docs.h5py.org/en/stable/high/attr.html
 
+## Related Reading
+
+- [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Storage optimization strategies
+- [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of all critical fixes
+- [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) - Full pipeline workflow
+
 ## Status
 
 ✅ **Fixed and tested** - All scripts updated and verified compatible.

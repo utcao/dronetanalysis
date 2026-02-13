@@ -552,3 +552,11 @@ Top Rewiring Hubs:
 ```
 
 Would you like me to integrate these into your Stage 3 script?
+
+---
+
+## Related Reading
+
+- [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) - Full pipeline workflow and usage
+- [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of enhanced metrics and fixes
+- [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) - Statistical methodology reference
