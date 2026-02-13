@@ -16,7 +16,9 @@ Output schema
 -------------
 expression.h5
     /expr              (n_genes, n_samples) float32 dataset
-    /expr.attrs        metadata: gene_names, sample_names, shape info
+    /expr.attrs        metadata: n_genes, n_samples
+    /gene_names        (n_genes,) string dataset
+    /sample_names      (n_samples,) string dataset
 """
 
 import argparse
@@ -76,11 +78,8 @@ def convert_tsv_to_hdf5(
         # Store metadata as attributes
         ds.attrs["n_genes"] = expr.shape[0]
         ds.attrs["n_samples"] = expr.shape[1]
-        ds.attrs["gene_names"] = df.index.astype(str).tolist()
-        ds.attrs["sample_names"] = df.columns.astype(str).tolist()
-        
-        # Optional: store gene/sample names as separate datasets for easier access
-        # (attributes have size limits, though usually fine for typical datasets)
+
+        # Store gene/sample names as separate datasets (avoids 64 KB attribute size limit)
         f.create_dataset("gene_names", data=df.index.astype(str).tolist(), dtype=h5py.string_dtype())
         f.create_dataset("sample_names", data=df.columns.astype(str).tolist(), dtype=h5py.string_dtype())
     
@@ -185,8 +184,7 @@ def generate_toy_data(h5_path: Path, n_genes: int = 10, n_samples: int = 60, see
         ds = f.create_dataset("expr", data=expr, dtype=np.float32)
         ds.attrs["n_genes"] = n_genes
         ds.attrs["n_samples"] = n_samples
-        ds.attrs["gene_names"] = gene_names
-        ds.attrs["sample_names"] = sample_names
+        # Store names as datasets (avoids 64 KB attribute size limit)
         f.create_dataset("gene_names", data=gene_names, dtype=h5py.string_dtype())
         f.create_dataset("sample_names", data=sample_names, dtype=h5py.string_dtype())
 

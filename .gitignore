@@ -20,7 +20,9 @@ Rplots.pdf
 # files
 src/test.r
 *.pkl
-
+*.pyc
+.nfs*
+settings.json
 # yu-tao
 .snakemake/iocache/latest.pkl
 dag.pdf
