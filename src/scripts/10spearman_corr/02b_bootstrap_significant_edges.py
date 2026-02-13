@@ -130,6 +130,7 @@ def bootstrap_significant_edges(
     gene_index: int = 0,
     edge_selection: str = "sig_edges",
     ci_alpha: float = 0.05,
+    storage_mode: str = "common",
 ) -> None:
     """
     Compute bootstrap correlations for significant edges only.
@@ -149,15 +150,38 @@ def bootstrap_significant_edges(
     # Load significant edge indices from Stage 2a
     print(f"Loading significant edges from {base_h5_path}...")
     with h5py.File(base_h5_path, "r") as h5:
+        # Check storage format
+        storage_mode = h5["meta"].attrs.get("storage_mode", "full")  # Default to full for legacy files
+        print(f"  Storage mode: {storage_mode}")
+
+        # Get significance mask
         if edge_selection == "sig_differential":
             sig_mask = h5["significant/sig_differential"][:]
         else:  # default: sig_edges
-            sig_mask = h5["significant/sig_edges"][:]
+            # For sparse formats, sig_edges may not exist; use union if needed
+            if "significant/sig_edges" in h5:
+                sig_mask = h5["significant/sig_edges"][:]
+            else:
+                # Fallback: use sig_differential (for minimal mode)
+                print(f"  WARNING: sig_edges not found, using sig_differential")
+                sig_mask = h5["significant/sig_differential"][:]
 
-        # Get base correlations for significant edges
         sig_indices = np.where(sig_mask)[0].astype(np.int32)
-        corr_low_base = h5["low/corr_triu"][:][sig_indices]
-        corr_high_base = h5["high/corr_triu"][:][sig_indices]
+
+        # Read correlations based on storage format
+        if storage_mode == "full":
+            # Legacy full format: dense arrays, index into them
+            corr_low_base = h5["low/corr_triu"][:][sig_indices]
+            corr_high_base = h5["high/corr_triu"][:][sig_indices]
+        else:
+            # Sparse format: data already filtered to significant edges
+            # Need to map sig_indices to sparse storage indices
+            stored_indices = h5["significant/indices"][:]
+            # Find which stored edges match our sig_indices
+            mask_in_stored = np.isin(stored_indices, sig_indices)
+            corr_low_base = h5["low/corr_sig"][:][mask_in_stored]
+            corr_high_base = h5["high/corr_sig"][:][mask_in_stored]
+
         delta_base = corr_high_base - corr_low_base
 
         # Propagate gene names
@@ -245,8 +269,12 @@ def bootstrap_significant_edges(
     print(f"    Mean CI width: {np.mean(ci_high - ci_low):.4f}")
     print(f"    Edges with CI excluding 0: {np.sum((ci_low > 0) | (ci_high < 0)):,}")
 
+    # Determine compression level based on storage mode
+    comp_level = 9 if storage_mode == "minimal" else 6 if storage_mode == "common" else 4
+
     # Save results
     print(f"\nSaving to {out_h5_path}...")
+    print(f"  Storage mode: {storage_mode}, compression level: {comp_level}")
     out_h5_path.parent.mkdir(parents=True, exist_ok=True)
 
     with h5py.File(out_h5_path, "w") as h5:
@@ -267,26 +295,27 @@ def bootstrap_significant_edges(
 
         # Base (original) values
         base = h5.create_group("base")
-        base.create_dataset("delta", data=delta_base, compression="gzip", compression_opts=4)
-        base.create_dataset("r_low", data=corr_low_base, compression="gzip", compression_opts=4)
-        base.create_dataset("r_high", data=corr_high_base, compression="gzip", compression_opts=4)
+        base.create_dataset("delta", data=delta_base, compression="gzip", compression_opts=comp_level)
+        base.create_dataset("r_low", data=corr_low_base, compression="gzip", compression_opts=comp_level)
+        base.create_dataset("r_high", data=corr_high_base, compression="gzip", compression_opts=comp_level)
 
         # Bootstrap results
         boot = h5.create_group("boot")
-        boot.create_dataset("delta", data=delta_boot, chunks=(n_sig_edges, 1),
-                           compression="gzip", compression_opts=4)
+        # NOTE: boot/delta array removed - it's NEVER read by Stage 3!
+        # Stage 3 only needs summary stats: delta_mean, delta_std, ci_low, ci_high, bias
+        # This saves 50-75% of file size (n_sig_edges × n_bootstrap array)
         boot.create_dataset("delta_mean", data=delta_mean.astype(np.float32),
-                           compression="gzip", compression_opts=4)
+                           compression="gzip", compression_opts=comp_level)
         boot.create_dataset("delta_std", data=delta_std.astype(np.float32),
-                           compression="gzip", compression_opts=4)
-        boot.create_dataset("ci_low", data=ci_low, compression="gzip", compression_opts=4)
-        boot.create_dataset("ci_high", data=ci_high, compression="gzip", compression_opts=4)
+                           compression="gzip", compression_opts=comp_level)
+        boot.create_dataset("ci_low", data=ci_low, compression="gzip", compression_opts=comp_level)
+        boot.create_dataset("ci_high", data=ci_high, compression="gzip", compression_opts=comp_level)
         boot.create_dataset("bias", data=bias.astype(np.float32),
-                           compression="gzip", compression_opts=4)
+                           compression="gzip", compression_opts=comp_level)
 
         # P-values
         pval_grp = h5.create_group("pval")
-        pval_grp.create_dataset("bootstrap_pval", data=pval, compression="gzip", compression_opts=4)
+        pval_grp.create_dataset("bootstrap_pval", data=pval, compression="gzip", compression_opts=comp_level)
 
         # Gene names (propagated from base_correlations.h5)
         if gene_names is not None:
@@ -355,6 +384,13 @@ def parse_args() -> argparse.Namespace:
         help="Confidence interval alpha (default: 0.05 for 95%% CI).",
     )
     parser.add_argument(
+        "--storage-mode",
+        type=str,
+        choices=["full", "common", "minimal"],
+        default="common",
+        help="Storage mode (must match Stage 2a): 'full', 'common', 'minimal'. Default: common.",
+    )
+    parser.add_argument(
         "--toy",
         action="store_true",
         help="Use toy data for testing.",
@@ -418,6 +454,7 @@ def main() -> None:
         gene_index=args.gene_index,
         edge_selection=args.edge_selection,
         ci_alpha=args.ci_alpha,
+        storage_mode=args.storage_mode,
     )
 
 

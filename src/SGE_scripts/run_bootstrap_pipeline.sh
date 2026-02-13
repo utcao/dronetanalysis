@@ -50,7 +50,7 @@ LOW_FRAC=0.2
 HIGH_FRAC=0.2
 N_BOOTSTRAP=500
 BOOTSTRAP_FRAC=0.8
-FDR_ALPHA=0.9
+FDR_ALPHA=0.7
 SEED=42
 TOY=false
 LOCAL=false
@@ -59,6 +59,7 @@ SKIP_STAGE4=true  # Stage 4 is for per-gene networks, skip by default
 CALC_PER_GENE_METRICS=false
 NO_CI_FILTER=false
 BATCH_SIZE=""  # Batch size for Stage 1 (empty = vectorized mode)
+STORAGE_MODE="common"  # Storage mode for Stage 2a/2b: full, common (default), minimal
 
 # ---------------------------------------------------------------------------
 # parse arguments
@@ -75,6 +76,7 @@ while [[ $# -gt 0 ]]; do
         --fdr-alpha)      FDR_ALPHA="$2";       shift 2 ;;
         --seed)           SEED="$2";            shift 2 ;;
         --batch-size)     BATCH_SIZE="$2";      shift 2 ;;
+        --storage-mode)   STORAGE_MODE="$2";    shift 2 ;;
         --toy)            TOY=true;             shift   ;;
         --local)          LOCAL=true;           shift   ;;
         --with-stage4)    SKIP_STAGE4=false;    shift   ;;
@@ -338,7 +340,8 @@ STAGE2A_CMD="python src/scripts/10spearman_corr/02a_calc_base_correlations.py \
     --indices-h5 $INDICES_H5 \
     --out-dir $BASE_CORR_DIR \
     --gene-index GENE_INDEX \
-    --fdr-alpha $FDR_ALPHA"
+    --fdr-alpha $FDR_ALPHA \
+    --storage-mode $STORAGE_MODE"
 
 STAGE2A_JID=$(run_array_job "stage2a_base" "$STAGE1_JID" "$STAGE2A_CMD" "$N_GENES" "32G" "4:0:0")
 
@@ -354,7 +357,8 @@ STAGE2B_CMD="python src/scripts/10spearman_corr/02b_bootstrap_significant_edges.
     --base-dir $BASE_CORR_DIR \
     --out-dir $BOOT_SIG_DIR \
     --gene-index GENE_INDEX \
-    --edge-selection sig_differential"
+    --edge-selection sig_differential \
+    --storage-mode $STORAGE_MODE"
 
 STAGE2B_JID=$(run_array_job "stage2b_boot" "$STAGE2A_JID" "$STAGE2B_CMD" "$N_GENES" "20G" "2:0:0")
 

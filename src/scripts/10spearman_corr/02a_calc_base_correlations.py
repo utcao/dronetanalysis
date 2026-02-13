@@ -148,6 +148,7 @@ def compute_base_correlations(
     fdr_alpha: float = 0.05,
     gene_index: int = 0,
     gene_names: list = None,
+    storage_mode: str = "common",
 ) -> None:
     """
     Compute base correlations and significance tests.
@@ -160,6 +161,10 @@ def compute_base_correlations(
     fdr_alpha : FDR threshold for significance
     gene_index : which gene's indices to use (default: 0, uses first gene)
     gene_names : list of gene name strings (propagated from expression.h5)
+    storage_mode : storage mode ('full', 'common', 'minimal')
+        - 'full': Store all arrays, dense format (legacy, not recommended)
+        - 'common': Sparse storage, remove unused arrays (default, 90% savings)
+        - 'minimal': Maximum compression, minimal arrays (97% savings)
     """
     n_genes, n_samples_total = expr.shape
     n_tests = n_genes * (n_genes - 1) // 2
@@ -228,76 +233,163 @@ def compute_base_correlations(
     print(f"    sig_differential: {sig_differential.sum():,} ({100*sig_differential.sum()/n_tests:.2f}%)")
     print(f"    sig_edges (both): {sig_edges.sum():,} ({100*sig_edges.sum()/n_tests:.2f}%)")
 
+    # Determine storage strategy and compression level based on mode
+    print(f"\n  Storage mode: {storage_mode}")
+
+    if storage_mode == "minimal":
+        # Minimal mode: only differential edges, max compression
+        store_mask = sig_differential
+        comp_level = 9
+        print(f"    Strategy: Sparse (only sig_differential), compression level 9")
+    elif storage_mode == "common":
+        # Common mode: union of significant edges, medium compression
+        store_mask = sig_edges | sig_differential  # Union for safety
+        comp_level = 6
+        print(f"    Strategy: Sparse (sig_edges | sig_differential), compression level 6")
+    else:  # full
+        # Full mode: dense storage (legacy)
+        store_mask = None  # Will store all edges
+        comp_level = 4
+        print(f"    Strategy: Dense (all edges), compression level 4 [LEGACY]")
+
+    # Get indices of edges to store
+    if store_mask is not None:
+        store_indices = np.where(store_mask)[0].astype(np.int32)
+        n_store = len(store_indices)
+        print(f"    Storing {n_store:,} edges ({100*n_store/n_tests:.2f}% of total)")
+    else:
+        store_indices = None
+        n_store = n_tests
+        print(f"    Storing all {n_tests:,} edges")
+
     # Save results
     print(f"\n  Saving to {out_h5_path}...")
     out_h5_path.parent.mkdir(parents=True, exist_ok=True)
 
-    chunk_size = min(1_000_000, n_tests)
+    # Ensure chunk_size is at least 1
+    if storage_mode != "full":
+        chunk_size = max(1, min(1_000_000, n_store))
+    else:
+        chunk_size = max(1, min(1_000_000, n_tests))
 
     with h5py.File(out_h5_path, "w") as h5:
         # Metadata
         meta = h5.create_group("meta")
         meta.attrs["n_genes"] = n_genes
-        meta.attrs["n_samples_total"] = n_samples_total
         meta.attrs["n_tests"] = n_tests
         meta.attrs["k_low"] = k_low
         meta.attrs["k_high"] = k_high
-        meta.attrs["low_frac"] = low_frac
-        meta.attrs["high_frac"] = high_frac
         meta.attrs["fdr_alpha"] = fdr_alpha
         meta.attrs["gene_index_used"] = gene_index
+        meta.attrs["storage_mode"] = storage_mode
+        # Only store informational attrs in full mode
+        if storage_mode == "full":
+            meta.attrs["n_samples_total"] = n_samples_total
+            meta.attrs["low_frac"] = low_frac
+            meta.attrs["high_frac"] = high_frac
+
+        # Significance masks (always bool, highly compressible)
+        grp_sig = h5.create_group("significant")
+        grp_sig.create_dataset("sig_differential", data=sig_differential, compression="gzip", compression_opts=comp_level)
+        grp_sig.create_dataset("sig_low", data=sig_low, compression="gzip", compression_opts=comp_level)
+        grp_sig.create_dataset("sig_high", data=sig_high, compression="gzip", compression_opts=comp_level)
+
+        # Store indices for sparse modes
+        if storage_mode != "full":
+            grp_sig.create_dataset("indices", data=store_indices, compression="gzip", compression_opts=comp_level)
+
+        # Optional masks (only in full mode to maintain backwards compatibility)
+        if storage_mode == "full":
+            grp_sig.create_dataset("sig_individual", data=sig_individual, compression="gzip")
+            grp_sig.create_dataset("sig_edges", data=sig_edges, compression="gzip")
+            grp_sig.create_dataset("indices", data=sig_indices, compression="gzip")
+            grp_sig.attrs["n_sig_low"] = int(sig_low.sum())
+            grp_sig.attrs["n_sig_high"] = int(sig_high.sum())
+            grp_sig.attrs["n_sig_individual"] = int(sig_individual.sum())
+            grp_sig.attrs["n_sig_differential"] = int(sig_differential.sum())
+            grp_sig.attrs["n_sig_edges"] = int(sig_edges.sum())
 
         # Low correlations
         grp_low = h5.create_group("low")
-        grp_low.create_dataset("corr_triu", data=corr_low, chunks=(chunk_size,),
-                               compression="gzip", compression_opts=4)
-        grp_low.create_dataset("pval_triu", data=pval_low, chunks=(chunk_size,),
-                               compression="gzip", compression_opts=4)
-        grp_low.create_dataset("qval_triu", data=qval_low, chunks=(chunk_size,),
-                               compression="gzip", compression_opts=4)
+        if storage_mode == "full":
+            # Full mode: dense storage
+            grp_low.create_dataset("corr_triu", data=corr_low, chunks=(chunk_size,),
+                                   compression="gzip", compression_opts=comp_level)
+            grp_low.create_dataset("pval_triu", data=pval_low, chunks=(chunk_size,),
+                                   compression="gzip", compression_opts=comp_level)
+            grp_low.create_dataset("qval_triu", data=qval_low, chunks=(chunk_size,),
+                                   compression="gzip", compression_opts=comp_level)
+        else:
+            # Sparse mode: only significant edges
+            # Handle empty case (no significant edges)
+            if n_store > 0:
+                grp_low.create_dataset("corr_sig", data=corr_low[store_indices], chunks=(chunk_size,),
+                                       compression="gzip", compression_opts=comp_level)
+            else:
+                # Create empty dataset with proper shape
+                grp_low.create_dataset("corr_sig", data=np.array([], dtype=np.float32),
+                                       compression="gzip", compression_opts=comp_level)
+            # Skip pval/qval - never used downstream
 
         # High correlations
         grp_high = h5.create_group("high")
-        grp_high.create_dataset("corr_triu", data=corr_high, chunks=(chunk_size,),
-                                compression="gzip", compression_opts=4)
-        grp_high.create_dataset("pval_triu", data=pval_high, chunks=(chunk_size,),
-                                compression="gzip", compression_opts=4)
-        grp_high.create_dataset("qval_triu", data=qval_high, chunks=(chunk_size,),
-                                compression="gzip", compression_opts=4)
+        if storage_mode == "full":
+            # Full mode: dense storage
+            grp_high.create_dataset("corr_triu", data=corr_high, chunks=(chunk_size,),
+                                    compression="gzip", compression_opts=comp_level)
+            grp_high.create_dataset("pval_triu", data=pval_high, chunks=(chunk_size,),
+                                    compression="gzip", compression_opts=comp_level)
+            grp_high.create_dataset("qval_triu", data=qval_high, chunks=(chunk_size,),
+                                    compression="gzip", compression_opts=comp_level)
+        else:
+            # Sparse mode: only significant edges
+            if n_store > 0:
+                grp_high.create_dataset("corr_sig", data=corr_high[store_indices], chunks=(chunk_size,),
+                                        compression="gzip", compression_opts=comp_level)
+            else:
+                grp_high.create_dataset("corr_sig", data=np.array([], dtype=np.float32),
+                                        compression="gzip", compression_opts=comp_level)
+            # Skip pval/qval - never used downstream
 
         # Differential test
         grp_diff = h5.create_group("diff")
-        grp_diff.create_dataset("fisher_z", data=fisher_z, chunks=(chunk_size,),
-                                compression="gzip", compression_opts=4)
-        grp_diff.create_dataset("pval_triu", data=pval_diff, chunks=(chunk_size,),
-                                compression="gzip", compression_opts=4)
-        grp_diff.create_dataset("qval_triu", data=qval_diff, chunks=(chunk_size,),
-                                compression="gzip", compression_opts=4)
-
-        # Delta (for convenience)
         delta = corr_high - corr_low
-        grp_diff.create_dataset("delta_triu", data=delta, chunks=(chunk_size,),
-                                compression="gzip", compression_opts=4)
 
-        # Significance masks
-        grp_sig = h5.create_group("significant")
-        grp_sig.create_dataset("sig_low", data=sig_low, compression="gzip")
-        grp_sig.create_dataset("sig_high", data=sig_high, compression="gzip")
-        grp_sig.create_dataset("sig_individual", data=sig_individual, compression="gzip")
-        grp_sig.create_dataset("sig_differential", data=sig_differential, compression="gzip")
-        grp_sig.create_dataset("sig_edges", data=sig_edges, compression="gzip")
-        grp_sig.create_dataset("indices", data=sig_indices, compression="gzip")
-
-        grp_sig.attrs["n_sig_low"] = int(sig_low.sum())
-        grp_sig.attrs["n_sig_high"] = int(sig_high.sum())
-        grp_sig.attrs["n_sig_individual"] = int(sig_individual.sum())
-        grp_sig.attrs["n_sig_differential"] = int(sig_differential.sum())
-        grp_sig.attrs["n_sig_edges"] = int(sig_edges.sum())
+        if storage_mode == "full":
+            # Full mode: dense storage with all arrays
+            grp_diff.create_dataset("fisher_z", data=fisher_z, chunks=(chunk_size,),
+                                    compression="gzip", compression_opts=comp_level)
+            grp_diff.create_dataset("pval_triu", data=pval_diff, chunks=(chunk_size,),
+                                    compression="gzip", compression_opts=comp_level)
+            grp_diff.create_dataset("qval_triu", data=qval_diff, chunks=(chunk_size,),
+                                    compression="gzip", compression_opts=comp_level)
+            grp_diff.create_dataset("delta_triu", data=delta, chunks=(chunk_size,),
+                                    compression="gzip", compression_opts=comp_level)
+        else:
+            # Sparse mode: only significant edges, skip fisher_z (never used)
+            if n_store > 0:
+                grp_diff.create_dataset("pval_sig", data=pval_diff[store_indices], chunks=(chunk_size,),
+                                        compression="gzip", compression_opts=comp_level)
+                grp_diff.create_dataset("qval_sig", data=qval_diff[store_indices], chunks=(chunk_size,),
+                                        compression="gzip", compression_opts=comp_level)
+                grp_diff.create_dataset("delta_sig", data=delta[store_indices], chunks=(chunk_size,),
+                                        compression="gzip", compression_opts=comp_level)
+            else:
+                grp_diff.create_dataset("pval_sig", data=np.array([], dtype=np.float32),
+                                        compression="gzip", compression_opts=comp_level)
+                grp_diff.create_dataset("qval_sig", data=np.array([], dtype=np.float32),
+                                        compression="gzip", compression_opts=comp_level)
+                grp_diff.create_dataset("delta_sig", data=np.array([], dtype=np.float32),
+                                        compression="gzip", compression_opts=comp_level)
 
         # Gene names (propagated from expression.h5)
         if gene_names is not None:
             h5.create_dataset("gene_names", data=gene_names, dtype=h5py.string_dtype())
 
+    # Print storage summary
+    if storage_mode != "full":
+        savings = 100 * (1 - n_store / n_tests)
+        print(f"    Sparse storage: {savings:.1f}% reduction in edge count")
     print("Done!")
 
 
@@ -340,6 +432,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         help="Which gene's indices to use for subsetting (default: 0).",
+    )
+    parser.add_argument(
+        "--storage-mode",
+        type=str,
+        choices=["full", "common", "minimal"],
+        default="common",
+        help="Storage mode: 'full' (dense, all arrays), 'common' (sparse, 90%% savings), 'minimal' (max compression, 97%% savings). Default: common.",
     )
     parser.add_argument(
         "--toy",
@@ -391,6 +490,7 @@ def main() -> None:
         fdr_alpha=args.fdr_alpha,
         gene_index=args.gene_index,
         gene_names=gene_names,
+        storage_mode=args.storage_mode,
     )
 
 
