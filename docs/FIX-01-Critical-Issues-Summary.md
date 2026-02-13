@@ -1,14 +1,17 @@
 # Comprehensive Fixes for Network Analysis Pipeline
 
+> **Note:** This is an executive summary. See individual guides for detailed technical documentation, implementation specifics, and troubleshooting.
+
 ## Issues Addressed
 
 1. ✅ **CRITICAL**: HDF5 attribute size limit (64 KB) - gene names now stored as datasets
 2. ✅ **CRITICAL**: Memory allocation errors (29 GB required) - batch processing + increased memory
-3. ✅ Bug: `gene_index_used` defaults silently to 0
-4. ✅ Missing metrics: sum_abs_delta, connectivity sums, 2-layer ratios
-5. ✅ Wasteful: `compute_all_global_topologies()` called repeatedly
-6. ✅ Missing: Focus gene low/high network stats
-7. ✅ Enhancement: Comprehensive biological metrics
+3. ✅ **CRITICAL**: Disk space overflow (7 TB) - sparse storage + removed unused arrays (87-96% savings)
+4. ✅ Bug: `gene_index_used` defaults silently to 0
+5. ✅ Missing metrics: sum_abs_delta, connectivity sums, 2-layer ratios
+6. ✅ Wasteful: `compute_all_global_topologies()` called repeatedly
+7. ✅ Missing: Focus gene low/high network stats
+8. ✅ Enhancement: Comprehensive biological metrics
 
 ---
 
@@ -29,7 +32,7 @@ OSError: Unable to synchronously create attribute (object header message is too 
 
 **Downstream Compatibility:** ✅ All downstream scripts already read from datasets - no changes needed!
 
-**Documentation:** See [HDF5_ATTRIBUTE_SIZE_FIX.md](HDF5_ATTRIBUTE_SIZE_FIX.md) for full technical details.
+**Documentation:** See [FIX-02-HDF5-Attributes.md](FIX-02-HDF5-Attributes.md) for full technical details.
 
 ---
 
@@ -88,11 +91,82 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 - Vectorized: 6 min (1,460 genes/min)
 - Batch (100): 9 min (974 genes/min, -33% but uses 1/10th memory)
 
-**Documentation:** See [MEMORY_OPTIMIZATION_GUIDE.md](MEMORY_OPTIMIZATION_GUIDE.md) for full details, benchmarks, and troubleshooting.
+**Documentation:** See [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) for full details, benchmarks, and troubleshooting.
 
 ---
 
-## 2. Fix `gene_index_used` Bug
+## 2. Fix Disk Space Overflow (7 TB → 0.9 TB) [CRITICAL]
+
+**Problem:** Pipeline generates 7 TB of data for 8,763 genes, causing disk space exhaustion:
+- Stage 2a: 500 MB per gene × 8,763 = **4.3 TB**
+- Stage 2b: 300 MB per gene × 8,763 = **2.6 TB**
+- **Total: ~7 TB** with massive waste from unused arrays
+
+**Root Causes:**
+1. **50% waste**: Stores 10 arrays but only 5 are used downstream
+2. **Dense storage**: Stores ALL 38M edges when only ~1-5% are significant
+3. **boot/delta waste**: Stores (n_sig_edges × n_bootstrap) array that's NEVER read
+
+**Solution:** Three storage modes with sparse storage and unused array removal:
+
+**Storage Modes:**
+| Mode | Type | Compression | Disk Usage | Status |
+|------|------|-------------|------------|--------|
+| **common** | Sparse | Level 6 | ~10% of full | **Default** |
+| **minimal** | Sparse | Level 9 | ~3% of full | Max savings |
+| **full** | Dense | Level 4 | 100% | Legacy only |
+
+**Modified Files:**
+- `src/scripts/10spearman_corr/02a_calc_base_correlations.py`:
+  - Added `--storage-mode` parameter (default: common)
+  - Implemented sparse storage (only significant edges)
+  - Removed unused arrays: fisher_z, low/pval, low/qval, high/pval, high/qval
+  - Variable compression (level 4/6/9 based on mode)
+
+- `src/scripts/10spearman_corr/02b_bootstrap_significant_edges.py`:
+  - **CRITICAL**: Removed boot/delta storage (NEVER read by Stage 3!)
+  - Added sparse reading from Stage 2a
+  - Variable compression based on mode
+
+- `src/scripts/10spearman_corr/03_reconstruct_diff_network.py`:
+  - Added backwards compatibility (reads both sparse and full formats)
+  - Auto-detects storage mode
+
+- `src/SGE_scripts/run_bootstrap_pipeline.sh`:
+  - Added `--storage-mode` parameter propagation
+
+**Usage:**
+```bash
+# Default optimized storage (recommended)
+bash src/SGE_scripts/run_bootstrap_pipeline.sh \
+    --expr-h5 expression.h5 \
+    --out-dir results
+
+# Maximum space savings
+bash src/SGE_scripts/run_bootstrap_pipeline.sh \
+    --expr-h5 expression.h5 \
+    --out-dir results \
+    --storage-mode minimal
+```
+
+**Storage Savings (8,763 genes):**
+- **Before**: 7.0 TB
+- **After (common)**: 0.9 TB (87% reduction)
+- **After (minimal)**: 0.2 TB (97% reduction)
+
+**Key Optimizations:**
+1. **Sparse storage**: Store only significant edges (~5%) instead of all edges
+2. **Remove unused**: Skip fisher_z, low/pval, low/qval, high/pval, high/qval (50% of arrays)
+3. **Remove boot/delta**: This single array was 50-75% of Stage 2b files but NEVER used!
+4. **Higher compression**: Level 6 (common) or 9 (minimal) vs 4 (full)
+
+**Backwards Compatibility:** ✅ Stage 3 auto-detects format and reads both old (full) and new (sparse) files
+
+**Documentation:** See [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) for full details, verification, and troubleshooting.
+
+---
+
+## 3. Fix `gene_index_used` Bug
 
 **Problem:** Lines 515, 545 in 03_reconstruct_diff_network.py
 ```python
@@ -381,7 +455,7 @@ def analyze_focus_gene_comprehensive(
 
 ## 5. Comprehensive Biological Metrics
 
-Based on NETWORK_METRICS_GUIDE.md, add:
+Based on GUIDE-02-Network-Metrics.md, add:
 
 ### A. Scale-Free Properties (GLOBAL networks)
 ```python
@@ -599,3 +673,13 @@ differential_network.h5
 - Metrics categorized by importance
 - Clear documentation of what to report
 - Biologically meaningful interpretations
+
+---
+
+## Related Reading
+
+- [FIX-02-HDF5-Attributes.md](FIX-02-HDF5-Attributes.md) - Detailed HDF5 attribute size fix documentation
+- [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) - Complete memory optimization guide
+- [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Complete storage optimization guide
+- [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) - Full pipeline workflow
+- [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) - Network topology metrics guide

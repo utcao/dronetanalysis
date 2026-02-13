@@ -238,11 +238,12 @@ print(f"Batch mode ({batch_size}): {mem_batch:.1f} GB")
 3. **Monitor first run** to verify memory allocation is sufficient
 4. **Adjust batch size** based on available memory and performance needs
 
-## Related Documentation
+## Related Reading
 
-- [HDF5 Attribute Size Fix](HDF5_ATTRIBUTE_SIZE_FIX.md) - Gene names storage optimization
-- [Complete Workflow Guide](COMPLETE_WORKFLOW_GUIDE.md) - Full pipeline documentation
-- [Comprehensive Fixes Summary](COMPREHENSIVE_FIXES_SUMMARY.md) - All pipeline fixes
+- [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) - Full pipeline documentation
+- [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Storage optimization strategies
+- [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of all critical fixes
+- [FIX-02-HDF5-Attributes.md](FIX-02-HDF5-Attributes.md) - Gene names storage optimization
 
 ## Technical Notes
 

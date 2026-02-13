@@ -325,3 +325,13 @@ ls -la results_test/
 # Check HDF5 contents
 python -c "import h5py; h5 = h5py.File('results_test/differential_network.h5', 'r'); print(list(h5.keys()))"
 ```
+
+---
+
+## Related Reading
+
+- [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) - Understanding network topology metrics
+- [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) - Memory optimization strategies (vectorized vs batch mode)
+- [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Storage optimization (common, minimal, full modes)
+- [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of critical pipeline fixes
+- [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) - Statistical methodology and pipeline design
