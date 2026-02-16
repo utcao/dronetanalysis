@@ -59,7 +59,7 @@ SKIP_STAGE4=true  # Stage 4 is for per-gene networks, skip by default
 CALC_PER_GENE_METRICS=false
 NO_CI_FILTER=false
 BATCH_SIZE=""  # Batch size for Stage 1 (empty = vectorized mode)
-STORAGE_MODE="common"  # Storage mode for Stage 2a/2b: full, common (default), minimal
+STORAGE_MODE="minimal"  # Storage mode for Stage 2a/2b: full, common (default), minimal
 
 # ---------------------------------------------------------------------------
 # parse arguments
@@ -379,7 +379,7 @@ if [[ "$NO_CI_FILTER" == true ]]; then
     STAGE3_CMD="$STAGE3_CMD --no-ci-filter"
 fi
 
-STAGE3_JID=$(run_job "stage3_collect" "$STAGE2B_JID" "$STAGE3_CMD" "16G" "1:0:0")
+STAGE3_JID=$(run_job "stage3_collect" "$STAGE2B_JID" "$STAGE3_CMD" "16G" "12:0:0")
 
 # ---------------------------------------------------------------------------
 # Stage 4 - Collect focus gene topology (optional, for per-gene networks)
