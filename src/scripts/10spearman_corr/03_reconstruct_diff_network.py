@@ -187,12 +187,16 @@ def compute_clustering_coefficient(adj: dict, n_genes: int) -> float:
     Compute global clustering coefficient (average of local clustering).
     High clustering = functional modules/pathways.
     """
+    # Optimized: Only iterate nodes with degree >= 2 (skip isolated nodes)
+    active_nodes = [node for node in adj if len(adj[node]) >= 2]
+
+    if not active_nodes:
+        return 0.0
+
     local_clustering = []
-    for node in range(n_genes):
-        neighbors = list(adj.get(node, set()))
+    for node in active_nodes:
+        neighbors = list(adj[node])
         k = len(neighbors)
-        if k < 2:
-            continue
         triangles = sum(
             1 for i_idx, n1 in enumerate(neighbors)
             for n2 in neighbors[i_idx + 1:]
@@ -311,8 +315,10 @@ def compute_global_topology(
     nodes_with_edges = set(gi) | set(gj)
     n_nodes = len(nodes_with_edges)
 
-    # Degree distribution
-    degrees = np.array([len(adj[g]) for g in range(n_genes)], dtype=np.int32)
+    # Degree distribution - Optimized: build directly from edge list
+    degrees = np.zeros(n_genes, dtype=np.int32)
+    np.add.at(degrees, gi, 1)  # Count occurrences in gene_i
+    np.add.at(degrees, gj, 1)  # Count occurrences in gene_j
 
     # Basic metrics
     density = 2 * n_edges / (n_genes * (n_genes - 1)) if n_genes > 1 else 0
@@ -542,33 +548,35 @@ def analyze_focus_gene(
                 indirect_partners.add(second)
     indirect_partners = sorted(indirect_partners)
 
-    # Get edges involving focus gene (1st layer edges)
-    direct_edges = []
-    for partner in direct_partners:
-        key = _edge_key(focus_gene, partner)
-        if key in edge_map:
-            direct_edges.append(edge_map[key])
-    direct_edges = np.array(direct_edges, dtype=np.int32)
-
-    # Get edges in 2-layer neighborhood (1st + edges between 1st layer)
-    two_layer_edges = set(direct_edges.tolist())
-    for i_idx, p1 in enumerate(direct_partners):
-        for p2 in direct_partners[i_idx + 1:]:
-            key = _edge_key(p1, p2)
-            if key in edge_map:
-                two_layer_edges.add(edge_map[key])
-    two_layer_edges = np.array(sorted(two_layer_edges), dtype=np.int32)
-
-    # Get FULL two-layer edge set (focus→L1 + L1↔L1 + L1→L2)
-    # This extends two_layer_edges with edges from L1 partners to L2-only partners
+    # OPTIMIZED: Use edge filtering instead of nested pair iteration
+    # Convert to sets for O(1) lookup
+    direct_set = set(direct_partners)
     indirect_set = set(indirect_partners)
-    full_two_layer_edges = set(two_layer_edges.tolist())
-    for p1 in direct_partners:
-        for p2 in indirect_set:
-            key = _edge_key(p1, p2)
-            if key in edge_map:
-                full_two_layer_edges.add(edge_map[key])
-    full_two_layer_edges = np.array(sorted(full_two_layer_edges), dtype=np.int32)
+
+    # Find edges by filtering the edge list - O(n_edges) instead of O(L1² + L1×L2)
+    direct_edges_list = []
+    l1_to_l1_edges = []
+    l1_to_l2_edges = []
+
+    for idx in range(len(gene_i)):
+        i, j = gene_i[idx], gene_j[idx]
+
+        # Check if this is a direct edge (focus gene ↔ L1 partner)
+        if (i == focus_gene and j in direct_set) or (j == focus_gene and i in direct_set):
+            direct_edges_list.append(idx)
+
+        # Check if this is an L1↔L1 edge (both endpoints in direct partners)
+        elif i in direct_set and j in direct_set:
+            l1_to_l1_edges.append(idx)
+
+        # Check if this is an L1→L2 edge (one in L1, one in L2)
+        elif (i in direct_set and j in indirect_set) or (j in direct_set and i in indirect_set):
+            l1_to_l2_edges.append(idx)
+
+    # Convert to numpy arrays
+    direct_edges = np.array(direct_edges_list, dtype=np.int32)
+    two_layer_edges = np.array(sorted(set(direct_edges_list + l1_to_l1_edges)), dtype=np.int32)
+    full_two_layer_edges = np.array(sorted(set(direct_edges_list + l1_to_l1_edges + l1_to_l2_edges)), dtype=np.int32)
 
     # Statistics for edge subsets (L1, L2, full two-layer)
     def compute_edge_stats(edge_indices):
@@ -756,24 +764,27 @@ def load_and_process(
         # Get indices of selected edges
         sig_indices = np.where(base_sig_mask)[0]
 
-        # Load correlations based on storage format
+        # Load correlations based on storage format - Optimized HDF5 indexing
         if storage_mode == "full":
-            # Legacy full format: dense arrays, index into them
-            corr_low = h5["low/corr_triu"][:][sig_indices]
-            corr_high = h5["high/corr_triu"][:][sig_indices]
-            pval_diff = h5["diff/pval_triu"][:][sig_indices]
-            qval_diff = h5["diff/qval_triu"][:][sig_indices]
-            delta_base = h5["diff/delta_triu"][:][sig_indices]
+            # Legacy full format: Use direct indexing (avoid loading full array)
+            # Note: HDF5 fancy indexing may still load full array depending on layout
+            # But this is cleaner and delegates optimization to h5py
+            corr_low = h5["low/corr_triu"][sig_indices]
+            corr_high = h5["high/corr_triu"][sig_indices]
+            pval_diff = h5["diff/pval_triu"][sig_indices]
+            qval_diff = h5["diff/qval_triu"][sig_indices]
+            delta_base = h5["diff/delta_triu"][sig_indices]
         else:
             # Sparse format: data already filtered to significant edges
             stored_indices = h5["significant/indices"][:]
             # Find which stored edges match our sig_indices
             mask_in_stored = np.isin(stored_indices, sig_indices)
-            corr_low = h5["low/corr_sig"][:][mask_in_stored]
-            corr_high = h5["high/corr_sig"][:][mask_in_stored]
-            pval_diff = h5["diff/pval_sig"][:][mask_in_stored]
-            qval_diff = h5["diff/qval_sig"][:][mask_in_stored]
-            delta_base = h5["diff/delta_sig"][:][mask_in_stored]
+            # Direct indexing without intermediate full array load
+            corr_low = h5["low/corr_sig"][mask_in_stored]
+            corr_high = h5["high/corr_sig"][mask_in_stored]
+            pval_diff = h5["diff/pval_sig"][mask_in_stored]
+            qval_diff = h5["diff/qval_sig"][mask_in_stored]
+            delta_base = h5["diff/delta_sig"][mask_in_stored]
 
         # Significance for selected edges
         sig_low = sig_low_full[sig_indices]
@@ -1042,6 +1053,103 @@ def _find_gene_file(directory: Path, gene_index: int) -> Path | None:
     return matches[0] if len(matches) == 1 else None
 
 
+def _process_single_gene_worker(
+    ref_idx: int,
+    g_idx: int,
+    g_name: str,
+    base_path: Path,
+    boot_dir: Path,
+    n_genes: int,
+    edge_selection: str,
+    min_effect: float,
+    require_ci_exclude_zero: bool,
+    corr_threshold: float,
+) -> tuple[int, dict | None]:
+    """
+    Worker function for parallel processing of a single reference gene.
+
+    Returns
+    -------
+    tuple of (ref_idx, results_dict or None)
+        ref_idx: Index of this gene in the gene list
+        results_dict: Dictionary with summary statistics, or None if processing failed
+    """
+    try:
+        # Find bootstrap file
+        boot_path = _find_gene_file(boot_dir, g_idx)
+        if boot_path is None:
+            return (ref_idx, None)
+
+        # Load and process data for this gene
+        results = load_and_process(
+            base_h5_path=base_path,
+            boot_h5_path=boot_path,
+            edge_selection=edge_selection,
+            min_effect=min_effect,
+            require_ci_exclude_zero=require_ci_exclude_zero,
+            corr_threshold=corr_threshold,
+        )
+
+        n_sig = results["n_significant"]
+        if n_sig == 0:
+            return (ref_idx, {"n_sig_total": 0})
+
+        # Compute qualitative counts
+        qs = results["qual_score"]
+        qual_counts = {
+            "n_disappear": int(np.sum(qs == QUAL_DISAPPEAR)),
+            "n_new": int(np.sum(qs == QUAL_NEW)),
+            "n_sign_change": int(np.sum(qs == QUAL_SIGN_CHANGE)),
+            "n_strengthen": int(np.sum(qs == QUAL_STRENGTHEN)),
+            "n_weaken": int(np.sum(qs == QUAL_WEAKEN)),
+        }
+
+        # Delta stats
+        abs_delta = np.abs(results["delta_base"])
+        delta_stats = {
+            "mean_abs_delta": float(np.mean(abs_delta)),
+            "max_abs_delta": float(np.max(abs_delta)),
+        }
+
+        # Focus gene analysis
+        fa = analyze_focus_gene(
+            focus_gene=g_idx,
+            gene_i=results["gene_i"],
+            gene_j=results["gene_j"],
+            qual_score=results["qual_score"],
+            r_low=results["r_low"],
+            r_high=results["r_high"],
+            delta=results["delta_base"],
+            n_genes=n_genes,
+            sig_low=results["sig_low"],
+            sig_high=results["sig_high"],
+            corr_threshold=corr_threshold,
+        )
+
+        # Extract flat metrics
+        focus_metrics = {k: fa[k] for k in [
+            "L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+            "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+            "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
+            "L2_deg_diff", "L2_rewire", "L2_str_low", "L2_str_high", "L2_str_diff",
+            "L2L1_deg", "L2L1_rewire", "L2L1_str",
+            "HL_str_L1", "HL_str_L2"
+        ]}
+
+        # Combine all results
+        return (ref_idx, {
+            "n_sig_total": n_sig,
+            "n_after_filter": n_sig,
+            **qual_counts,
+            **delta_stats,
+            **focus_metrics,
+        })
+
+    except (ValueError, KeyError) as e:
+        # Return None on error - will be handled in main function
+        return (ref_idx, None)
+
+
 def collect_per_gene_networks(
     base_dir: Path,
     boot_dir: Path,
@@ -1129,76 +1237,68 @@ def collect_per_gene_networks(
         "HL_str_L2": np.zeros(n_ref_genes, dtype=np.float32),
     }
 
-    # Process each reference gene
-    for ref_idx, (g_idx, g_name) in enumerate(zip(gene_indices, gene_file_names)):
-        base_path = base_files[ref_idx]
-        boot_path = _find_gene_file(boot_dir, g_idx)
+    # OPTIMIZED: Process genes in parallel using multiprocessing
+    import multiprocessing as mp
+    from functools import partial
 
-        if boot_path is None:
-            print(f"  [{ref_idx+1}/{n_ref_genes}] Gene {g_idx} ({g_name}): no bootstrap file, skipping")
+    # Determine number of CPUs to use (leave 1-2 free for system)
+    n_cpus = max(1, mp.cpu_count() - 2)
+    # Limit memory usage: assume ~6GB per worker, max 16 workers
+    n_workers = min(n_cpus, 16, n_ref_genes)
+
+    print(f"  Using {n_workers} parallel workers for {n_ref_genes} genes...")
+
+    # Prepare worker arguments (gene index, name, paths)
+    worker_args = [
+        (ref_idx, gene_indices[ref_idx], gene_file_names[ref_idx],
+         base_files[ref_idx], boot_dir, n_genes,
+         edge_selection, min_effect, require_ci_exclude_zero, corr_threshold)
+        for ref_idx in range(n_ref_genes)
+    ]
+
+    # Run parallel processing with progress updates
+    if n_workers > 1:
+        with mp.Pool(processes=n_workers) as pool:
+            results_list = pool.starmap(_process_single_gene_worker, worker_args)
+    else:
+        # Fallback to sequential if only 1 worker
+        results_list = [_process_single_gene_worker(*args) for args in worker_args]
+
+    # Aggregate results into summary arrays
+    n_processed = 0
+    n_with_edges = 0
+    for ref_idx, gene_result in results_list:
+        if gene_result is None:
+            # Gene processing failed or was skipped
+            g_idx = gene_indices[ref_idx]
+            g_name = gene_file_names[ref_idx]
+            print(f"  Gene {g_idx} ({g_name}): skipped (no bootstrap file or error)")
             continue
 
-        if (ref_idx + 1) % max(1, n_ref_genes // 20) == 0 or ref_idx == 0:
-            print(f"  [{ref_idx+1}/{n_ref_genes}] Gene {g_idx} ({g_name})...")
+        n_processed += 1
 
-        # Use existing load_and_process iterating for each .h5/gene
-        try:
-            results = load_and_process(
-                base_h5_path=base_path,
-                boot_h5_path=boot_path,
-                edge_selection=edge_selection,
-                min_effect=min_effect,
-                require_ci_exclude_zero=require_ci_exclude_zero,
-                corr_threshold=corr_threshold,
-            )
-        except (ValueError, KeyError) as e:
-            print(f"  [{ref_idx+1}/{n_ref_genes}] Gene {g_idx} ({g_name}): ERROR - {e}, skipping")
-            continue
-
-        n_sig = results["n_significant"]
+        # Copy metrics to summary arrays
+        n_sig = gene_result.get("n_sig_total", 0)
         summary["n_sig_total"][ref_idx] = n_sig
 
         if n_sig == 0:
             continue
 
-        summary["n_after_filter"][ref_idx] = n_sig
+        n_with_edges += 1
 
-        # Whole-network qualitative counts
-        qs = results["qual_score"]
-        summary["n_disappear"][ref_idx] = int(np.sum(qs == QUAL_DISAPPEAR))
-        summary["n_new"][ref_idx] = int(np.sum(qs == QUAL_NEW))
-        summary["n_sign_change"][ref_idx] = int(np.sum(qs == QUAL_SIGN_CHANGE))
-        summary["n_strengthen"][ref_idx] = int(np.sum(qs == QUAL_STRENGTHEN))
-        summary["n_weaken"][ref_idx] = int(np.sum(qs == QUAL_WEAKEN))
+        # Copy all metrics from gene_result to summary
+        for key in ["n_after_filter", "n_disappear", "n_new", "n_sign_change",
+                    "n_strengthen", "n_weaken", "mean_abs_delta", "max_abs_delta",
+                    "L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+                    "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+                    "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
+                    "L2_deg_diff", "L2_rewire", "L2_str_low", "L2_str_high", "L2_str_diff",
+                    "L2L1_deg", "L2L1_rewire", "L2L1_str",
+                    "HL_str_L1", "HL_str_L2"]:
+            if key in gene_result:
+                summary[key][ref_idx] = gene_result[key]
 
-        # Delta stats
-        abs_delta = np.abs(results["delta_base"])
-        summary["mean_abs_delta"][ref_idx] = float(np.mean(abs_delta))
-        summary["max_abs_delta"][ref_idx] = float(np.max(abs_delta))
-
-        # Focus gene analysis (reference gene = focus gene)
-        fa = analyze_focus_gene(
-            focus_gene=g_idx,
-            gene_i=results["gene_i"],
-            gene_j=results["gene_j"],
-            qual_score=results["qual_score"],
-            r_low=results["r_low"],
-            r_high=results["r_high"],
-            delta=results["delta_base"],
-            n_genes=n_genes,
-            sig_low=results["sig_low"],
-            sig_high=results["sig_high"],
-            corr_threshold=corr_threshold,
-        )
-
-        # Copy flat metrics from analyze_focus_gene into summary arrays
-        for key in ["L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
-                     "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
-                     "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
-                     "L2_deg_diff", "L2_rewire", "L2_str_low", "L2_str_high", "L2_str_diff",
-                     "L2L1_deg", "L2L1_rewire", "L2L1_str",
-                     "HL_str_L1", "HL_str_L2"]:
-            summary[key][ref_idx] = fa[key]
+    print(f"  Processed {n_processed} genes ({n_with_edges} with significant edges)")
 
     # Write summary HDF5
     print(f"\nSaving summary to {out_h5_path}...")

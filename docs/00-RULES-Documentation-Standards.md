@@ -210,6 +210,7 @@ GUIDE-01-Complete-Workflow.md
 GUIDE-02-Network-Metrics.md
 OPTIMIZATION-01-Memory.md
 OPTIMIZATION-02-Storage.md
+OPTIMIZATION-03-Network-Reconstruction.md
 FIX-01-Critical-Issues-Summary.md
 FIX-02-HDF5-Attributes.md
 REFERENCE-01-Statistical-Methods.md
@@ -217,7 +218,7 @@ REFERENCE-01-Statistical-Methods.md
 
 **Examples:**
 - Adding a new GUIDE → `GUIDE-03-[Name].md`
-- Adding a new OPTIMIZATION → `OPTIMIZATION-03-[Name].md`
+- Adding a new OPTIMIZATION → `OPTIMIZATION-04-[Name].md`
 - Adding a new FIX → `FIX-03-[Name].md`
 
 ### Step 3: Use Template
@@ -437,6 +438,7 @@ docs/
 ├── GUIDE-02-Network-Metrics.md
 ├── OPTIMIZATION-01-Memory.md
 ├── OPTIMIZATION-02-Storage.md
+├── OPTIMIZATION-03-Network-Reconstruction.md
 ├── FIX-01-Critical-Issues-Summary.md
 ├── FIX-02-HDF5-Attributes.md
 ├── REFERENCE-01-Statistical-Methods.md
@@ -450,7 +452,7 @@ docs/
 ### Next Available Numbers
 
 - **GUIDE:** 03
-- **OPTIMIZATION:** 03
+- **OPTIMIZATION:** 04
 - **FIX:** 03
 - **REFERENCE:** 02
 

@@ -31,7 +31,7 @@ test_gene_size     <- 500
 # or read from a file, e.g.: readLines("config/required_genes.txt")
 # Dicer 1 & 2:  FBgn0039016, FBgn0034246
 # Chaperon
-# Hsp83, Trap1, FBgn0026761, FBgn0001233,
+# Hsp83, Trap1, Gp93: FBgn0026761, FBgn0001233, FBgn0039562
 # DnaJ-1: FBgn0263106 
 # Kinase_ids <- readLines("dataset/flybase/FlyBase_IDs_KIN_KINASES.txt")
 hsp_ids <- readLines("dataset/flybase/FlyBase_IDs_HSP_HEAT_SHOCK_PROTEINS.txt")
