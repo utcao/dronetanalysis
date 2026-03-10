@@ -17,31 +17,32 @@
 #                                                           ▼
 #                                                   collect_networks (single)
 #                                                     │           │
-#                                              summary.h5    rewiring_hubs.tsv
+#                                              summary.h5   rewiring_hubs.tsv
+#                                                           │
+#                                              [optional]   ▼
+#                                                   visualization (Stage 4)
+#                                                   visualization_data/
 #
 # Usage:
 #   # Toy (local, 4 cores):
 #   snakemake -s src/pipelines/Snakefile_bootstrap --config toy=true -j 4
 #
-#   # Real data from TSV:
+#   # ct_voom subset test (15 focus genes):
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
-#       --configfile config/bootstrap_pipeline.yaml \
-#       --config expr_tsv=dataset/processed/VOOM/voomdataCtrl.txt \
-#       -j 20
+#       --configfile config/ct_voom_snakemake.yaml --until bootstrap_significant -j 15
 #
-#   # Real data from HDF5 (skip conversion):
+#   # hs_voom full run (all 8763 genes):
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
-#       --configfile config/bootstrap_pipeline.yaml \
-#       --config expr_h5=dataset/expression.h5 \
-#       -j 20
+#       --configfile config/hs_voom_snakemake.yaml -j 100
 #
 #   # SGE cluster (with a Snakemake cluster profile):
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
-#       --configfile config/bootstrap_pipeline.yaml \
+#       --configfile config/hs_voom_snakemake.yaml \
 #       --profile config/sge_profile -j 100
 #
 #   # Dry run (show what would be done):
-#   snakemake -s src/pipelines/Snakefile_bootstrap --config toy=true -n
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/ct_voom_snakemake.yaml -n
 # =============================================================================
 
 import h5py
@@ -59,19 +60,33 @@ HIGH_FRAC      = config.get("high_frac", 0.2)
 N_BOOTSTRAP    = config.get("n_bootstrap", 50)
 BOOTSTRAP_FRAC = config.get("bootstrap_frac", 0.8)
 SEED           = config.get("seed", 42)
+BATCH_SIZE     = config.get("batch_size", None)   # None = vectorized (fast, ~30 GB RAM)
+
 FDR_ALPHA      = config.get("fdr_alpha", 0.05)
 EDGE_SEL       = config.get("edge_selection", "sig_edges")
 NO_CI_FILTER   = config.get("no_ci_filter", False)
 MIN_EFFECT     = config.get("min_effect", 0.0)
 CORR_THRESH    = config.get("corr_threshold", 0.0001)
+STORAGE_MODE   = config.get("storage_mode", "minimal")
+ANNOTATE       = config.get("annotate", False)
+
+# Optional stages (disabled by default; enable in config or via --config)
+SKIP_VIS       = config.get("skip_visualization", True)
+
+# Optional: restrict stages 2a/2b to a named subset of genes (list of FBgn IDs).
+# Stages 0, 1, and 3 are unaffected.
+# When set, use --until bootstrap_significant to avoid Stage 3 with partial data.
+# Example config:  gene_subset: [FBgn0002563, FBgn0027844]
+GENE_SUBSET    = set(config.get("gene_subset", []))
 
 # Fixed paths derived from OUT
-EXPR_H5_FINAL = EXPR_H5 if EXPR_H5 else f"{OUT}/expression.h5"
-INDICES_H5    = f"{OUT}/bootstrap_indices.h5"
-BASE_DIR      = f"{OUT}/base_correlations"
-BOOT_DIR      = f"{OUT}/bootstrap_significant"
-SUMMARY_H5    = f"{OUT}/differential_network_summary.h5"
-SUMMARY_TSV   = f"{OUT}/rewiring_hubs.tsv"
+EXPR_H5_FINAL  = EXPR_H5 if EXPR_H5 else f"{OUT}/expression.h5"
+INDICES_H5     = f"{OUT}/bootstrap_indices.h5"
+BASE_DIR       = f"{OUT}/base_correlations"
+BOOT_DIR       = f"{OUT}/bootstrap_significant"
+SUMMARY_H5     = f"{OUT}/differential_network_summary.h5"
+SUMMARY_TSV    = f"{OUT}/rewiring_hubs.tsv"
+VIS_DIR        = f"{OUT}/visualization_data"
 
 
 # ---------------------------------------------------------------------------
@@ -89,18 +104,26 @@ def _read_gene_names(h5_path):
         return [f"gene_{i}" for i in range(n)]
 
 
+def _filter_genes(names):
+    """Return (index, name) pairs, filtered by GENE_SUBSET when non-empty."""
+    pairs = list(enumerate(names))
+    if GENE_SUBSET:
+        pairs = [(i, n) for i, n in pairs if n in GENE_SUBSET]
+    return pairs
+
+
 def all_base_corr_files(wildcards):
-    """Aggregate function: list all per-gene base_correlations files."""
+    """Aggregate function: list per-gene base_correlations files (filtered by gene_subset)."""
     h5_path = checkpoints.preprocess.get(**wildcards).output[0]
     names = _read_gene_names(h5_path)
-    return [f"{BASE_DIR}/{i:04d}_{name}.h5" for i, name in enumerate(names)]
+    return [f"{BASE_DIR}/{i:04d}_{name}.h5" for i, name in _filter_genes(names)]
 
 
 def all_boot_sig_files(wildcards):
-    """Aggregate function: list all per-gene bootstrap_significant files."""
+    """Aggregate function: list per-gene bootstrap_significant files (filtered by gene_subset)."""
     h5_path = checkpoints.preprocess.get(**wildcards).output[0]
     names = _read_gene_names(h5_path)
-    return [f"{BOOT_DIR}/{i:04d}_{name}.h5" for i, name in enumerate(names)]
+    return [f"{BOOT_DIR}/{i:04d}_{name}.h5" for i, name in _filter_genes(names)]
 
 
 # ---------------------------------------------------------------------------
@@ -111,12 +134,18 @@ wildcard_constraints:
 
 
 # ---------------------------------------------------------------------------
-# Target rule
+# Target rule — includes optional stages when enabled in config
 # ---------------------------------------------------------------------------
+def _all_targets(wildcards):
+    targets = [SUMMARY_H5, SUMMARY_TSV]
+    if not SKIP_VIS:
+        targets.append(VIS_DIR)
+    return targets
+
+
 rule all:
     input:
-        SUMMARY_H5,
-        SUMMARY_TSV,
+        _all_targets,
 
 
 # ---------------------------------------------------------------------------
@@ -129,8 +158,8 @@ checkpoint preprocess:
     output:
         EXPR_H5_FINAL,
     resources:
-        mem_mb = 16000,
-        runtime = 120,
+        mem_mb  = 16000,
+        runtime = 30,
     run:
         if TOY:
             shell(
@@ -159,9 +188,11 @@ rule bootstrap_indices:
         expr = EXPR_H5_FINAL,
     output:
         INDICES_H5,
+    params:
+        batch_flag = f"--batch-size {BATCH_SIZE}" if BATCH_SIZE else "",
     resources:
-        mem_mb = 8000,
-        runtime = "1:00:00",
+        mem_mb  = 12000 if BATCH_SIZE else 30000,
+        runtime = 60,
     shell:
         """
         python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
@@ -169,7 +200,7 @@ rule bootstrap_indices:
             --out-h5 {output} \
             --low-frac {LOW_FRAC} --high-frac {HIGH_FRAC} \
             --n-bootstrap {N_BOOTSTRAP} --bootstrap-frac {BOOTSTRAP_FRAC} \
-            --seed {SEED}
+            --seed {SEED} {params.batch_flag}
         """
 
 
@@ -189,7 +220,7 @@ rule base_correlations:
         gene_index = lambda wc: int(wc.gi),
     resources:
         mem_mb  = 32000,
-        runtime = "4:00:00",
+        runtime = 240,
     shell:
         """
         python src/scripts/10spearman_corr/02a_calc_base_correlations.py \
@@ -197,7 +228,8 @@ rule base_correlations:
             --indices-h5 {input.indices} \
             --out-h5 {output} \
             --gene-index {params.gene_index} \
-            --fdr-alpha {FDR_ALPHA}
+            --fdr-alpha {FDR_ALPHA} \
+            --storage-mode {STORAGE_MODE}
         """
 
 
@@ -217,7 +249,7 @@ rule bootstrap_significant:
         gene_index = lambda wc: int(wc.gi),
     resources:
         mem_mb  = 16000,
-        runtime = "2:00:00",
+        runtime = 120,
     shell:
         """
         python src/scripts/10spearman_corr/02b_bootstrap_significant_edges.py \
@@ -226,7 +258,8 @@ rule bootstrap_significant:
             --base-h5 {input.base} \
             --out-h5 {output} \
             --gene-index {params.gene_index} \
-            --edge-selection {EDGE_SEL}
+            --edge-selection {EDGE_SEL} \
+            --storage-mode {STORAGE_MODE}
         """
 
 
@@ -244,19 +277,44 @@ rule collect_networks:
         h5  = SUMMARY_H5,
         tsv = SUMMARY_TSV,
     params:
-        ci_flag = "--no-ci-filter" if NO_CI_FILTER else "",
+        ci_flag      = "--no-ci-filter" if NO_CI_FILTER else "",
+        annotate_flag = "--annotate" if ANNOTATE else "",
     resources:
         mem_mb  = 16000,
-        runtime = "1:00:00",
+        runtime = 720,
     shell:
         """
         python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
             --base-dir {BASE_DIR} \
             --boot-dir {BOOT_DIR} \
             --out-h5 {output.h5} \
-            --out-tsv {output.tsv} \
+            --out-focus-tsv {output.tsv} \
             --edge-selection {EDGE_SEL} \
             --min-effect {MIN_EFFECT} \
             --corr-threshold {CORR_THRESH} \
-            {params.ci_flag}
+            {params.ci_flag} {params.annotate_flag}
         """
+
+
+# ---------------------------------------------------------------------------
+# Stage 4: Prepare visualization data (optional, skip_visualization: true by default)
+#
+# Reads the summary differential network and exports TSV + GraphML files.
+# Enable with skip_visualization: false in config.
+# ---------------------------------------------------------------------------
+if not SKIP_VIS:
+    rule visualization:
+        input:
+            SUMMARY_H5,
+        output:
+            directory(VIS_DIR),
+        resources:
+            mem_mb  = 8000,
+            runtime = 60,
+        shell:
+            """
+            python src/scripts/10spearman_corr/05_prepare_visualization_data.py \
+                --diff-h5 {input} \
+                --out-dir {output} \
+                --corr-threshold {CORR_THRESH}
+            """

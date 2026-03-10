@@ -1,0 +1,83 @@
+# =============================================================================
+# hs_voom_snakemake.yaml
+# Snakemake config for the hs_voom condition (heat-shock, VOOM-normalized).
+# Full production run — processes all 8763 genes.
+#
+# Usage:
+#   # Dry run (show what would be executed):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/hs_voom_snakemake.yaml -n
+#
+#   # Local run (all genes, heavy — use SGE instead):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/hs_voom_snakemake.yaml -j 8
+#
+#   # SGE cluster (recommended for full run):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/hs_voom_snakemake.yaml \
+#       --profile config/sge_profile -j 200
+#
+#   # Run only stages 2b (base_correlations already exist):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/hs_voom_snakemake.yaml \
+#       --until bootstrap_significant -j 200
+#
+# Notes:
+#   - expression.h5 and bootstrap_indices.h5 already exist in out_dir.
+#   - base_correlations/ already exists (8763 files) — stage 2a will be skipped.
+#   - Runs stage 2b (bootstrap_significant) for all genes.
+#   - Stage 3 (collect_networks) runs after all 8763 stage 2b files complete.
+# =============================================================================
+
+# --- Input (HDF5 already exists, skip TSV conversion) ---
+expr_h5: "results_hs_voom/expression.h5"
+
+# --- Output ---
+out_dir: "results_hs_voom"
+
+# --- Bootstrap parameters (match original run) ---
+low_frac: 0.2
+high_frac: 0.2
+n_bootstrap: 1000
+bootstrap_frac: 0.8
+seed: 42
+batch_size: null        # null = vectorized (fast, ~30 GB RAM); set integer for batch mode
+
+# --- Significance (match original run) ---
+fdr_alpha: 0.7
+edge_selection: "sig_differential"
+no_ci_filter: false
+
+# --- Storage (match original run) ---
+storage_mode: "minimal"
+
+# --- Thresholds ---
+min_effect: 0.0
+corr_threshold: 0.0001
+
+# --- Optional stages ---
+skip_visualization: true
+annotate: false
+
+# --- No gene_subset: process all 8763 genes ---
+# if mask Gene subset section
+# --- Gene subset ---
+# Restrict stages 2a + 2b to these 15 focus genes.
+# Derived from files in results_ct_voom/base_correlations/.
+# Remove this section to process all genes.
+gene_subset:
+  - FBgn0002563
+  - FBgn0027844
+  - FBgn0039016
+  - FBgn0039562
+  - FBgn0000559
+  - FBgn0026761
+  - FBgn0034246
+  - FBgn0000406
+  - FBgn0040007
+  - FBgn0262972
+  - FBgn0263106
+  - FBgn0265800
+  - FBgn0265999
+  - FBgn0001233
+  - FBgn0001248

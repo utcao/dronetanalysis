@@ -1,0 +1,78 @@
+# =============================================================================
+# ct_voom_snakemake.yaml
+# Snakemake config for the ct_voom condition (control, VOOM-normalized).
+# This is a SUBSET config — processes only the 15 focus genes for testing.
+# Parameters match the original full ct_voom run.
+#
+# Usage:
+#   # Dry run (show what would be executed):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/ct_voom_snakemake.yaml -n
+#
+#   # Run stages 2a + 2b for the 15 focus genes only (local):
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/ct_voom_snakemake.yaml \
+#       --until bootstrap_significant -j 15
+#
+#   # SGE cluster:
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/ct_voom_snakemake.yaml \
+#       --until bootstrap_significant --profile config/sge_profile -j 15
+#
+# Notes:
+#   - expression.h5 and bootstrap_indices.h5 are created in out_dir if absent.
+#   - Only genes listed in gene_subset run through stages 2a and 2b.
+#   - Use --until bootstrap_significant to skip stage 3 when using a subset.
+#   - To run all genes, remove the gene_subset section.
+# =============================================================================
+
+# --- Input ---
+expr_tsv: "dataset/processed/VOOM/voomdataCtrl.txt"
+
+# --- Output ---
+out_dir: "results_ct_voom"
+
+# --- Bootstrap parameters (match original run) ---
+low_frac: 0.2
+high_frac: 0.2
+n_bootstrap: 1000
+bootstrap_frac: 0.8
+seed: 42
+batch_size: null        # null = vectorized (fast, ~30 GB RAM); set integer for batch mode
+
+# --- Significance (match original run) ---
+fdr_alpha: 0.7
+edge_selection: "sig_differential"
+no_ci_filter: false
+
+# --- Storage (match original run) ---
+storage_mode: "minimal"
+
+# --- Thresholds ---
+min_effect: 0.0
+corr_threshold: 0.0001
+
+# --- Optional stages ---
+skip_visualization: true
+annotate: false
+
+# --- Gene subset ---
+# Restrict stages 2a + 2b to these 15 focus genes.
+# Derived from files in results_ct_voom/base_correlations/.
+# Remove this section to process all genes.
+gene_subset:
+  - FBgn0002563
+  - FBgn0027844
+  - FBgn0039016
+  - FBgn0039562
+  - FBgn0000559
+  - FBgn0026761
+  - FBgn0034246
+  - FBgn0000406
+  - FBgn0040007
+  - FBgn0262972
+  - FBgn0263106
+  - FBgn0265800
+  - FBgn0265999
+  - FBgn0001233
+  - FBgn0001248
