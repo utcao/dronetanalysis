@@ -1159,6 +1159,7 @@ def collect_per_gene_networks(
     min_effect: float = 0.0,
     require_ci_exclude_zero: bool = True,
     corr_threshold: float = 0.0001,
+    annotate: bool = False,
 ) -> None:
     """
     Collect per-gene network results from directories of per-gene h5 files.
@@ -1397,6 +1398,47 @@ def collect_per_gene_networks(
                 f.write("\t".join(vals) + "\n")
         print(f"  Saved {n_with_edges} genes to focus gene TSV")
 
+        if annotate:
+            annotate_tsv(out_focus_tsv_path, gene_id_col="gene_id")
+
+
+# =============================================================================
+# Annotation
+# =============================================================================
+
+def annotate_tsv(tsv_path: Path, gene_id_col: str = "gene_id") -> None:
+    """
+    Annotate a TSV file with gene symbols/names using the R script
+    06_annotate_rewiring_table.R and org.Dm.eg.db.
+    """
+    import subprocess
+
+    script_dir = Path(__file__).resolve().parent
+    r_script = script_dir / "06_annotate_rewiring_table.R"
+
+    if not r_script.exists():
+        print(f"  WARNING: Annotation script not found at {r_script}")
+        return
+
+    out_path = tsv_path.with_name(tsv_path.stem + "_annotated.tsv")
+    cmd = [
+        "Rscript", str(r_script),
+        "--input-tsv", str(tsv_path),
+        "--output-tsv", str(out_path),
+        "--gene-id-col", gene_id_col,
+    ]
+    print(f"\nAnnotating {tsv_path.name} with gene names...")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            print(f"  Annotated TSV saved to {out_path}")
+        else:
+            print(f"  WARNING: Annotation failed:\n{result.stderr}")
+    except FileNotFoundError:
+        print("  WARNING: Rscript not found. Skipping annotation.")
+    except subprocess.TimeoutExpired:
+        print("  WARNING: Annotation timed out after 120s.")
+
 
 # =============================================================================
 # Summary Printing
@@ -1575,6 +1617,10 @@ def parse_args() -> argparse.Namespace:
         "--gene-ids", type=str, default=None,
         help="Path to file with gene IDs (one per line) for labeling.",
     )
+    parser.add_argument(
+        "--annotate", action="store_true",
+        help="Annotate the output TSV with gene symbols/names using org.Dm.eg.db (requires R).",
+    )
     return parser.parse_args()
 
 
@@ -1592,6 +1638,7 @@ def main() -> None:
             min_effect=args.min_effect,
             require_ci_exclude_zero=not args.no_ci_filter,
             corr_threshold=args.corr_threshold,
+            annotate=args.annotate,
         )
         return
 
