@@ -15,8 +15,8 @@ This pipeline identifies **differential co-expression** between low and high exp
 | 2a | `10spearman_corr/02a_calc_base_correlations.py` | `base_correlations.h5` | Compute correlations + significance tests |
 | 2b | `10spearman_corr/02b_bootstrap_significant_edges.py` | `bootstrap_significant.h5` | Bootstrap only significant edges |
 | 3 | `10spearman_corr/03_reconstruct_diff_network.py` | `differential_network.h5` | Reconstruct network with topology |
-| 4 | `10spearman_corr/04_collect_focus_gene_topology.py` | `focus_gene_topology.h5` | (Optional) Aggregate per-gene networks |
-| 5 | `10spearman_corr/05_prepare_visualization_data.py` | `visualization_data/` | Export for R visualization |
+| 4 | `10spearman_corr/05_prepare_visualization_data.py` | `visualization_data/` | (Optional) Export for R visualization |
+| 5 | `10spearman_corr/06_annotate_rewiring_table.R` | `*_annotated.tsv` | Annotate gene IDs with symbols/names |
 
 ---
 
@@ -132,6 +132,14 @@ python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
     --out-h5 results/differential_network.h5 \
     --out-tsv results/rewiring_hubs.tsv \
     --calc-per-gene-metrics
+
+# With automatic annotation (adds gene symbols/names via org.Dm.eg.db)
+python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
+    --base-dir results/per_gene/base \
+    --boot-dir results/per_gene/boot \
+    --out-h5 results/per_gene_summary.h5 \
+    --out-focus-tsv results/focus_gene_metrics.tsv \
+    --annotate
 ```
 
 **Features:**
@@ -139,19 +147,9 @@ python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
 - Qualitative edge classification (disappear, new, sign_change, strengthen, weaken)
 - Focus gene neighborhood analysis (1st and 2nd layer partners)
 - Optional per-gene metrics (--calc-per-gene-metrics)
+- Optional `--annotate` flag to automatically annotate the output TSV with gene symbols/names (requires R)
 
-### Stage 4: Collect Focus Gene Topology (Optional)
-```bash
-# Only needed for per-gene network analysis
-python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
-    --network-dir results/networks \
-    --focus-genes top:50 \
-    --n-genes 20000 \
-    --out-h5 results/focus_gene_topology.h5 \
-    --n-jobs 8
-```
-
-### Stage 5: Prepare Visualization Data
+### Stage 4: Prepare Visualization Data
 ```bash
 python src/scripts/10spearman_corr/05_prepare_visualization_data.py \
     --diff-h5 results/differential_network.h5 \
@@ -171,6 +169,30 @@ visualization_data/
 │   └── ...
 └── visualize_networks.R   - R script template
 ```
+
+### Stage 5: Annotate Rewiring Table
+```bash
+# Standalone: annotate any TSV containing FBgn gene IDs
+Rscript src/scripts/10spearman_corr/06_annotate_rewiring_table.R \
+    --input-tsv results/focus_gene_metrics.tsv \
+    --output-tsv results/focus_gene_metrics_annotated.tsv
+
+# Or with a custom gene ID column name
+Rscript src/scripts/10spearman_corr/06_annotate_rewiring_table.R \
+    --input-tsv results/focus_gene_metrics.tsv \
+    --gene-id-col gene_id
+```
+
+**Adds these columns** (using `org.Dm.eg.db` local database):
+- `SYMBOL` - Gene symbol (e.g., Hsp70Aa)
+- `GENENAME` - Full gene name/description
+- `ENTREZID` - NCBI Entrez Gene ID
+- `ENSEMBL` - Ensembl gene ID
+
+**Notes:**
+- Uses `src/utils/utils_annotation.R` which provides a reusable `annotate_fbgn()` function
+- Can also be triggered automatically from Stage 3 with the `--annotate` flag
+- No network access required (local SQLite database)
 
 ### Stage 6: R Visualization
 ```bash
@@ -304,6 +326,52 @@ matrices/
 | **Focus gene collection** | ~2 hours | ~4 GB | Top rewiring genes deep dive |
 
 **Recommendation:** Start with global analysis, use per-gene only for targeted follow-up.
+
+---
+
+## Running a Gene Subset (Testing / Re-running Specific Genes)
+
+To re-run stages 2a and 2b for only a specific set of genes (e.g. to test code changes without processing all ~8,700 genes), use the `gene_subset` config parameter.
+
+### Quick start
+
+```bash
+# Dry run — shows what would be executed for the 15 ct_voom focus genes:
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml -n
+
+# Local execution (runs 02a then 02b for each gene in the subset):
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml -j 15
+
+# Run only stage 2a (skip 2b and stage 3):
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml \
+    --until base_correlations -j 15
+```
+
+Snakemake skips output files that already exist, so re-running is safe and only processes missing or outdated files.
+
+### How it works
+
+The `gene_subset` key in the YAML config limits stages 2a and 2b to named genes:
+
+```yaml
+gene_subset:
+  - FBgn0001233
+  - FBgn0002563
+```
+
+- Stages 0 (preprocess) and 1 (bootstrap indices) always run for the full dataset.
+- Stage 3 (`collect_networks`) expects **all** per-gene files, so omit it when using a subset (use `--until bootstrap_significant`).
+- To process all genes again, remove or comment out the `gene_subset` section.
+
+### Config files
+
+| Config | Purpose |
+|--------|---------|
+| `config/ct_voom_snakemake.yaml` | ct_voom — 15 focus genes (subset testing) |
+| `config/hs_voom_snakemake.yaml` | hs_voom — all 8763 genes (full production run) |
 
 ---
 

@@ -19,6 +19,7 @@ src/test/
 Rplots.pdf
 
 # files
+*chimi*
 src/test.r
 *.pkl
 *.pyc
