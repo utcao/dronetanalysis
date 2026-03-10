@@ -319,6 +319,7 @@ dependencies:
   - r-abind=1.4_8
   - r-ape=5.8_1
   - r-aplot=0.2.9
+  - r-argparse
   - r-askpass=1.2.1
   - r-assertthat=0.2.1
   - r-backports=1.5.0
