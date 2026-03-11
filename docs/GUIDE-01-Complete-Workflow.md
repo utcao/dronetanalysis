@@ -14,8 +14,9 @@ This pipeline identifies **differential co-expression** between low and high exp
 | 1 | `01subset/01get_extreme_pop_bootstrap.py` | `bootstrap_indices.h5` | Generate bootstrap sample indices |
 | 2a | `10spearman_corr/02a_calc_base_correlations.py` | `base_correlations/{gi}_{gene}.h5` | Compute correlations + significance tests (per gene) |
 | 2b | `10spearman_corr/02b_bootstrap_significant_edges.py` | `bootstrap_significant/{gi}_{gene}.h5` | Bootstrap only significant edges (per gene) |
-| 3 | `10spearman_corr/03_reconstruct_diff_network.py` | `differential_network_summary.h5`, `rewiring_hubs.tsv` | Reconstruct network, classify edges, focus gene metrics |
-| 4 | `10spearman_corr/04_collect_focus_gene_topology.py` | `focus_gene_topology.h5` | (Placeholder) Collect per-gene topology for focus genes |
+| 3 | `10spearman_corr/03_reconstruct_diff_network.py` | `networks/{gi}_{gene}.h5` | Reconstruct full topology + focus gene metrics (per gene) |
+| 3b | `10spearman_corr/03b_collect_networks.py` | `differential_network_summary.h5`, `rewiring_hubs.tsv` | Aggregate per-gene networks into summary |
+| 4 | `10spearman_corr/04_collect_focus_gene_topology.py` | `focus_gene_topology.h5` | Collect per-gene topology for focus genes (optional) |
 | 5 | `10spearman_corr/05_prepare_visualization_data.py` | `visualization_data/` | (Optional) Export for R/Cytoscape visualization |
 | 6 | `10spearman_corr/06_annotate_rewiring_table.R` | `*_annotated.tsv` | Annotate gene IDs with symbols/names |
 
@@ -133,44 +134,57 @@ python src/scripts/10spearman_corr/02b_bootstrap_significant_edges.py \
 
 **Key insight:** Only bootstraps significant edges (~1% of all edges), providing ~100x speedup.
 
-### Stage 3: Reconstruct Differential Network
+### Stage 3: Reconstruct Single-Gene Differential Network (per gene)
 
-**Directory mode** (used by Snakemake — reads all per-gene files at once):
-```bash
-python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
-    --base-dir results/base_correlations \
-    --boot-dir results/bootstrap_significant \
-    --out-h5 results/differential_network_summary.h5 \
-    --out-focus-tsv results/rewiring_hubs.tsv \
-    --edge-selection sig_differential \
-    --annotate
-```
+Run once per reference gene (Snakemake schedules these as an array job via the
+`reconstruct_single` rule):
 
-**Single-gene mode** (used for per-gene topology files needed by Stage 4):
 ```bash
 python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
     --base-h5 results/base_correlations/0001_FBgn0001234.h5 \
     --boot-h5 results/bootstrap_significant/0001_FBgn0001234.h5 \
-    --out-h5 results/networks/differential_network_gene_1.h5 \
+    --out-h5 results/networks/0001_FBgn0001234.h5 \
     --edge-selection sig_differential
 ```
 
 **Features:**
-- Global topology for LOW, HIGH, and DIFF networks
+- Global topology for LOW, HIGH, and DIFF networks (with degree arrays)
 - Qualitative edge classification (disappear, new, sign_change, strengthen, weaken)
 - Focus gene neighborhood analysis (direct L1 partners + outer-layer L1↔L1 / L1→L2)
 - Two-layer edge definitions:
   - `direct_edges` = focus→L1 edges only
   - `two_layer_edges` = L1↔L1 + L1→L2 edges (outer layer, excludes ego)
   - `full_two_layer_edges` = all three (complete 2-hop ego network)
-- Per-gene metrics written to TSV (`rewiring_hubs.tsv`), see column reference in
-  [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md)
-- Optional `--annotate` to add gene symbols/names (requires R)
+- L1/L2/ratio metrics stored in `focus_gene/metrics/` for downstream collection
 
-### Stage 4: Collect Focus Gene Topology (placeholder)
+### Stage 3b: Collect Networks (single aggregation job)
+
+Reads all per-gene network files from Stage 3 and aggregates them:
 
 ```bash
-# NOTE: requires Stage 3 run in single-gene mode first (see above)
+# Preferred: reads Stage 3 output (no re-computation)
+python src/scripts/10spearman_corr/03b_collect_networks.py \
+    --networks-dir results/networks \
+    --out-h5 results/differential_network_summary.h5 \
+    --out-focus-tsv results/rewiring_hubs.tsv \
+    --annotate
+
+# Fallback: reads raw base/boot dirs (no Stage 3 output required)
+python src/scripts/10spearman_corr/03b_collect_networks.py \
+    --base-dir results/base_correlations \
+    --boot-dir results/bootstrap_significant \
+    --out-h5 results/differential_network_summary.h5 \
+    --out-focus-tsv results/rewiring_hubs.tsv
+```
+
+Per-gene metrics written to `rewiring_hubs.tsv`, see column reference in
+[GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md).
+Optional `--annotate` adds gene symbols/names (requires R).
+
+### Stage 4: Collect Focus Gene Topology
+
+```bash
+# Reads per-gene network files from Stage 3 (networks/ directory)
 python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
     --network-dir results/networks \
     --focus-genes top:50 \
@@ -179,7 +193,8 @@ python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
     --out-h5 results/focus_gene_topology.h5
 ```
 
-Stage 4 is not yet wired in Snakemake. See [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md#stage-4-architecture-gap) for the architectural reason.
+Enable via Snakemake with `skip_focus_topology: false` in config (see
+[GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md)).
 
 ### Stage 5: Prepare Visualization Data
 ```bash
@@ -386,7 +401,7 @@ Snakemake skips output files that already exist, so re-running is safe and only 
 
 ### How it works
 
-The `gene_subset` key in the YAML config limits stages 2a and 2b to named genes:
+The `gene_subset` key in the YAML config limits per-gene jobs to named genes:
 
 ```yaml
 gene_subset:
@@ -394,9 +409,13 @@ gene_subset:
   - FBgn0002563
 ```
 
-- Stages 0 (preprocess) and 1 (bootstrap indices) always run for the full dataset.
-- Stage 3 (`collect_networks`) expects **all** per-gene files, so omit it when using a subset (use `--until bootstrap_significant`).
-- To process all genes again, remove or comment out the `gene_subset` section.
+- **Stages 0 and 1** always run for the full dataset (bootstrap indices cover all genes).
+- **Stages 2a, 2b, 3 (reconstruct_single), 3b (collect_networks), and 4** respect the
+  subset — Snakemake only schedules jobs for genes in the subset, via the `_filter_genes()`
+  aggregate input function.
+- `collect_networks` (Stage 3b) reads only files that exist in `networks/`, so it
+  automatically handles partial subsets without any special flags.
+- To process all genes, remove or set `gene_subset: []`.
 
 ### Config files
 

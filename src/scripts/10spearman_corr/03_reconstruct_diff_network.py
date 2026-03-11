@@ -2,19 +2,23 @@
 """
 Stage 3: Reconstruct Differential Co-expression Network with Topological Analysis.
 
-Combines results from Stage 2a (base correlations) and Stage 2b (bootstrap)
-to produce final differential network with:
-- Quantitative changes (delta = r_high - r_low)
-- Qualitative changes (disappear, new, sign_change)
-- Global topological features for LOW, HIGH, and DIFF networks
-- Focus gene neighborhood analysis (1st and 2nd layer partners)
+Runs in single-gene mode: takes one reference gene's base_correlations.h5
+(Stage 2a) and bootstrap_significant.h5 (Stage 2b) and produces a full
+per-gene differential_network.h5 with topology and focus-gene neighborhood
+analysis.  Intended to be scheduled by Snakemake once per gene (wildcard rule
+reconstruct_single), mirroring the per-gene structure of Stages 2a/2b.
+
+For batch aggregation across all per-gene files see 03b_collect_networks.py.
 
 Pipeline position
 -----------------
 Stage 1   01subset/01get_extreme_pop_bootstrap.py  →  bootstrap_indices.h5
 Stage 2a  02a_calc_base_correlations.py            →  base_correlations.h5
 Stage 2b  02b_bootstrap_significant_edges.py       →  bootstrap_significant.h5
-Stage 3   THIS SCRIPT                              →  differential_network.h5
+Stage 3   THIS SCRIPT                              →  networks/{gi}_{gene_id}.h5
+Stage 3b  03b_collect_networks.py                  →  differential_network_summary.h5
+                                                       rewiring_hubs.tsv
+Stage 4   04_collect_focus_gene_topology.py        →  focus_gene_topology.h5
 
 Qualitative Changes (with low as reference)
 -------------------------------------------
@@ -40,8 +44,9 @@ Output HDF5 layout
         gene_index
         direct_partners      (n_direct,) - 1st layer neighbors
         indirect_partners    (n_indirect,) - 2nd layer neighbors
-        direct_stats         - summary for 1st layer
+        direct_stats         - summary for 1st layer (mean_delta, mean_abs_delta, ...)
         two_layer_stats      - summary for 1st + 2nd layers
+        metrics/             - flat L1/L2/ratio attrs for collection by Stage 3b/4
 """
 
 from __future__ import annotations
@@ -575,7 +580,7 @@ def analyze_focus_gene(
 
     # Convert to numpy arrays
     direct_edges = np.array(direct_edges_list, dtype=np.int32)
-    two_layer_edges = np.array(sorted(set(direct_edges_list + l1_to_l1_edges)), dtype=np.int32)
+    two_layer_edges = np.array(sorted(set(l1_to_l1_edges + l1_to_l2_edges)), dtype=np.int32)
     full_two_layer_edges = np.array(sorted(set(direct_edges_list + l1_to_l1_edges + l1_to_l2_edges)), dtype=np.int32)
 
     # Statistics for edge subsets (L1, L2, full two-layer)
@@ -586,7 +591,9 @@ def analyze_focus_gene(
                 "n_disappear": 0, "n_new": 0, "n_sign_change": 0,
                 "n_strengthen": 0, "n_weaken": 0,
                 "mean_abs_delta": 0.0,
-                "sum_abs_delta": 0.0, "str_low": 0.0, "str_high": 0.0,
+                "sum_abs_delta": 0.0,
+                "conn_sum_low": 0.0, "conn_sum_high": 0.0,
+                "conn_mean_low": 0.0, "conn_mean_high": 0.0,
             }
         qs = qual_score[edge_indices]
         rl = np.abs(r_low[edge_indices])
@@ -604,14 +611,17 @@ def analyze_focus_gene(
         n_weaken = int(np.sum(mask_both & (rh < rl)))
 
         # str_low / str_high: sum|r| only for "present" edges
+        # if not significant, it is 0
         if sig_low is not None:
             present_low = sig_low[edge_indices] & (rl >= corr_threshold)
             present_high = sig_high[edge_indices] & (rh >= corr_threshold)
         else:
-            present_low = rl >= corr_threshold
-            present_high = rh >= corr_threshold
-        str_low = float(np.sum(rl[present_low]))
-        str_high = float(np.sum(rh[present_high]))
+            present_low = 0
+            present_high = 0
+        str_sum_low = float(np.sum(rl[present_low]))
+        str_sum_high = float(np.sum(rh[present_high]))
+        str_mean_low = float(np.mean(rl[present_low]))
+        str_mean_high = float(np.mean(rh[present_high]))
 
         return {
             "n_edges": len(edge_indices),
@@ -620,10 +630,13 @@ def analyze_focus_gene(
             "n_sign_change": n_sign_change,
             "n_strengthen": n_strengthen,
             "n_weaken": n_weaken,
+            "mean_delta": float(np.mean(delta[edge_indices])),
             "mean_abs_delta": float(np.mean(np.abs(delta[edge_indices]))),
             "sum_abs_delta": float(np.sum(np.abs(delta[edge_indices]))),
-            "str_low": str_low,
-            "str_high": str_high,
+            "conn_sum_low": str_sum_low,
+            "conn_sum_high": str_sum_high,
+            "conn_mean_low": str_mean_low,
+            "conn_mean_high": str_mean_high,
         }
 
     direct_stats = compute_edge_stats(direct_edges)
@@ -640,29 +653,36 @@ def analyze_focus_gene(
     L2_set.discard(focus_gene)
     L2_deg_diff = len(L2_set)  # all unique nodes in L1+L2
 
+    # --- Focus gene degree per condition ---
+    focus_deg_low = len(adj_low.get(focus_gene, set()))
+    focus_deg_high = len(adj_high.get(focus_gene, set()))
+
     # --- Rewiring scores (disappear + new + sign_change) ---
     L1_rewire = (direct_stats["n_disappear"] + direct_stats["n_new"]
                  + direct_stats["n_sign_change"])
-    L2_rewire = (full_two_layer_stats["n_disappear"] + full_two_layer_stats["n_new"]
-                 + full_two_layer_stats["n_sign_change"])
+    # L2 rewiring uses two_layer_stats (outer layers: L1↔L1 + L1→L2)
+    L2_rewire = (two_layer_stats["n_disappear"] + two_layer_stats["n_new"]
+                 + two_layer_stats["n_sign_change"])
 
-    # --- Strength metrics ---
-    L1_str_low = direct_stats["str_low"]
-    L1_str_high = direct_stats["str_high"]
-    L1_str_diff = direct_stats["sum_abs_delta"]
+    # --- Connectivity metrics (sum and mean |r|) ---
+    L1_conn_low = direct_stats["conn_sum_low"]
+    L1_conn_high = direct_stats["conn_sum_high"]
+    L1_conn_diff = direct_stats["sum_abs_delta"]
     L1_mean_abs_dr = direct_stats["mean_abs_delta"]
-    L2_str_low = full_two_layer_stats["str_low"]
-    L2_str_high = full_two_layer_stats["str_high"]
-    L2_str_diff = full_two_layer_stats["sum_abs_delta"]
+    # L2 uses outer-layer edges only (two_layer_stats: L1↔L1 + L1→L2)
+    L2_conn_low = two_layer_stats["conn_sum_low"]
+    L2_conn_high = two_layer_stats["conn_sum_high"]
+    L2_conn_diff = two_layer_stats["sum_abs_delta"]
+    L2_mean_abs_dr = two_layer_stats["mean_abs_delta"]
 
     # --- L2/L1 expansion ratios (diff network) ---
     L2L1_deg = L2_deg_diff / L1_deg_diff if L1_deg_diff > 0 else 0.0
     L2L1_rewire = L2_rewire / L1_rewire if L1_rewire > 0 else 0.0
-    L2L1_str = L2_str_diff / L1_str_diff if L1_str_diff > 0 else 0.0
+    L2L1_conn = L2_conn_diff / L1_conn_diff if L1_conn_diff > 0 else 0.0
 
-    # --- High/Low condition strength ratios ---
-    HL_str_L1 = L1_str_high / L1_str_low if L1_str_low > 0 else 0.0
-    HL_str_L2 = L2_str_high / L2_str_low if L2_str_low > 0 else 0.0
+    # --- High/Low condition connectivity ratios ---
+    HL_conn_L1 = L1_conn_high / L1_conn_low if L1_conn_low > 0 else 0.0
+    HL_conn_L2 = L2_conn_high / L2_conn_low if L2_conn_low > 0 else 0.0
 
     # Per-partner breakdown for direct partners
     partner_details = []
@@ -690,6 +710,10 @@ def analyze_focus_gene(
         "full_two_layer_stats": full_two_layer_stats,
         "partner_details": partner_details,
         # --- Flat metrics for TSV collection ---
+        # Tier 1: Focus gene degree per condition
+        "focus_deg_low": focus_deg_low,
+        "focus_deg_high": focus_deg_high,
+        # L1 (direct partners)
         "L1_deg_diff": L1_deg_diff,
         "L1_n_disappear": direct_stats["n_disappear"],
         "L1_n_new": direct_stats["n_new"],
@@ -697,20 +721,36 @@ def analyze_focus_gene(
         "L1_n_strengthen": direct_stats["n_strengthen"],
         "L1_n_weaken": direct_stats["n_weaken"],
         "L1_rewire": L1_rewire,
-        "L1_str_low": float(L1_str_low),
-        "L1_str_high": float(L1_str_high),
-        "L1_str_diff": float(L1_str_diff),
+        "L1_conn_low": float(L1_conn_low),
+        "L1_conn_high": float(L1_conn_high),
+        "L1_conn_diff": float(L1_conn_diff),
+        "L1_conn_mean_low": float(direct_stats["conn_mean_low"]),
+        "L1_conn_mean_high": float(direct_stats["conn_mean_high"]),
         "L1_mean_abs_dr": float(L1_mean_abs_dr),
+        # L2 (outer layers: L1↔L1 + L1→L2)
         "L2_deg_diff": L2_deg_diff,
+        "L2_n_disappear": two_layer_stats["n_disappear"],
+        "L2_n_new": two_layer_stats["n_new"],
+        "L2_n_sign_chg": two_layer_stats["n_sign_change"],
+        "L2_n_strengthen": two_layer_stats["n_strengthen"],
+        "L2_n_weaken": two_layer_stats["n_weaken"],
         "L2_rewire": L2_rewire,
-        "L2_str_low": float(L2_str_low),
-        "L2_str_high": float(L2_str_high),
-        "L2_str_diff": float(L2_str_diff),
+        "L2_conn_low": float(L2_conn_low),
+        "L2_conn_high": float(L2_conn_high),
+        "L2_conn_diff": float(L2_conn_diff),
+        "L2_conn_mean_low": float(two_layer_stats["conn_mean_low"]),
+        "L2_conn_mean_high": float(two_layer_stats["conn_mean_high"]),
+        "L2_mean_abs_dr": float(L2_mean_abs_dr),
+        # Sublayer edge counts
+        "n_direct_edges": len(direct_edges_list),
+        "n_l1_to_l1_edges": len(l1_to_l1_edges),
+        "n_l1_to_l2_edges": len(l1_to_l2_edges),
+        # Ratios
         "L2L1_deg": float(L2L1_deg),
         "L2L1_rewire": float(L2L1_rewire),
-        "L2L1_str": float(L2L1_str),
-        "HL_str_L1": float(HL_str_L1),
-        "HL_str_L2": float(HL_str_L2),
+        "L2L1_conn": float(L2L1_conn),
+        "HL_conn_L1": float(HL_conn_L1),
+        "HL_conn_L2": float(HL_conn_L2),
     }
 
 
@@ -1043,404 +1083,6 @@ def save_results(
 
 
 # =============================================================================
-# Per-Gene Collection (directory mode)
-# =============================================================================
-
-def _find_gene_file(directory: Path, gene_index: int) -> Path | None:
-    """Find per-gene h5 file by index prefix. Returns None if not found."""
-    prefix = f"{gene_index:04d}_"
-    matches = list(directory.glob(f"{prefix}*.h5"))
-    return matches[0] if len(matches) == 1 else None
-
-
-def _process_single_gene_worker(
-    ref_idx: int,
-    g_idx: int,
-    g_name: str,
-    base_path: Path,
-    boot_dir: Path,
-    n_genes: int,
-    edge_selection: str,
-    min_effect: float,
-    require_ci_exclude_zero: bool,
-    corr_threshold: float,
-) -> tuple[int, dict | None]:
-    """
-    Worker function for parallel processing of a single reference gene.
-
-    Returns
-    -------
-    tuple of (ref_idx, results_dict or None)
-        ref_idx: Index of this gene in the gene list
-        results_dict: Dictionary with summary statistics, or None if processing failed
-    """
-    try:
-        # Find bootstrap file
-        boot_path = _find_gene_file(boot_dir, g_idx)
-        if boot_path is None:
-            return (ref_idx, None)
-
-        # Load and process data for this gene
-        results = load_and_process(
-            base_h5_path=base_path,
-            boot_h5_path=boot_path,
-            edge_selection=edge_selection,
-            min_effect=min_effect,
-            require_ci_exclude_zero=require_ci_exclude_zero,
-            corr_threshold=corr_threshold,
-        )
-
-        n_sig = results["n_significant"]
-        if n_sig == 0:
-            return (ref_idx, {"n_sig_total": 0})
-
-        # Compute qualitative counts
-        qs = results["qual_score"]
-        qual_counts = {
-            "n_disappear": int(np.sum(qs == QUAL_DISAPPEAR)),
-            "n_new": int(np.sum(qs == QUAL_NEW)),
-            "n_sign_change": int(np.sum(qs == QUAL_SIGN_CHANGE)),
-            "n_strengthen": int(np.sum(qs == QUAL_STRENGTHEN)),
-            "n_weaken": int(np.sum(qs == QUAL_WEAKEN)),
-        }
-
-        # Delta stats
-        abs_delta = np.abs(results["delta_base"])
-        delta_stats = {
-            "mean_abs_delta": float(np.mean(abs_delta)),
-            "max_abs_delta": float(np.max(abs_delta)),
-        }
-
-        # Focus gene analysis
-        fa = analyze_focus_gene(
-            focus_gene=g_idx,
-            gene_i=results["gene_i"],
-            gene_j=results["gene_j"],
-            qual_score=results["qual_score"],
-            r_low=results["r_low"],
-            r_high=results["r_high"],
-            delta=results["delta_base"],
-            n_genes=n_genes,
-            sig_low=results["sig_low"],
-            sig_high=results["sig_high"],
-            corr_threshold=corr_threshold,
-        )
-
-        # Extract flat metrics
-        focus_metrics = {k: fa[k] for k in [
-            "L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
-            "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
-            "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
-            "L2_deg_diff", "L2_rewire", "L2_str_low", "L2_str_high", "L2_str_diff",
-            "L2L1_deg", "L2L1_rewire", "L2L1_str",
-            "HL_str_L1", "HL_str_L2"
-        ]}
-
-        # Combine all results
-        return (ref_idx, {
-            "n_sig_total": n_sig,
-            "n_after_filter": n_sig,
-            **qual_counts,
-            **delta_stats,
-            **focus_metrics,
-        })
-
-    except (ValueError, KeyError) as e:
-        # Return None on error - will be handled in main function
-        return (ref_idx, None)
-
-
-def collect_per_gene_networks(
-    base_dir: Path,
-    boot_dir: Path,
-    out_h5_path: Path,
-    out_focus_tsv_path: Path | None = None,
-    edge_selection: str = "sig_edges",
-    min_effect: float = 0.0,
-    require_ci_exclude_zero: bool = True,
-    corr_threshold: float = 0.0001,
-    annotate: bool = False,
-) -> None:
-    """
-    Collect per-gene network results from directories of per-gene h5 files.
-
-    For each reference gene g, reads base_correlations and bootstrap_significant
-    files, applies filters, computes qualitative classification and topology,
-    and writes a summary.
-    """
-    # Discover per-gene files
-    base_files = sorted(base_dir.glob("*_*.h5"))
-    boot_files = sorted(boot_dir.glob("*_*.h5"))
-
-    if not base_files:
-        raise FileNotFoundError(f"No per-gene h5 files found in {base_dir}")
-
-    # Extract gene indices and names from filenames
-    gene_indices = []
-    gene_file_names = []
-    for f in base_files:
-        parts = f.stem.split("_", 1)  # "0003_FBgn0025702" → ["0003", "FBgn0025702"]
-        gene_indices.append(int(parts[0]))
-        gene_file_names.append(parts[1] if len(parts) > 1 else f"gene_{parts[0]}")
-
-    n_ref_genes = len(gene_indices)
-    print(f"Found {n_ref_genes} per-gene base_correlations files")
-    print(f"Found {len(boot_files)} per-gene bootstrap_significant files")
-
-    # Read n_genes from first file (same in the rest)
-    with h5py.File(base_files[0], "r") as h5:
-        n_genes = h5["meta"].attrs["n_genes"]
-        # Read propagated gene names if available
-        if "gene_names" in h5:
-            all_gene_names = [x.decode() if isinstance(x, bytes) else x for x in h5["gene_names"][:]]
-        else:
-            all_gene_names = None
-
-    print(f"Network size: {n_genes} genes, {n_genes * (n_genes - 1) // 2} possible edges")
-
-    # Initialize per-reference-gene summary arrays
-    summary = {
-        "gene_index": np.array(gene_indices, dtype=np.int32),
-        "n_sig_total": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_after_filter": np.zeros(n_ref_genes, dtype=np.int32),
-        # Whole-network qualitative counts
-        "n_disappear": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_new": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_sign_change": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_strengthen": np.zeros(n_ref_genes, dtype=np.int32),
-        "n_weaken": np.zeros(n_ref_genes, dtype=np.int32),
-        "mean_abs_delta": np.zeros(n_ref_genes, dtype=np.float32),
-        "max_abs_delta": np.zeros(n_ref_genes, dtype=np.float32),
-        # Focus gene L1 metrics
-        "L1_deg_diff": np.zeros(n_ref_genes, dtype=np.int32),
-        "L1_n_disappear": np.zeros(n_ref_genes, dtype=np.int32),
-        "L1_n_new": np.zeros(n_ref_genes, dtype=np.int32),
-        "L1_n_sign_chg": np.zeros(n_ref_genes, dtype=np.int32),
-        "L1_n_strengthen": np.zeros(n_ref_genes, dtype=np.int32),
-        "L1_n_weaken": np.zeros(n_ref_genes, dtype=np.int32),
-        "L1_rewire": np.zeros(n_ref_genes, dtype=np.int32),
-        "L1_str_low": np.zeros(n_ref_genes, dtype=np.float32),
-        "L1_str_high": np.zeros(n_ref_genes, dtype=np.float32),
-        "L1_str_diff": np.zeros(n_ref_genes, dtype=np.float32),
-        "L1_mean_abs_dr": np.zeros(n_ref_genes, dtype=np.float32),
-        # Focus gene L2 metrics
-        "L2_deg_diff": np.zeros(n_ref_genes, dtype=np.int32),
-        "L2_rewire": np.zeros(n_ref_genes, dtype=np.int32),
-        "L2_str_low": np.zeros(n_ref_genes, dtype=np.float32),
-        "L2_str_high": np.zeros(n_ref_genes, dtype=np.float32),
-        "L2_str_diff": np.zeros(n_ref_genes, dtype=np.float32),
-        # L2/L1 expansion ratios (diff network)
-        "L2L1_deg": np.zeros(n_ref_genes, dtype=np.float32),
-        "L2L1_rewire": np.zeros(n_ref_genes, dtype=np.float32),
-        "L2L1_str": np.zeros(n_ref_genes, dtype=np.float32),
-        # High/Low condition strength ratios
-        "HL_str_L1": np.zeros(n_ref_genes, dtype=np.float32),
-        "HL_str_L2": np.zeros(n_ref_genes, dtype=np.float32),
-    }
-
-    # OPTIMIZED: Process genes in parallel using multiprocessing
-    import multiprocessing as mp
-    from functools import partial
-
-    # Determine number of CPUs to use (leave 1-2 free for system)
-    n_cpus = max(1, mp.cpu_count() - 2)
-    # Limit memory usage: assume ~6GB per worker, max 16 workers
-    n_workers = min(n_cpus, 16, n_ref_genes)
-
-    print(f"  Using {n_workers} parallel workers for {n_ref_genes} genes...")
-
-    # Prepare worker arguments (gene index, name, paths)
-    worker_args = [
-        (ref_idx, gene_indices[ref_idx], gene_file_names[ref_idx],
-         base_files[ref_idx], boot_dir, n_genes,
-         edge_selection, min_effect, require_ci_exclude_zero, corr_threshold)
-        for ref_idx in range(n_ref_genes)
-    ]
-
-    # Run parallel processing with progress updates
-    if n_workers > 1:
-        with mp.Pool(processes=n_workers) as pool:
-            results_list = pool.starmap(_process_single_gene_worker, worker_args)
-    else:
-        # Fallback to sequential if only 1 worker
-        results_list = [_process_single_gene_worker(*args) for args in worker_args]
-
-    # Aggregate results into summary arrays
-    n_processed = 0
-    n_with_edges = 0
-    for ref_idx, gene_result in results_list:
-        if gene_result is None:
-            # Gene processing failed or was skipped
-            g_idx = gene_indices[ref_idx]
-            g_name = gene_file_names[ref_idx]
-            print(f"  Gene {g_idx} ({g_name}): skipped (no bootstrap file or error)")
-            continue
-
-        n_processed += 1
-
-        # Copy metrics to summary arrays
-        n_sig = gene_result.get("n_sig_total", 0)
-        summary["n_sig_total"][ref_idx] = n_sig
-
-        if n_sig == 0:
-            continue
-
-        n_with_edges += 1
-
-        # Copy all metrics from gene_result to summary
-        for key in ["n_after_filter", "n_disappear", "n_new", "n_sign_change",
-                    "n_strengthen", "n_weaken", "mean_abs_delta", "max_abs_delta",
-                    "L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
-                    "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
-                    "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
-                    "L2_deg_diff", "L2_rewire", "L2_str_low", "L2_str_high", "L2_str_diff",
-                    "L2L1_deg", "L2L1_rewire", "L2L1_str",
-                    "HL_str_L1", "HL_str_L2"]:
-            if key in gene_result:
-                summary[key][ref_idx] = gene_result[key]
-
-    print(f"  Processed {n_processed} genes ({n_with_edges} with significant edges)")
-
-    # Write summary HDF5
-    print(f"\nSaving summary to {out_h5_path}...")
-    out_h5_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with h5py.File(out_h5_path, "w") as h5:
-        meta = h5.create_group("meta")
-        meta.attrs["n_genes"] = n_genes
-        meta.attrs["n_ref_genes"] = n_ref_genes
-        meta.attrs["edge_selection"] = edge_selection
-        meta.attrs["min_effect"] = min_effect
-        meta.attrs["corr_threshold"] = corr_threshold
-        meta.attrs["require_ci_exclude_zero"] = require_ci_exclude_zero
-
-        if all_gene_names is not None:
-            h5.create_dataset("gene_names", data=all_gene_names, dtype=h5py.string_dtype())
-
-        per_gene = h5.create_group("per_gene")
-        for key, arr in summary.items():
-            per_gene.create_dataset(key, data=arr, compression="gzip")
-
-        # Store reference gene names
-        per_gene.create_dataset(
-            "gene_name", data=gene_file_names, dtype=h5py.string_dtype()
-        )
-
-    # Print summary
-    n_with_edges = np.sum(summary["n_sig_total"] > 0)
-    print(f"\n{'='*60}")
-    print(f"PER-GENE NETWORK COLLECTION SUMMARY")
-    print(f"{'='*60}")
-    print(f"  Reference genes processed: {n_ref_genes}")
-    print(f"  Reference genes with edges: {n_with_edges}")
-    print(f"  Total sig edges across all genes: {summary['n_sig_total'].sum():,}")
-    if n_with_edges > 0:
-        active = summary["n_sig_total"] > 0
-        print(f"  Mean sig edges per active gene: {summary['n_sig_total'][active].mean():.1f}")
-        print(f"  Max sig edges: {summary['n_sig_total'].max():,}")
-        print(f"  Mean |Δr| (active genes): {summary['mean_abs_delta'][active].mean():.4f}")
-
-    # Top genes by L2L1_deg
-    if n_with_edges > 0:
-        top_idx = np.argsort(summary["L2L1_deg"])[::-1][:min(20, n_ref_genes)]
-        print(f"\n  Top genes by L2/L1 degree ratio (diff network):")
-        print(f"  {'Idx':>6} {'Gene':>20} {'SigTotal':>10} {'L1_deg':>7} {'L2_deg':>7} "
-              f"{'L2L1':>7} {'L1_rew':>7} {'L2_rew':>7}")
-        for i in top_idx:
-            if summary["n_sig_total"][i] > 0:
-                print(f"  {summary['gene_index'][i]:>6} {gene_file_names[i]:>20} "
-                      f"{summary['n_sig_total'][i]:>10} {summary['L1_deg_diff'][i]:>7} "
-                      f"{summary['L2_deg_diff'][i]:>7} {summary['L2L1_deg'][i]:>7.2f} "
-                      f"{summary['L1_rewire'][i]:>7} {summary['L2_rewire'][i]:>7}")
-
-    # Write focus gene TSV (sorted by L2L1_deg descending)
-    if out_focus_tsv_path:
-        print(f"\nSaving focus gene TSV to {out_focus_tsv_path}...")
-        out_focus_tsv_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # TSV columns (order matches revised plan)
-        focus_tsv_cols = [
-            "gene_idx", "gene_id", "n_sig_total",
-            "L1_deg_diff",
-            "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
-            "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
-            "L1_str_low", "L1_str_high", "L1_str_diff", "L1_mean_abs_dr",
-            "L2_deg_diff", "L2_rewire",
-            "L2_str_low", "L2_str_high", "L2_str_diff",
-            "L2L1_deg", "L2L1_rewire", "L2L1_str",
-            "HL_str_L1", "HL_str_L2",
-        ]
-
-        # Sort by L2L1_deg descending
-        sort_idx = np.argsort(summary["L2L1_deg"])[::-1]
-
-        # Integer columns (no decimal formatting)
-        int_cols = {"gene_idx", "n_sig_total", "L1_deg_diff",
-                    "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
-                    "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
-                    "L2_deg_diff", "L2_rewire"}
-
-        with open(out_focus_tsv_path, "w") as f:
-            f.write("\t".join(focus_tsv_cols) + "\n")
-            for i in sort_idx:
-                if summary["n_sig_total"][i] == 0:
-                    continue
-                vals = []
-                for col in focus_tsv_cols:
-                    if col == "gene_idx":
-                        vals.append(str(summary["gene_index"][i]))
-                    elif col == "gene_id":
-                        vals.append(gene_file_names[i])
-                    elif col in int_cols:
-                        vals.append(str(summary[col][i]))
-                    else:
-                        vals.append(f"{summary[col][i]:.4f}")
-                f.write("\t".join(vals) + "\n")
-        print(f"  Saved {n_with_edges} genes to focus gene TSV")
-
-        if annotate:
-            annotate_tsv(out_focus_tsv_path, gene_id_col="gene_id")
-
-
-# =============================================================================
-# Annotation
-# =============================================================================
-
-def annotate_tsv(tsv_path: Path, gene_id_col: str = "gene_id") -> None:
-    """
-    Annotate a TSV file with gene symbols/names using the R script
-    06_annotate_rewiring_table.R and org.Dm.eg.db.
-    """
-    import subprocess
-
-    script_dir = Path(__file__).resolve().parent
-    r_script = script_dir / "06_annotate_rewiring_table.R"
-
-    if not r_script.exists():
-        print(f"  WARNING: Annotation script not found at {r_script}")
-        return
-
-    out_path = tsv_path.with_name(tsv_path.stem + "_annotated.tsv")
-    cmd = [
-        "Rscript", str(r_script),
-        "--input-tsv", str(tsv_path),
-        "--output-tsv", str(out_path),
-        "--gene-id-col", gene_id_col,
-    ]
-    print(f"\nAnnotating {tsv_path.name} with gene names...")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        if result.returncode == 0:
-            print(f"  Annotated TSV saved to {out_path}")
-        else:
-            print(f"  WARNING: Annotation failed:\n{result.stderr}")
-    except FileNotFoundError:
-        print("  WARNING: Rscript not found. Skipping annotation.")
-    except subprocess.TimeoutExpired:
-        print("  WARNING: Annotation timed out after 120s.")
-
-
-# =============================================================================
 # Summary Printing
 # =============================================================================
 
@@ -1527,28 +1169,39 @@ def print_summary(results: dict, all_topo: dict, focus_analysis: dict) -> None:
         print(f"  Direct partners (1st layer): {focus_analysis['n_direct_partners']}")
         print(f"  Indirect partners (2nd layer): {focus_analysis['n_indirect_partners']}")
 
-        ds = focus_analysis["direct_stats"]
         fa = focus_analysis
-        print(f"\n  L1 (Direct) Metrics:")
+        print(f"  Degree in LOW: {fa['focus_deg_low']}, HIGH: {fa['focus_deg_high']}")
+
+        print(f"\n  L1 (Direct partners) Metrics:")
         print(f"    Degree (diff): {fa['L1_deg_diff']}")
-        print(f"    Disappear: {ds['n_disappear']}, New: {ds['n_new']}, "
-              f"Sign change: {ds['n_sign_change']}")
-        print(f"    Strengthen: {ds['n_strengthen']}, Weaken: {ds['n_weaken']}")
+        print(f"    Edges — direct: {fa['n_direct_edges']}")
+        print(f"    Disappear: {fa['L1_n_disappear']}, New: {fa['L1_n_new']}, "
+              f"Sign change: {fa['L1_n_sign_chg']}")
+        print(f"    Strengthen: {fa['L1_n_strengthen']}, Weaken: {fa['L1_n_weaken']}")
         print(f"    Rewiring: {fa['L1_rewire']}")
-        print(f"    str_low: {fa['L1_str_low']:.4f}, str_high: {fa['L1_str_high']:.4f}, "
-              f"str_diff: {fa['L1_str_diff']:.4f}")
+        print(f"    conn_low: {fa['L1_conn_low']:.4f}, conn_high: {fa['L1_conn_high']:.4f}, "
+              f"conn_diff: {fa['L1_conn_diff']:.4f}")
+        print(f"    conn_mean_low: {fa['L1_conn_mean_low']:.4f}, "
+              f"conn_mean_high: {fa['L1_conn_mean_high']:.4f}")
         print(f"    Mean |Δr|: {fa['L1_mean_abs_dr']:.4f}")
 
-        print(f"\n  L2 (Full Two-Layer) Metrics:")
+        print(f"\n  L2 (Outer layers: L1↔L1 + L1→L2) Metrics:")
         print(f"    Degree (diff): {fa['L2_deg_diff']}")
+        print(f"    Edges — L1↔L1: {fa['n_l1_to_l1_edges']}, L1→L2: {fa['n_l1_to_l2_edges']}")
+        print(f"    Disappear: {fa['L2_n_disappear']}, New: {fa['L2_n_new']}, "
+              f"Sign change: {fa['L2_n_sign_chg']}")
+        print(f"    Strengthen: {fa['L2_n_strengthen']}, Weaken: {fa['L2_n_weaken']}")
         print(f"    Rewiring: {fa['L2_rewire']}")
-        print(f"    str_low: {fa['L2_str_low']:.4f}, str_high: {fa['L2_str_high']:.4f}, "
-              f"str_diff: {fa['L2_str_diff']:.4f}")
+        print(f"    conn_low: {fa['L2_conn_low']:.4f}, conn_high: {fa['L2_conn_high']:.4f}, "
+              f"conn_diff: {fa['L2_conn_diff']:.4f}")
+        print(f"    conn_mean_low: {fa['L2_conn_mean_low']:.4f}, "
+              f"conn_mean_high: {fa['L2_conn_mean_high']:.4f}")
+        print(f"    Mean |Δr|: {fa['L2_mean_abs_dr']:.4f}")
 
         print(f"\n  Ratios:")
         print(f"    L2/L1 deg: {fa['L2L1_deg']:.2f}, rewire: {fa['L2L1_rewire']:.2f}, "
-              f"str: {fa['L2L1_str']:.2f}")
-        print(f"    H/L str L1: {fa['HL_str_L1']:.4f}, L2: {fa['HL_str_L2']:.4f}")
+              f"conn: {fa['L2L1_conn']:.2f}")
+        print(f"    H/L conn L1: {fa['HL_conn_L1']:.4f}, L2: {fa['HL_conn_L2']:.4f}")
 
         if focus_analysis["partner_details"]:
             print(f"\n  Direct Partner Details:")
@@ -1564,33 +1217,19 @@ def print_summary(results: dict, all_topo: dict, focus_analysis: dict) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Stage 3: Reconstruct differential network with topology analysis."
-    )
-    # Single-file mode
-    parser.add_argument(
-        "--base-h5", type=str, default=None,
-        help="Path to base_correlations.h5 from Stage 2a (single-gene mode).",
+        description="Stage 3: Reconstruct differential network with topology analysis (single-gene mode)."
     )
     parser.add_argument(
-        "--boot-h5", type=str, default=None,
-        help="Path to bootstrap_significant.h5 from Stage 2b (single-gene mode).",
-    )
-    # Per-gene directory mode
-    parser.add_argument(
-        "--base-dir", type=str, default=None,
-        help="Directory of per-gene base_correlations h5 files (per-gene mode).",
+        "--base-h5", type=str, required=True,
+        help="Path to base_correlations.h5 from Stage 2a.",
     )
     parser.add_argument(
-        "--boot-dir", type=str, default=None,
-        help="Directory of per-gene bootstrap_significant h5 files (per-gene mode).",
+        "--boot-h5", type=str, required=True,
+        help="Path to bootstrap_significant.h5 from Stage 2b.",
     )
     parser.add_argument(
         "--out-h5", type=str, default="results/differential_network.h5",
         help="Output HDF5 path.",
-    )
-    parser.add_argument(
-        "--out-focus-tsv", type=str, default=None,
-        help="Output TSV path for focus gene metrics table (per-gene mode).",
     )
     parser.add_argument(
         "--edge-selection", type=str, choices=["sig_edges", "sig_differential"],
@@ -1617,35 +1256,12 @@ def parse_args() -> argparse.Namespace:
         "--gene-ids", type=str, default=None,
         help="Path to file with gene IDs (one per line) for labeling.",
     )
-    parser.add_argument(
-        "--annotate", action="store_true",
-        help="Annotate the output TSV with gene symbols/names using org.Dm.eg.db (requires R).",
-    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
 
-    # Dispatch: per-gene directory mode vs single-file mode
-    if args.base_dir and args.boot_dir:
-        collect_per_gene_networks(
-            base_dir=Path(args.base_dir),
-            boot_dir=Path(args.boot_dir),
-            out_h5_path=Path(args.out_h5),
-            out_focus_tsv_path=Path(args.out_focus_tsv) if args.out_focus_tsv else None,
-            edge_selection=args.edge_selection,
-            min_effect=args.min_effect,
-            require_ci_exclude_zero=not args.no_ci_filter,
-            corr_threshold=args.corr_threshold,
-            annotate=args.annotate,
-        )
-        return
-
-    if not args.base_h5 or not args.boot_h5:
-        raise SystemExit("ERROR: provide --base-h5/--boot-h5 or --base-dir/--boot-dir.")
-
-    # Single-file mode (original behavior)
     # Load and process data
     results = load_and_process(
         base_h5_path=Path(args.base_h5),

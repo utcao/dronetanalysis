@@ -73,16 +73,15 @@ ANNOTATE       = config.get("annotate", False)
 # Optional stages (disabled by default; enable in config or via --config)
 SKIP_VIS        = config.get("skip_visualization", True)
 
-# Stage 4: Focus gene topology
-# NOTE: Requires Stage 3 to be run in per-gene single-gene mode first (see
-#       Stage 4 rule below). Keep True until that rule is fully wired.
+# Stage 4: Focus gene topology (optional; enable with skip_focus_topology: false)
 SKIP_FOCUS_TOPO = config.get("skip_focus_topology", True)
 FOCUS_GENES     = config.get("focus_genes", "top:50")
 FOCUS_N_JOBS    = config.get("focus_n_jobs", 4)
 
-# Optional: restrict stages 2a/2b to a named subset of genes (list of FBgn IDs).
-# Stages 0, 1, and 3 are unaffected.
-# When set, use --until bootstrap_significant to avoid Stage 3 with partial data.
+# Optional: restrict processing to a named subset of genes (list of FBgn IDs).
+# Stages 0 and 1 always process all genes (bootstrap indices cover the full matrix).
+# Stages 2a, 2b, 3 (reconstruct_single), 3b (collect_networks), and 4 respect this
+# subset via _filter_genes() — only genes in the subset have per-gene jobs scheduled.
 # Example config:  gene_subset: [FBgn0002563, FBgn0027844]
 GENE_SUBSET    = set(config.get("gene_subset", []))
 
@@ -135,6 +134,14 @@ def all_boot_sig_files(wildcards):
     return [f"{BOOT_DIR}/{i:04d}_{name}.h5" for i, name in _filter_genes(names)]
 
 
+def all_network_files(wildcards):
+    """Aggregate function: list per-gene differential_network.h5 files (filtered by gene_subset).
+    These are produced by the reconstruct_single rule (Stage 3)."""
+    h5_path = checkpoints.preprocess.get(**wildcards).output[0]
+    names = _read_gene_names(h5_path)
+    return [f"{NETWORKS_DIR}/{i:04d}_{name}.h5" for i, name in _filter_genes(names)]
+
+
 # ---------------------------------------------------------------------------
 # Wildcard constraints: {gi} is always exactly 4 digits
 # ---------------------------------------------------------------------------
@@ -149,6 +156,8 @@ def _all_targets(wildcards):
     targets = [SUMMARY_H5, SUMMARY_TSV]
     if not SKIP_VIS:
         targets.append(VIS_DIR)
+    if not SKIP_FOCUS_TOPO:
+        targets.append(FOCUS_TOPO_H5)
     return targets
 
 
@@ -217,14 +226,15 @@ rule bootstrap_indices:
 # Stage 2a: Base correlations + FDR significance (per gene)
 #
 # Wildcard {gi} = zero-padded gene index, {gene_id} = gene name.
-# Each gene produces one file: {BASE_DIR}/{gi}_{gene_id}.h5
+# Output is temp(): deleted automatically after reconstruct_single (Stage 3) finishes
+# for that gene, since no downstream rule needs the raw base_correlations file after that.
 # ---------------------------------------------------------------------------
 rule base_correlations:
     input:
         expr    = EXPR_H5_FINAL,
         indices = INDICES_H5,
     output:
-        f"{BASE_DIR}/{{gi}}_{{gene_id}}.h5",
+        temp(f"{BASE_DIR}/{{gi}}_{{gene_id}}.h5"),
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
@@ -246,6 +256,7 @@ rule base_correlations:
 # Stage 2b: Bootstrap significant edges (per gene)
 #
 # Reads the matching base_correlations file for this gene.
+# Output is temp(): deleted after reconstruct_single (Stage 3) finishes.
 # ---------------------------------------------------------------------------
 rule bootstrap_significant:
     input:
@@ -253,7 +264,7 @@ rule bootstrap_significant:
         indices = INDICES_H5,
         base    = f"{BASE_DIR}/{{gi}}_{{gene_id}}.h5",
     output:
-        f"{BOOT_DIR}/{{gi}}_{{gene_id}}.h5",
+        temp(f"{BOOT_DIR}/{{gi}}_{{gene_id}}.h5"),
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
@@ -273,76 +284,95 @@ rule bootstrap_significant:
 
 
 # ---------------------------------------------------------------------------
-# Stage 3: Collect per-gene networks into summary (single job)
+# Stage 3: Reconstruct per-gene differential network (one job per gene)
 #
-# Waits for ALL per-gene files via the aggregate input functions,
-# then runs the collection script in directory mode.
+# Mirrors the structure of Stages 2a/2b: one Snakemake job per reference gene,
+# parallelised natively by Snakemake (no internal multiprocessing).
+# Respects GENE_SUBSET via all_network_files() → _filter_genes().
+# ---------------------------------------------------------------------------
+rule reconstruct_single:
+    input:
+        base = f"{BASE_DIR}/{{gi}}_{{gene_id}}.h5",
+        boot = f"{BOOT_DIR}/{{gi}}_{{gene_id}}.h5",
+    output:
+        f"{NETWORKS_DIR}/{{gi}}_{{gene_id}}.h5",
+    params:
+        ci_flag = "--no-ci-filter" if NO_CI_FILTER else "",
+    resources:
+        mem_mb  = 4000,
+        runtime = 30,
+    shell:
+        """
+        python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
+            --base-h5 {input.base} \
+            --boot-h5 {input.boot} \
+            --out-h5 {output} \
+            --edge-selection {EDGE_SEL} \
+            --min-effect {MIN_EFFECT} \
+            --corr-threshold {CORR_THRESH} \
+            {params.ci_flag}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 3b: Collect per-gene networks into summary (single job)
+#
+# Waits for ALL per-gene network files (from reconstruct_single) via
+# all_network_files(), then aggregates into summary.h5 + rewiring_hubs.tsv.
 # ---------------------------------------------------------------------------
 rule collect_networks:
     input:
-        base_files = all_base_corr_files,
-        boot_files = all_boot_sig_files,
+        network_files = all_network_files,
     output:
         h5  = SUMMARY_H5,
         tsv = SUMMARY_TSV,
     params:
-        ci_flag      = "--no-ci-filter" if NO_CI_FILTER else "",
         annotate_flag = "--annotate" if ANNOTATE else "",
     resources:
-        mem_mb  = 16000,
-        runtime = 720,
+        mem_mb  = 8000,
+        runtime = 120,
     shell:
         """
-        python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
-            --base-dir {BASE_DIR} \
-            --boot-dir {BOOT_DIR} \
+        python src/scripts/10spearman_corr/03b_collect_networks.py \
+            --networks-dir {NETWORKS_DIR} \
             --out-h5 {output.h5} \
             --out-focus-tsv {output.tsv} \
-            --edge-selection {EDGE_SEL} \
-            --min-effect {MIN_EFFECT} \
-            --corr-threshold {CORR_THRESH} \
-            {params.ci_flag} {params.annotate_flag}
+            {params.annotate_flag}
         """
 
 
 # ---------------------------------------------------------------------------
-# Stage 4: Collect focus gene topology (placeholder — disabled by default)
+# Stage 4: Collect focus gene topology (optional; enable with skip_focus_topology: false)
 #
-# WHY DISABLED: 04_collect_focus_gene_topology.py expects per-gene HDF5 files
-# with the structure  topology/global_low(high/diff)/degrees  written by Stage 3
-# in SINGLE-GENE mode (--base-h5 / --boot-h5). The collect_networks rule above
-# runs Stage 3 in DIRECTORY mode, producing only the aggregated summary HDF5
-# which Stage 4 cannot read.
-#
-# To wire this rule, add a new 'reconstruct_single' array rule that calls
-# Stage 3 once per gene in single-gene mode, writing per-gene topology files
-# to NETWORKS_DIR. Then uncomment the rule below.
+# Reads all per-gene network files from NETWORKS_DIR (same files produced by
+# reconstruct_single) and aggregates degree + L1/L2/ratio metrics for each
+# focus gene across all reference-gene contexts.
 #
 # Config: skip_focus_topology (default true), focus_genes, focus_n_jobs
 # ---------------------------------------------------------------------------
-# if not SKIP_FOCUS_TOPO:
-#     rule collect_focus_gene_topology:
-#         input:
-#             network_files = ...,   # per-gene topology HDF5s from reconstruct_single
-#             summary = SUMMARY_H5,
-#         output:
-#             FOCUS_TOPO_H5,
-#         params:
-#             n_genes = lambda wc, input: (
-#                 __import__('h5py').File(input.summary, 'r')['meta'].attrs['n_genes']
-#             ),
-#         resources:
-#             mem_mb  = 8000,
-#             runtime = 120,
-#         shell:
-#             """
-#             python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
-#                 --network-dir {NETWORKS_DIR} \
-#                 --focus-genes {FOCUS_GENES} \
-#                 --n-genes {params.n_genes} \
-#                 --n-jobs {FOCUS_N_JOBS} \
-#                 --out-h5 {output}
-#             """
+if not SKIP_FOCUS_TOPO:
+    rule collect_focus_gene_topology:
+        input:
+            network_files = all_network_files,
+            summary = SUMMARY_H5,
+        output:
+            FOCUS_TOPO_H5,
+        params:
+            n_genes = lambda wc, input: (
+                __import__('h5py').File(input.summary, 'r')['meta'].attrs['n_genes']
+            ),
+        resources:
+            mem_mb  = 8000,
+            runtime = 120,
+        shell:
+            """
+            python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
+                --network-dir {NETWORKS_DIR} \
+                --focus-genes {FOCUS_GENES} \
+                --n-genes {params.n_genes} \
+                --n-jobs {FOCUS_N_JOBS} \
+                --out-h5 {output}
+            """
 
 
 # ---------------------------------------------------------------------------
