@@ -63,16 +63,17 @@ annotate:        false  # true = annotate output TSV with gene symbols (requires
 # --- Optional stages ---
 skip_visualization:  true  # false = run Stage 5 (visualization export)
 
-# --- Stage 4: Focus gene topology (placeholder, not yet wired) ---
-# Keep true. Stage 4 requires per-gene single-gene mode output from Stage 3,
-# which the current pipeline does not produce. See Stage 4 section below.
+# --- Stage 4: Focus gene topology ---
+# Set skip_focus_topology: false to enable.
+# Requires Stage 3 (reconstruct_single) to complete for all relevant genes first.
 skip_focus_topology: true
 focus_genes: "top:50"    # "top:N", "0,1,2,...", or "range:start:end"
-focus_n_jobs: 4
+focus_n_jobs: 4          # parallel workers for Stage 4
 
 # --- Gene subset (optional) ---
-# Restrict stages 2a and 2b to named genes only (for testing/re-runs).
-# Remove to process all genes. Use --until bootstrap_significant with subsets.
+# Restrict per-gene jobs (Stages 2a, 2b, 3, 3b, 4) to a named subset of genes.
+# Stages 0 and 1 always process the full expression matrix.
+# Remove gene_subset (or set to []) to process all genes.
 gene_subset:
   - FBgn0002563
   - FBgn0027844
@@ -90,10 +91,11 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
     -n
 ```
 
-> **Note on checkpoint behaviour:** The dry run will show only 3 jobs (`preprocess`,
-> `collect_networks`, `all`) even when dozens of per-gene jobs will run. This is expected —
-> Snakemake cannot enumerate per-gene Stage 2a/2b jobs until the `preprocess` checkpoint
-> completes and `expression.h5` is created. All stages will execute correctly in a real run.
+> **Note on checkpoint behaviour:** The dry run will show only a small number of jobs
+> (`preprocess`, `collect_networks`, `all`) even when dozens of per-gene jobs will run.
+> This is expected — Snakemake cannot enumerate per-gene Stage 2a/2b/3 jobs until the
+> `preprocess` checkpoint completes and `expression.h5` is created. All stages will
+> execute correctly in a real run.
 
 ### Full run from scratch (new output folder)
 
@@ -104,7 +106,7 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
     -j 15
 ```
 
-### Re-run only Stage 3 (existing intermediate files)
+### Re-run only Stage 3b collection (existing intermediate files)
 
 ```bash
 snakemake -s src/pipelines/Snakefile_bootstrap \
@@ -119,6 +121,15 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
 snakemake -s src/pipelines/Snakefile_bootstrap \
     --configfile config/ct_voom_snakemake.yaml \
     --until bootstrap_significant \
+    -j 15
+```
+
+### Run through Stage 3 including Stage 4 (focus gene topology)
+
+```bash
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml \
+    --config skip_focus_topology=false \
     -j 15
 ```
 
@@ -147,21 +158,24 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
    Stage 1: bootstrap_indices
    → bootstrap_indices.h5
         │
-        ├──────────────────────────────────────┐
-        ▼                                      ▼
-   Stage 2a: base_correlations           (per gene)
+        ├────────────────────────────────────────────┐
+        ▼                                            ▼
+   Stage 2a: base_correlations               (per gene, ×N)
    → base_correlations/{gi}_{name}.h5
         │
         ▼
-   Stage 2b: bootstrap_significant       (per gene)
+   Stage 2b: bootstrap_significant           (per gene, ×N)
    → bootstrap_significant/{gi}_{name}.h5
         │
         ▼
-   Stage 3: collect_networks
-   → differential_network_summary.h5
-   → rewiring_hubs.tsv
+   Stage 3: reconstruct_single              (per gene, ×N)
+   → networks/{gi}_{name}.h5
         │
-        ├── [Stage 4: placeholder — see below]
+        ├──────────────────────────────────┐
+        ▼                                  ▼
+   Stage 3b: collect_networks         Stage 4: collect_focus_gene_topology
+   → differential_network_summary.h5  → focus_gene_topology.h5
+   → rewiring_hubs.tsv                  (if skip_focus_topology: false)
         │
         └── [Stage 5: visualization, if skip_visualization: false]
             → visualization_data/
@@ -170,9 +184,41 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
 ### Why Stage 2 shows as a checkpoint
 
 `preprocess` is a Snakemake **checkpoint** because the number and names of per-gene jobs
-in Stages 2a and 2b depend on the gene names inside `expression.h5`. Snakemake cannot
+in Stages 2a, 2b, and 3 depend on the gene names inside `expression.h5`. Snakemake cannot
 know how many `{gi}_{gene_id}` targets to create until the file exists. Once `preprocess`
 completes, the DAG is re-evaluated and all per-gene jobs are scheduled automatically.
+
+---
+
+## Gene Subset Filtering
+
+Setting `gene_subset` in the config restricts per-gene jobs to only the named genes:
+
+```yaml
+gene_subset:
+  - FBgn0002563
+  - FBgn0027844
+```
+
+**Which stages are affected:**
+
+| Stage | Subset filtering |
+|-------|-----------------|
+| Stage 0 (preprocess) | Always runs on full data |
+| Stage 1 (bootstrap_indices) | Always runs on full data |
+| Stage 2a (base_correlations) | ✅ Only subset genes scheduled |
+| Stage 2b (bootstrap_significant) | ✅ Only subset genes scheduled |
+| Stage 3 (reconstruct_single) | ✅ Only subset genes scheduled |
+| Stage 3b (collect_networks) | ✅ Reads only existing per-gene files |
+| Stage 4 (collect_focus_topology) | ✅ Reads only existing per-gene files |
+| Stage 5 (visualization) | Reads aggregated summary, unaffected |
+
+This uses the `_filter_genes()` function and Snakemake's **checkpoint + aggregate input**
+pattern: each downstream stage's input is resolved dynamically from the gene names in
+`expression.h5`, filtered by `GENE_SUBSET`. Only files whose gene IDs are in the subset
+are ever requested, so Snakemake never schedules jobs for excluded genes.
+
+Remove `gene_subset` (or set to `[]`) to process all genes.
 
 ---
 
@@ -206,20 +252,35 @@ Bootstraps only the significant edges identified in Stage 2a (~100× speedup).
 - **Output:** `{out_dir}/bootstrap_significant/{gi}_{gene_id}.h5` (one per gene)
 - **Key params:** `edge_selection`, `storage_mode`
 
-### Stage 3 — Collect Networks
+### Stage 3 — Reconstruct Single Network (per gene, array job)
 
-Aggregates all per-gene files, classifies edge changes, and computes focus gene neighborhood metrics.
+Reconstructs the full differential network for each reference gene: qualitative edge
+classification, global topology (LOW/HIGH/DIFF networks with degree distributions), and
+focus gene neighborhood analysis (L1/L2 partners with connectivity metrics).
 - **Script:** `src/scripts/10spearman_corr/03_reconstruct_diff_network.py`
+- **Output:** `{out_dir}/networks/{gi}_{gene_id}.h5` (one per gene, ~4 GB RAM per job)
+- **Key params:** `edge_selection`, `min_effect`, `corr_threshold`, `no_ci_filter`
+- **Note:** Scheduled as one Snakemake job per gene (like Stages 2a/2b), enabling native
+  Snakemake parallelism across a cluster.
+
+### Stage 3b — Collect Networks (single job)
+
+Aggregates per-gene network files from Stage 3 into a summary HDF5 and the
+`rewiring_hubs.tsv` ranking table. Reads from `networks/` (Stage 3 output).
+- **Script:** `src/scripts/10spearman_corr/03b_collect_networks.py`
 - **Output:** `{out_dir}/differential_network_summary.h5`, `{out_dir}/rewiring_hubs.tsv`
-- **Key params:** `edge_selection`, `min_effect`, `corr_threshold`, `no_ci_filter`, `annotate`
-- **Runs in directory mode** (reads all per-gene files at once via `--base-dir`/`--boot-dir`)
+- **Key params:** `annotate`
+- **Fallback mode:** Can also read raw `--base-dir`/`--boot-dir` directly (standalone use
+  without running Stage 3 first).
 
-### Stage 4 — Focus Gene Topology (placeholder, disabled)
+### Stage 4 — Focus Gene Topology (optional)
 
-Collects per-gene topology matrices (degree_low, degree_high, degree_diff) across all
-reference gene contexts for a selected set of focus genes.
+Collects per-gene topology matrices (degree_low, degree_high, degree_diff) and L1/L2
+metrics across all reference gene contexts for a selected set of focus genes.
 - **Script:** `src/scripts/10spearman_corr/04_collect_focus_gene_topology.py`
-- **Status:** Disabled (`skip_focus_topology: true`). See [Stage 4 Architecture Gap](#stage-4-architecture-gap).
+- **Output:** `{out_dir}/focus_gene_topology.h5`
+- **Enable with:** `skip_focus_topology: false` in config
+- **Key params:** `focus_genes` ("top:N", "0,1,2,...", or "range:start:end"), `focus_n_jobs`
 
 ### Stage 5 — Visualization Export (optional)
 
@@ -227,33 +288,6 @@ Exports the differential network to TSV and GraphML files for R/Cytoscape visual
 - **Script:** `src/scripts/10spearman_corr/05_prepare_visualization_data.py`
 - **Output:** `{out_dir}/visualization_data/`
 - **Enable with:** `skip_visualization: false` in config
-
----
-
-## Stage 4 Architecture Gap
-
-`04_collect_focus_gene_topology.py` expects one HDF5 file **per reference gene** with the
-structure:
-```
-{gene}.h5
-└── topology/
-    ├── global_low/degrees
-    ├── global_high/degrees
-    └── global_diff/degrees
-```
-
-Stage 3 in **single-gene mode** (`--base-h5 / --boot-h5`) produces exactly this format.
-However, the Snakemake `collect_networks` rule runs Stage 3 in **directory mode**
-(`--base-dir / --boot-dir`), which produces only a single aggregated summary HDF5 — Stage 4
-cannot read this.
-
-**To wire Stage 4 in the future:**
-1. Add a new `reconstruct_single` array rule that calls Stage 3 once per focus gene in
-   single-gene mode, writing per-gene topology files to `{out_dir}/networks/`.
-2. Uncomment the Stage 4 rule in `Snakefile_bootstrap`.
-
-The Stage 4 config variables (`skip_focus_topology`, `focus_genes`, `focus_n_jobs`) are
-already in place and will be picked up once the rule is uncommented.
 
 ---
 
@@ -271,8 +305,12 @@ After a successful run:
 ├── bootstrap_significant/             # Stage 2b (per gene)
 │   ├── 0000_FBgn0000001.h5
 │   └── ...
-├── differential_network_summary.h5    # Stage 3 — aggregated metrics
-├── rewiring_hubs.tsv                  # Stage 3 — per-gene TSV (sortable)
+├── networks/                          # Stage 3 (per gene)
+│   ├── 0000_FBgn0000001.h5
+│   └── ...
+├── differential_network_summary.h5    # Stage 3b — aggregated metrics
+├── rewiring_hubs.tsv                  # Stage 3b — per-gene TSV (sortable)
+├── focus_gene_topology.h5             # Stage 4 (if enabled)
 └── visualization_data/                # Stage 5 (if enabled)
     ├── edges_low.tsv
     ├── edges_high.tsv
@@ -334,7 +372,7 @@ Sorted by `L2L1_deg` (descending). Key columns:
 
 ## Troubleshooting
 
-### Dry run shows only 3 jobs
+### Dry run shows only a few jobs
 
 Expected. See [checkpoint behaviour note](#dry-run-always-do-this-first) above.
 
@@ -349,11 +387,11 @@ To force everything from scratch in a new directory:
 snakemake ... --config out_dir=results_new -j 15
 ```
 
-### Stage 3 fails with KeyError
+### Stage 3b fails with KeyError / missing metrics
 
-Likely a stale `bootstrap_significant/` file from a previous version. Re-run Stage 2b:
+Likely a stale `networks/` file from a previous version. Re-run Stage 3:
 ```bash
-snakemake ... --forcerun bootstrap_significant -j 15
+snakemake ... --forcerun reconstruct_single -j 15
 ```
 
 ### storage_mode: "common" not recognised
@@ -375,4 +413,4 @@ See [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) for storage mode de
 ---
 
 **Last Updated:** 2026-03-11
-**Status:** ✅ Active — Stage 4 placeholder pending architecture decision
+**Status:** ✅ Active — Stage 4 enabled (conditional on `skip_focus_topology: false`)

@@ -21,7 +21,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 |----------|-------------|
 | [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) | Complete pipeline workflow from expression data to differential network analysis |
 | [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) | Understanding network topology metrics (degree, betweenness, clustering, etc.) |
-| [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) | Snakemake workflow: config reference, all parameters, running commands, Stage 4 gap |
+| [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) | Snakemake workflow: config reference, all parameters, gene subset filtering, Stage 4 |
 
 ### ⚡ Optimization Guides
 
@@ -115,12 +115,14 @@ Historical development logs and planning documents:
 | **1** | 01get_extreme_pop_bootstrap.py | expression.h5 | bootstrap_indices.h5 | --batch-size (optional) |
 | **2a** | 02a_calc_base_correlations.py | expression.h5, bootstrap_indices.h5 | base_correlations/{gi}_{gene}.h5 | --storage-mode |
 | **2b** | 02b_bootstrap_significant_edges.py | expression.h5, base_correlations/ | bootstrap_significant/{gi}_{gene}.h5 | --storage-mode |
-| **3** | 03_reconstruct_diff_network.py | base_correlations/, bootstrap_significant/ | differential_network_summary.h5, rewiring_hubs.tsv | --edge-selection, --annotate |
-| **4** ⚠️ | 04_collect_focus_gene_topology.py | networks/{gene}.h5 (per-gene topology from Stage 3 single-gene mode) | focus_gene_topology.h5 | --focus-genes, --n-jobs |
+| **3** | 03_reconstruct_diff_network.py | base_correlations/{gi}.h5, bootstrap_significant/{gi}.h5 | networks/{gi}_{gene}.h5 | --edge-selection |
+| **3b** | 03b_collect_networks.py | networks/ | differential_network_summary.h5, rewiring_hubs.tsv | --annotate |
+| **4** | 04_collect_focus_gene_topology.py | networks/ | focus_gene_topology.h5 | --focus-genes, --n-jobs |
 | **5** | 05_prepare_visualization_data.py | differential_network_summary.h5 | visualization_data/ | - |
 | **6** | 06_annotate_rewiring_table.R | rewiring_hubs.tsv | rewiring_hubs_annotated.tsv | - |
 
-⚠️ Stage 4 is not yet wired in Snakemake. See [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md#stage-4-architecture-gap).
+Stages 2a, 2b, 3, 3b, and 4 respect `gene_subset` config — only named genes are processed.
+Stage 4 is optional; enable with `skip_focus_topology: false` in config.
 
 For detailed stage information, see [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md).
 
@@ -183,10 +185,14 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ## Recent Updates
 
 ### 2026-03-11
+- ✅ **Pipeline Refactoring**: Stage 3 split into single-gene `reconstruct_single` (per-gene
+  array job) + `03b_collect_networks.py` (aggregation). Stage 4 now fully wired in Snakemake.
+- ✅ **Gene Subset Propagation**: `gene_subset` config now propagates through Stages 2a, 2b,
+  3, 3b, and 4 via `_filter_genes()` aggregate inputs. Stages 0 and 1 unaffected.
+- ✅ **Stage 4 Enabled**: `collect_focus_gene_topology` rule active; enable with
+  `skip_focus_topology: false`. Fixed `mean_delta` attribute bug in Stage 4 reader.
 - ✅ **Snakemake Pipeline**: Added `GUIDE-03-Snakemake-Pipeline.md` with full config
-  reference, stage descriptions, checkpoint behaviour explanation, and Stage 4 gap analysis
-- ✅ **Stage 4 Placeholder**: Added commented-out `collect_focus_gene_topology` rule and
-  config vars (`skip_focus_topology`, `focus_genes`, `focus_n_jobs`) to Snakefile and YAML
+  reference, stage descriptions, checkpoint behaviour explanation, and Gene Subset Filtering section
 - ✅ **Network Metrics Renamed**: `str_*` → `conn_*` throughout Stage 3 and TSV output
   (connectivity = sum/mean \|r\|); fixed stale key inconsistency bug in `compute_edge_stats`
 - ✅ **New Focus Gene Metrics**: `focus_deg_low/high`, `L1/L2_conn_mean_low/high`,
@@ -220,6 +226,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2026-02-13
-**Pipeline Version:** 2.0 (with optimizations)
+**Last Updated:** 2026-03-11
+**Pipeline Version:** 2.1 (single-gene Stage 3, gene subset propagation, Stage 4 wired)
 **Status:** ✅ All documentation current

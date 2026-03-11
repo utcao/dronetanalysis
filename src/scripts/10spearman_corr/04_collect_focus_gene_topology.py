@@ -5,12 +5,16 @@ Stage 4: Collect Focus Gene Topology Across All Gene-Wise HDF5 Files.
 Aggregates topology information for focus genes across all per-gene networks,
 where each network is defined by a different reference gene's low/high split.
 
+Reads per-gene differential_network.h5 files written by Stage 3
+(reconstruct_single Snakemake rule, 03_reconstruct_diff_network.py).
+
 Pipeline position
 -----------------
 Stage 1   01subset/01get_extreme_pop_bootstrap.py  →  bootstrap_indices.h5
 Stage 2a  02a_calc_base_correlations.py            →  base_correlations.h5
 Stage 2b  02b_bootstrap_significant_edges.py       →  bootstrap_significant.h5
-Stage 3   03_reconstruct_diff_network.py           →  differential_network_gene_*.h5
+Stage 3   03_reconstruct_diff_network.py           →  networks/{gi}_{gene_id}.h5  (×N)
+Stage 3b  03b_collect_networks.py                  →  differential_network_summary.h5
 Stage 4   THIS SCRIPT                              →  focus_gene_topology.h5
 
 Output Structure
@@ -59,17 +63,27 @@ def extract_focus_gene_stats_from_file(
         ref_gene: int - reference gene index (from filename or metadata)
         focus_stats: dict[focus_gene] -> {degree_low, degree_high, degree_diff, ...}
     """
-    # Extract reference gene index from filename (e.g., differential_network_gene_123.h5)
-    match = re.search(r"gene[_-]?(\d+)", h5_path.stem)
-    if match:
-        ref_gene = int(match.group(1))
-    else:
-        ref_gene = 0
-
     focus_stats = {}
 
     try:
         with h5py.File(h5_path, "r") as h5:
+            # Prefer gene_index_used from meta (set by Stage 3 reconstruct_single).
+            # Fall back to filename parsing for legacy files.
+            if "meta" in h5 and "gene_index_used" in h5["meta"].attrs:
+                ref_gene = int(h5["meta"].attrs["gene_index_used"])
+            else:
+                # Legacy: parse from filename, e.g. differential_network_gene_123.h5
+                #         or new Snakemake convention 0003_FBgn0025702.h5
+                stem = h5_path.stem
+                m_legacy = re.search(r"gene[_-]?(\d+)", stem)
+                m_new = re.match(r"^(\d+)_", stem)
+                if m_legacy:
+                    ref_gene = int(m_legacy.group(1))
+                elif m_new:
+                    ref_gene = int(m_new.group(1))
+                else:
+                    ref_gene = 0
+
             # Check if file has topology data
             if "topology" not in h5:
                 return {"ref_gene": ref_gene, "focus_stats": focus_stats}
@@ -86,7 +100,7 @@ def extract_focus_gene_stats_from_file(
             has_focus = "focus_gene" in h5
             if has_focus:
                 focus_grp = h5["focus_gene"]
-                file_focus_gene = focus_grp.attrs.get("gene_index", -1)
+                file_focus_gene = int(focus_grp.attrs.get("gene_index", -1))
             else:
                 file_focus_gene = -1
 
@@ -100,16 +114,25 @@ def extract_focus_gene_stats_from_file(
 
                 # If this focus gene matches the file's focus gene, add detailed stats
                 if fg == file_focus_gene and has_focus:
-                    ds = focus_grp["direct_stats"]
                     stats.update({
-                        "n_direct_partners": focus_grp.attrs.get("n_direct_partners", 0),
-                        "n_indirect_partners": focus_grp.attrs.get("n_indirect_partners", 0),
-                        "direct_n_disappear": ds.attrs.get("n_disappear", 0),
-                        "direct_n_new": ds.attrs.get("n_new", 0),
-                        "direct_n_sign_change": ds.attrs.get("n_sign_change", 0),
-                        "direct_mean_delta": ds.attrs.get("mean_delta", 0.0),
-                        "direct_mean_abs_delta": ds.attrs.get("mean_abs_delta", 0.0),
+                        "n_direct_partners": int(focus_grp.attrs.get("n_direct_partners", 0)),
+                        "n_indirect_partners": int(focus_grp.attrs.get("n_indirect_partners", 0)),
                     })
+                    # direct_stats group (L1 edge-level stats)
+                    if "direct_stats" in focus_grp:
+                        ds = focus_grp["direct_stats"]
+                        stats.update({
+                            "direct_n_disappear": int(ds.attrs.get("n_disappear", 0)),
+                            "direct_n_new": int(ds.attrs.get("n_new", 0)),
+                            "direct_n_sign_change": int(ds.attrs.get("n_sign_change", 0)),
+                            "direct_mean_delta": float(ds.attrs.get("mean_delta", 0.0)),
+                            "direct_mean_abs_delta": float(ds.attrs.get("mean_abs_delta", 0.0)),
+                        })
+                    # metrics/ group — flat L1/L2/ratio attrs stored by Stage 3
+                    if "metrics" in focus_grp:
+                        met = focus_grp["metrics"]
+                        for key in met.attrs:
+                            stats[key] = met.attrs[key]
 
                 focus_stats[fg] = stats
 
@@ -125,14 +148,15 @@ def collect_focus_gene_topology(
     focus_genes: list[int],
     n_genes: int,
     n_jobs: int = 1,
-    file_pattern: str = "differential_network_gene_*.h5",
+    file_pattern: str = "*.h5",
 ) -> dict:
     """
     Collect topology for focus genes across all per-gene network files.
 
     Parameters
     ----------
-    network_dir : Directory containing differential_network_gene_*.h5 files
+    network_dir : Directory containing per-gene differential_network.h5 files
+                  (named {gi}_{gene_id}.h5 by the Snakemake reconstruct_single rule)
     focus_genes : List of focus gene indices
     n_genes : Total number of genes (for reference gene axis)
     n_jobs : Number of parallel jobs
@@ -323,8 +347,8 @@ def parse_args() -> argparse.Namespace:
         help="Number of parallel jobs (default: 1).",
     )
     parser.add_argument(
-        "--file-pattern", type=str, default="differential_network_gene_*.h5",
-        help="Glob pattern for network files.",
+        "--file-pattern", type=str, default="*.h5",
+        help="Glob pattern for network files (default: *.h5).",
     )
     return parser.parse_args()
 
