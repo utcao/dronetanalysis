@@ -12,17 +12,33 @@ This pipeline identifies **differential co-expression** between low and high exp
 |-------|--------|--------|-------------|
 | 0 | `00preprocess/00convert_expr_to_hdf5.py` | `expression.h5` | Convert TSV to HDF5 |
 | 1 | `01subset/01get_extreme_pop_bootstrap.py` | `bootstrap_indices.h5` | Generate bootstrap sample indices |
-| 2a | `10spearman_corr/02a_calc_base_correlations.py` | `base_correlations.h5` | Compute correlations + significance tests |
-| 2b | `10spearman_corr/02b_bootstrap_significant_edges.py` | `bootstrap_significant.h5` | Bootstrap only significant edges |
-| 3 | `10spearman_corr/03_reconstruct_diff_network.py` | `differential_network.h5` | Reconstruct network with topology |
-| 4 | `10spearman_corr/05_prepare_visualization_data.py` | `visualization_data/` | (Optional) Export for R visualization |
-| 5 | `10spearman_corr/06_annotate_rewiring_table.R` | `*_annotated.tsv` | Annotate gene IDs with symbols/names |
+| 2a | `10spearman_corr/02a_calc_base_correlations.py` | `base_correlations/{gi}_{gene}.h5` | Compute correlations + significance tests (per gene) |
+| 2b | `10spearman_corr/02b_bootstrap_significant_edges.py` | `bootstrap_significant/{gi}_{gene}.h5` | Bootstrap only significant edges (per gene) |
+| 3 | `10spearman_corr/03_reconstruct_diff_network.py` | `differential_network_summary.h5`, `rewiring_hubs.tsv` | Reconstruct network, classify edges, focus gene metrics |
+| 4 | `10spearman_corr/04_collect_focus_gene_topology.py` | `focus_gene_topology.h5` | (Placeholder) Collect per-gene topology for focus genes |
+| 5 | `10spearman_corr/05_prepare_visualization_data.py` | `visualization_data/` | (Optional) Export for R/Cytoscape visualization |
+| 6 | `10spearman_corr/06_annotate_rewiring_table.R` | `*_annotated.tsv` | Annotate gene IDs with symbols/names |
 
 ---
 
 ## Quick Start
 
-### Option 1: Local Test with Toy Data
+### Option 0: Snakemake (recommended)
+
+```bash
+# Dry run (shows what will execute)
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml --config out_dir=results_test -n
+
+# Full run (15-gene subset from config)
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml --config out_dir=results_test -j 15
+```
+
+See [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) for full Snakemake
+documentation including config reference, stage descriptions, and troubleshooting.
+
+### Option 1: Local Test with Toy Data (bash script)
 ```bash
 # Run complete pipeline locally (no SGE needed)
 bash src/SGE_scripts/run_bootstrap_pipeline.sh --toy --local --out-dir results_toy
@@ -118,38 +134,54 @@ python src/scripts/10spearman_corr/02b_bootstrap_significant_edges.py \
 **Key insight:** Only bootstraps significant edges (~1% of all edges), providing ~100x speedup.
 
 ### Stage 3: Reconstruct Differential Network
+
+**Directory mode** (used by Snakemake — reads all per-gene files at once):
 ```bash
 python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
-    --base-h5 results/base_correlations.h5 \
-    --boot-h5 results/bootstrap_significant.h5 \
-    --out-h5 results/differential_network.h5 \
-    --edge-selection sig_edges
-
-# With per-gene metrics and TSV output
-python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
-    --base-h5 results/base_correlations.h5 \
-    --boot-h5 results/bootstrap_significant.h5 \
-    --out-h5 results/differential_network.h5 \
-    --out-tsv results/rewiring_hubs.tsv \
-    --calc-per-gene-metrics
-
-# With automatic annotation (adds gene symbols/names via org.Dm.eg.db)
-python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
-    --base-dir results/per_gene/base \
-    --boot-dir results/per_gene/boot \
-    --out-h5 results/per_gene_summary.h5 \
-    --out-focus-tsv results/focus_gene_metrics.tsv \
+    --base-dir results/base_correlations \
+    --boot-dir results/bootstrap_significant \
+    --out-h5 results/differential_network_summary.h5 \
+    --out-focus-tsv results/rewiring_hubs.tsv \
+    --edge-selection sig_differential \
     --annotate
+```
+
+**Single-gene mode** (used for per-gene topology files needed by Stage 4):
+```bash
+python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
+    --base-h5 results/base_correlations/0001_FBgn0001234.h5 \
+    --boot-h5 results/bootstrap_significant/0001_FBgn0001234.h5 \
+    --out-h5 results/networks/differential_network_gene_1.h5 \
+    --edge-selection sig_differential
 ```
 
 **Features:**
 - Global topology for LOW, HIGH, and DIFF networks
 - Qualitative edge classification (disappear, new, sign_change, strengthen, weaken)
-- Focus gene neighborhood analysis (1st and 2nd layer partners)
-- Optional per-gene metrics (--calc-per-gene-metrics)
-- Optional `--annotate` flag to automatically annotate the output TSV with gene symbols/names (requires R)
+- Focus gene neighborhood analysis (direct L1 partners + outer-layer L1↔L1 / L1→L2)
+- Two-layer edge definitions:
+  - `direct_edges` = focus→L1 edges only
+  - `two_layer_edges` = L1↔L1 + L1→L2 edges (outer layer, excludes ego)
+  - `full_two_layer_edges` = all three (complete 2-hop ego network)
+- Per-gene metrics written to TSV (`rewiring_hubs.tsv`), see column reference in
+  [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md)
+- Optional `--annotate` to add gene symbols/names (requires R)
 
-### Stage 4: Prepare Visualization Data
+### Stage 4: Collect Focus Gene Topology (placeholder)
+
+```bash
+# NOTE: requires Stage 3 run in single-gene mode first (see above)
+python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
+    --network-dir results/networks \
+    --focus-genes top:50 \
+    --n-genes 8763 \
+    --n-jobs 4 \
+    --out-h5 results/focus_gene_topology.h5
+```
+
+Stage 4 is not yet wired in Snakemake. See [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md#stage-4-architecture-gap) for the architectural reason.
+
+### Stage 5: Prepare Visualization Data
 ```bash
 python src/scripts/10spearman_corr/05_prepare_visualization_data.py \
     --diff-h5 results/differential_network.h5 \
@@ -170,7 +202,7 @@ visualization_data/
 └── visualize_networks.R   - R script template
 ```
 
-### Stage 5: Annotate Rewiring Table
+### Stage 6: Annotate Rewiring Table
 ```bash
 # Standalone: annotate any TSV containing FBgn gene IDs
 Rscript src/scripts/10spearman_corr/06_annotate_rewiring_table.R \
@@ -194,7 +226,7 @@ Rscript src/scripts/10spearman_corr/06_annotate_rewiring_table.R \
 - Can also be triggered automatically from Stage 3 with the `--annotate` flag
 - No network access required (local SQLite database)
 
-### Stage 6: R Visualization
+### Stage 7: R Visualization
 ```bash
 cd results/visualization_data
 Rscript visualize_networks.R
@@ -398,6 +430,7 @@ python -c "import h5py; h5 = h5py.File('results_test/differential_network.h5', '
 
 ## Related Reading
 
+- [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) - Snakemake workflow: config reference, stage descriptions, troubleshooting
 - [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) - Understanding network topology metrics
 - [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) - Memory optimization strategies (vectorized vs batch mode)
 - [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Storage optimization (common, minimal, full modes)

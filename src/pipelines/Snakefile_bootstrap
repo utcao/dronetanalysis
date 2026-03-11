@@ -71,7 +71,14 @@ STORAGE_MODE   = config.get("storage_mode", "minimal")
 ANNOTATE       = config.get("annotate", False)
 
 # Optional stages (disabled by default; enable in config or via --config)
-SKIP_VIS       = config.get("skip_visualization", True)
+SKIP_VIS        = config.get("skip_visualization", True)
+
+# Stage 4: Focus gene topology
+# NOTE: Requires Stage 3 to be run in per-gene single-gene mode first (see
+#       Stage 4 rule below). Keep True until that rule is fully wired.
+SKIP_FOCUS_TOPO = config.get("skip_focus_topology", True)
+FOCUS_GENES     = config.get("focus_genes", "top:50")
+FOCUS_N_JOBS    = config.get("focus_n_jobs", 4)
 
 # Optional: restrict stages 2a/2b to a named subset of genes (list of FBgn IDs).
 # Stages 0, 1, and 3 are unaffected.
@@ -86,6 +93,8 @@ BASE_DIR       = f"{OUT}/base_correlations"
 BOOT_DIR       = f"{OUT}/bootstrap_significant"
 SUMMARY_H5     = f"{OUT}/differential_network_summary.h5"
 SUMMARY_TSV    = f"{OUT}/rewiring_hubs.tsv"
+FOCUS_TOPO_H5  = f"{OUT}/focus_gene_topology.h5"
+NETWORKS_DIR   = f"{OUT}/networks"
 VIS_DIR        = f"{OUT}/visualization_data"
 
 
@@ -297,7 +306,47 @@ rule collect_networks:
 
 
 # ---------------------------------------------------------------------------
-# Stage 4: Prepare visualization data (optional, skip_visualization: true by default)
+# Stage 4: Collect focus gene topology (placeholder — disabled by default)
+#
+# WHY DISABLED: 04_collect_focus_gene_topology.py expects per-gene HDF5 files
+# with the structure  topology/global_low(high/diff)/degrees  written by Stage 3
+# in SINGLE-GENE mode (--base-h5 / --boot-h5). The collect_networks rule above
+# runs Stage 3 in DIRECTORY mode, producing only the aggregated summary HDF5
+# which Stage 4 cannot read.
+#
+# To wire this rule, add a new 'reconstruct_single' array rule that calls
+# Stage 3 once per gene in single-gene mode, writing per-gene topology files
+# to NETWORKS_DIR. Then uncomment the rule below.
+#
+# Config: skip_focus_topology (default true), focus_genes, focus_n_jobs
+# ---------------------------------------------------------------------------
+# if not SKIP_FOCUS_TOPO:
+#     rule collect_focus_gene_topology:
+#         input:
+#             network_files = ...,   # per-gene topology HDF5s from reconstruct_single
+#             summary = SUMMARY_H5,
+#         output:
+#             FOCUS_TOPO_H5,
+#         params:
+#             n_genes = lambda wc, input: (
+#                 __import__('h5py').File(input.summary, 'r')['meta'].attrs['n_genes']
+#             ),
+#         resources:
+#             mem_mb  = 8000,
+#             runtime = 120,
+#         shell:
+#             """
+#             python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
+#                 --network-dir {NETWORKS_DIR} \
+#                 --focus-genes {FOCUS_GENES} \
+#                 --n-genes {params.n_genes} \
+#                 --n-jobs {FOCUS_N_JOBS} \
+#                 --out-h5 {output}
+#             """
+
+
+# ---------------------------------------------------------------------------
+# Stage 5: Prepare visualization data (optional, skip_visualization: true by default)
 #
 # Reads the summary differential network and exports TSV + GraphML files.
 # Enable with skip_visualization: false in config.
