@@ -208,6 +208,7 @@ Use the next available number in that category:
 ```
 GUIDE-01-Complete-Workflow.md
 GUIDE-02-Network-Metrics.md
+GUIDE-03-Snakemake-Pipeline.md
 OPTIMIZATION-01-Memory.md
 OPTIMIZATION-02-Storage.md
 OPTIMIZATION-03-Network-Reconstruction.md
@@ -436,6 +437,7 @@ docs/
 ├── 00-RULES-Documentation-Standards.md  ← You are here
 ├── GUIDE-01-Complete-Workflow.md
 ├── GUIDE-02-Network-Metrics.md
+├── GUIDE-03-Snakemake-Pipeline.md
 ├── OPTIMIZATION-01-Memory.md
 ├── OPTIMIZATION-02-Storage.md
 ├── OPTIMIZATION-03-Network-Reconstruction.md
@@ -451,7 +453,7 @@ docs/
 
 ### Next Available Numbers
 
-- **GUIDE:** 03
+- **GUIDE:** 04
 - **OPTIMIZATION:** 04
 - **FIX:** 03
 - **REFERENCE:** 02
@@ -472,7 +474,7 @@ When in doubt, look at existing documents as examples!
 
 ---
 
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-03-11
 **Status:** ✅ Active documentation standard
 **Related Reading:**
 - [README.md](README.md) - Central navigation hub

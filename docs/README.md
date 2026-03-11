@@ -21,6 +21,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 |----------|-------------|
 | [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) | Complete pipeline workflow from expression data to differential network analysis |
 | [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) | Understanding network topology metrics (degree, betweenness, clustering, etc.) |
+| [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) | Snakemake workflow: config reference, all parameters, running commands, Stage 4 gap |
 
 ### ⚡ Optimization Guides
 
@@ -112,11 +113,14 @@ Historical development logs and planning documents:
 |-------|--------|-------|--------|----------------|
 | **0** | 00convert_expr_to_hdf5.py | expression.tsv | expression.h5 | - |
 | **1** | 01get_extreme_pop_bootstrap.py | expression.h5 | bootstrap_indices.h5 | --batch-size (optional) |
-| **2a** | 02a_calc_base_correlations.py | expression.h5, bootstrap_indices.h5 | base_correlations/ | --storage-mode |
-| **2b** | 02b_bootstrap_significant_edges.py | expression.h5, base_correlations/ | bootstrap_significant/ | --storage-mode |
-| **3** | 03_reconstruct_diff_network.py | base_correlations/, bootstrap_significant/ | differential_network_summary.h5 | - |
-| **4** | 04_collect_focus_gene_topology.py | differential_network_summary.h5 | focus_gene_topology/ | --focus-genes |
+| **2a** | 02a_calc_base_correlations.py | expression.h5, bootstrap_indices.h5 | base_correlations/{gi}_{gene}.h5 | --storage-mode |
+| **2b** | 02b_bootstrap_significant_edges.py | expression.h5, base_correlations/ | bootstrap_significant/{gi}_{gene}.h5 | --storage-mode |
+| **3** | 03_reconstruct_diff_network.py | base_correlations/, bootstrap_significant/ | differential_network_summary.h5, rewiring_hubs.tsv | --edge-selection, --annotate |
+| **4** ⚠️ | 04_collect_focus_gene_topology.py | networks/{gene}.h5 (per-gene topology from Stage 3 single-gene mode) | focus_gene_topology.h5 | --focus-genes, --n-jobs |
 | **5** | 05_prepare_visualization_data.py | differential_network_summary.h5 | visualization_data/ | - |
+| **6** | 06_annotate_rewiring_table.R | rewiring_hubs.tsv | rewiring_hubs_annotated.tsv | - |
+
+⚠️ Stage 4 is not yet wired in Snakemake. See [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md#stage-4-architecture-gap).
 
 For detailed stage information, see [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md).
 
@@ -177,6 +181,19 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ---
 
 ## Recent Updates
+
+### 2026-03-11
+- ✅ **Snakemake Pipeline**: Added `GUIDE-03-Snakemake-Pipeline.md` with full config
+  reference, stage descriptions, checkpoint behaviour explanation, and Stage 4 gap analysis
+- ✅ **Stage 4 Placeholder**: Added commented-out `collect_focus_gene_topology` rule and
+  config vars (`skip_focus_topology`, `focus_genes`, `focus_n_jobs`) to Snakefile and YAML
+- ✅ **Network Metrics Renamed**: `str_*` → `conn_*` throughout Stage 3 and TSV output
+  (connectivity = sum/mean \|r\|); fixed stale key inconsistency bug in `compute_edge_stats`
+- ✅ **New Focus Gene Metrics**: `focus_deg_low/high`, `L1/L2_conn_mean_low/high`,
+  `L2_n_disappear/new/sign_chg/strengthen/weaken`, `L2_mean_abs_dr`,
+  `n_direct_edges`, `n_l1_to_l1_edges`, `n_l1_to_l2_edges`
+- ✅ **Two-layer Edge Definition**: `two_layer_edges` now = L1↔L1 + L1→L2 (outer layers
+  only); `full_two_layer_edges` = complete 2-hop ego network including focus→L1
 
 ### 2026-02-14
 - ✅ **Network Reconstruction Optimization**: Implemented 200-800x speedup for Stage 3

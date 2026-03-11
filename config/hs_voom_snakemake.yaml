@@ -49,7 +49,7 @@ edge_selection: "sig_differential"
 no_ci_filter: false
 
 # --- Storage (match original run) ---
-storage_mode: "minimal"
+storage_mode: "common"
 
 # --- Thresholds ---
 min_effect: 0.0
@@ -58,6 +58,12 @@ corr_threshold: 0.0001
 # --- Optional stages ---
 skip_visualization: true
 annotate: false
+
+# --- Stage 4: Focus gene topology (placeholder, not yet wired in Snakemake) ---
+# Requires Stage 3 per-gene single-gene mode output. Keep true for now.
+skip_focus_topology: true
+focus_genes: "top:50"    # "top:N", "0,1,2,...", or "range:start:end"
+focus_n_jobs: 4
 
 # --- No gene_subset: process all 8763 genes ---
 # if mask Gene subset section
