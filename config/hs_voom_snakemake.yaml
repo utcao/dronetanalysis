@@ -29,8 +29,10 @@
 #   - Stage 3 (collect_networks) runs after all 8763 stage 2b files complete.
 # =============================================================================
 
-# --- Input (HDF5 already exists, skip TSV conversion) ---
-expr_h5: "results_hs_voom/expression.h5"
+# --- Input ---
+expr_tsv: "dataset/processed/VOOM/voomdataHS.txt"
+# if HDF5 already exists, skip TSV conversion
+# expr_h5: "results_hs_voom/expression.h5"
 
 # --- Output ---
 out_dir: "results_hs_voom"
