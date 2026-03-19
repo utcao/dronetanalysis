@@ -6,6 +6,7 @@
 results*
 test*
 # project folds
+.obsidian/
 dataset/
 manuscript/
 planning/
