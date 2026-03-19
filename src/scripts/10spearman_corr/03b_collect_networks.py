@@ -28,15 +28,14 @@ Output HDF5 layout (summary.h5)
     per_gene/
         gene_index          (n_ref,) int32
         gene_name           (n_ref,) str
-        n_sig_total         (n_ref,) int32
-        n_after_filter      (n_ref,) int32
+        n_sig_edges_diff    (n_ref,) int32   # # significant differential edges
         n_disappear, n_new, n_sign_change, n_strengthen, n_weaken  (n_ref,) int32
         mean_abs_delta      (n_ref,) float32
         max_abs_delta       (n_ref,) float32
         focus_deg_low       (n_ref,) int32
         focus_deg_high      (n_ref,) int32
-        L1_deg_diff, L1_rewire, L1_conn_low, ...   (n_ref,) float32 / int32
-        L2_deg_diff, L2_rewire, L2_conn_low, ...   (n_ref,) float32 / int32
+        L1_n_nodes, L1_rewire, L1_frac_rewire, L1_clique_density, L1_conn_low, ...   (n_ref,) float32 / int32
+        L2_n_nodes, L2_n_edges, L2_rewire, L2_conn_low, ...   (n_ref,) float32 / int32
         L2L1_deg, L2L1_rewire, L2L1_conn           (n_ref,) float32
         HL_conn_L1, HL_conn_L2                     (n_ref,) float32
 """
@@ -71,34 +70,40 @@ def _import_stage3():
 # ---------------------------------------------------------------------------
 
 _SUMMARY_KEYS = [
-    "n_sig_total", "n_after_filter",
+    "n_sig_edges_diff",
     "n_disappear", "n_new", "n_sign_change", "n_strengthen", "n_weaken",
     "mean_abs_delta", "max_abs_delta",
     "focus_deg_low", "focus_deg_high",
-    "L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+    "L1_n_nodes", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
     "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+    "L1_frac_disappear", "L1_frac_new", "L1_frac_rewire",
     "L1_conn_low", "L1_conn_high", "L1_conn_diff",
-    "L1_conn_mean_low", "L1_conn_mean_high", "L1_mean_abs_dr",
-    "L2_deg_diff",
+    "L1_conn_mean_low", "L1_conn_mean_high", "L1_mean_abs_dr", "L1_mean_delta",
+    "L1_clique_density",
+    "L2_n_nodes", "L2_n_edges",
     "L2_n_disappear", "L2_n_new", "L2_n_sign_chg",
     "L2_n_strengthen", "L2_n_weaken", "L2_rewire",
     "L2_conn_low", "L2_conn_high", "L2_conn_diff",
-    "L2_conn_mean_low", "L2_conn_mean_high", "L2_mean_abs_dr",
-    "n_direct_edges", "n_l1_to_l1_edges", "n_l1_to_l2_edges",
+    "L2_conn_mean_low", "L2_conn_mean_high", "L2_mean_abs_dr", "L2_mean_delta",
+    "full_n_edges", "full_rewire",
+    "full_conn_low", "full_conn_high", "full_conn_diff",
+    "full_mean_abs_dr", "full_mean_delta",
+    "n_l1_to_l1_edges", "n_l1_to_l2_edges",
     "L2L1_deg", "L2L1_rewire", "L2L1_conn",
     "HL_conn_L1", "HL_conn_L2",
 ]
 
 _INT_KEYS = {
-    "n_sig_total", "n_after_filter",
+    "n_sig_edges_diff",
     "n_disappear", "n_new", "n_sign_change", "n_strengthen", "n_weaken",
     "focus_deg_low", "focus_deg_high",
-    "L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+    "L1_n_nodes", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
     "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
-    "L2_deg_diff",
+    "L2_n_nodes", "L2_n_edges",
     "L2_n_disappear", "L2_n_new", "L2_n_sign_chg",
     "L2_n_strengthen", "L2_n_weaken", "L2_rewire",
-    "n_direct_edges", "n_l1_to_l1_edges", "n_l1_to_l2_edges",
+    "full_n_edges", "full_rewire",
+    "n_l1_to_l1_edges", "n_l1_to_l2_edges",
 }
 
 
@@ -113,12 +118,11 @@ def _read_gene_summary_from_network_file(h5_path: Path) -> dict | None:
             gene_index = int(h5["meta"].attrs.get("gene_index_used", 0))
 
             if n_sig == 0:
-                return {"gene_index": gene_index, "n_sig_total": 0}
+                return {"gene_index": gene_index, "n_sig_edges_diff": 0}
 
             result = {
                 "gene_index": gene_index,
-                "n_sig_total": n_sig,
-                "n_after_filter": n_sig,
+                "n_sig_edges_diff": n_sig,
             }
 
             # Qualitative counts from edges/qual_summary
@@ -215,8 +219,8 @@ def collect_from_network_dir(
             continue
 
         n_processed += 1
-        n_sig = res.get("n_sig_total", 0)
-        summary["n_sig_total"][ref_idx] = n_sig
+        n_sig = res.get("n_sig_edges_diff", 0)
+        summary["n_sig_edges_diff"][ref_idx] = n_sig
 
         if n_sig == 0:
             continue
@@ -286,7 +290,7 @@ def _worker(
 
         n_sig = results["n_significant"]
         if n_sig == 0:
-            return (ref_idx, {"n_sig_total": 0})
+            return (ref_idx, {"n_sig_edges_diff": 0})
 
         qs = results["qual_score"]
         qual_counts = {
@@ -319,23 +323,27 @@ def _worker(
 
         focus_metrics = {k: fa[k] for k in [
             "focus_deg_low", "focus_deg_high",
-            "L1_deg_diff", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
+            "L1_n_nodes", "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
             "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+            "L1_frac_disappear", "L1_frac_new", "L1_frac_rewire",
             "L1_conn_low", "L1_conn_high", "L1_conn_diff",
-            "L1_conn_mean_low", "L1_conn_mean_high", "L1_mean_abs_dr",
-            "L2_deg_diff",
+            "L1_conn_mean_low", "L1_conn_mean_high", "L1_mean_abs_dr", "L1_mean_delta",
+            "L1_clique_density",
+            "L2_n_nodes", "L2_n_edges",
             "L2_n_disappear", "L2_n_new", "L2_n_sign_chg",
             "L2_n_strengthen", "L2_n_weaken", "L2_rewire",
             "L2_conn_low", "L2_conn_high", "L2_conn_diff",
-            "L2_conn_mean_low", "L2_conn_mean_high", "L2_mean_abs_dr",
-            "n_direct_edges", "n_l1_to_l1_edges", "n_l1_to_l2_edges",
+            "L2_conn_mean_low", "L2_conn_mean_high", "L2_mean_abs_dr", "L2_mean_delta",
+            "full_n_edges", "full_rewire",
+            "full_conn_low", "full_conn_high", "full_conn_diff",
+            "full_mean_abs_dr", "full_mean_delta",
+            "n_l1_to_l1_edges", "n_l1_to_l2_edges",
             "L2L1_deg", "L2L1_rewire", "L2L1_conn",
             "HL_conn_L1", "HL_conn_L2",
         ]}
 
         return (ref_idx, {
-            "n_sig_total": n_sig,
-            "n_after_filter": n_sig,
+            "n_sig_edges_diff": n_sig,
             **qual_counts,
             **delta_stats,
             **focus_metrics,
@@ -417,8 +425,8 @@ def collect_from_raw_dirs(
             print(f"  Gene {gene_indices[ref_idx]} ({gene_file_names[ref_idx]}): skipped")
             continue
         n_processed += 1
-        n_sig = gene_result.get("n_sig_total", 0)
-        summary["n_sig_total"][ref_idx] = n_sig
+        n_sig = gene_result.get("n_sig_edges_diff", 0)
+        summary["n_sig_edges_diff"][ref_idx] = n_sig
         if n_sig == 0:
             continue
         n_with_edges += 1
@@ -485,46 +493,59 @@ def _write_summary_h5(
 
 
 def _print_summary(summary: dict, gene_file_names: list, n_ref: int) -> None:
-    n_with_edges = int(np.sum(summary["n_sig_total"] > 0))
+    n_with_edges = int(np.sum(summary["n_sig_edges_diff"] > 0))
     print(f"\n{'='*60}")
     print("PER-GENE NETWORK COLLECTION SUMMARY")
     print(f"{'='*60}")
     print(f"  Reference genes processed: {n_ref}")
     print(f"  Reference genes with edges: {n_with_edges}")
-    print(f"  Total sig edges across all genes: {summary['n_sig_total'].sum():,}")
+    print(f"  Total sig diff edges across all genes: {summary['n_sig_edges_diff'].sum():,}")
     if n_with_edges > 0:
-        active = summary["n_sig_total"] > 0
-        print(f"  Mean sig edges per active gene: {summary['n_sig_total'][active].mean():.1f}")
-        print(f"  Max sig edges: {summary['n_sig_total'].max():,}")
+        active = summary["n_sig_edges_diff"] > 0
+        print(f"  Mean sig diff edges per active gene: {summary['n_sig_edges_diff'][active].mean():.1f}")
+        print(f"  Max sig diff edges: {summary['n_sig_edges_diff'].max():,}")
         print(f"  Mean |Δr| (active genes): {summary['mean_abs_delta'][active].mean():.4f}")
 
     if n_with_edges > 0 and "L2L1_deg" in summary:
         top_idx = np.argsort(summary["L2L1_deg"])[::-1][:min(20, n_ref)]
-        print(f"\n  Top genes by L2/L1 degree ratio (diff network):")
-        print(f"  {'Idx':>6} {'Gene':>20} {'SigTotal':>10} {'L1_deg':>7} "
-              f"{'L2_deg':>7} {'L2L1':>7} {'L1_rew':>7} {'L2_rew':>7}")
+        print(f"\n  Top genes by L2/L1 node ratio (diff network):")
+        print(f"  {'Idx':>6} {'Gene':>20} {'DiffEdges':>10} {'L1_nodes':>8} "
+              f"{'L2_nodes':>8} {'L2L1':>7} {'L1_rew':>7} {'L2_rew':>7}")
         for i in top_idx:
-            if summary["n_sig_total"][i] > 0:
+            if summary["n_sig_edges_diff"][i] > 0:
                 print(f"  {summary['gene_index'][i]:>6} {gene_file_names[i]:>20} "
-                      f"{summary['n_sig_total'][i]:>10} {summary['L1_deg_diff'][i]:>7} "
-                      f"{summary['L2_deg_diff'][i]:>7} {summary['L2L1_deg'][i]:>7.2f} "
+                      f"{summary['n_sig_edges_diff'][i]:>10} {summary['L1_n_nodes'][i]:>8} "
+                      f"{summary['L2_n_nodes'][i]:>8} {summary['L2L1_deg'][i]:>7.2f} "
                       f"{summary['L1_rewire'][i]:>7} {summary['L2_rewire'][i]:>7}")
 
 
 _FOCUS_TSV_COLS = [
-    "gene_idx", "gene_id", "n_sig_total",
+    "gene_idx", "gene_id", "n_sig_edges_diff",
+    # Focus degree per condition (among differential edges only)
     "focus_deg_low", "focus_deg_high",
-    "L1_deg_diff",
+    # L1: direct partners of focus gene in diff network
+    "L1_n_nodes",
     "L1_n_disappear", "L1_n_new", "L1_n_sign_chg",
     "L1_n_strengthen", "L1_n_weaken", "L1_rewire",
+    "L1_frac_disappear", "L1_frac_new", "L1_frac_rewire",
     "L1_conn_low", "L1_conn_high", "L1_conn_diff",
-    "L1_conn_mean_low", "L1_conn_mean_high", "L1_mean_abs_dr",
-    "L2_deg_diff",
+    "L1_conn_mean_low", "L1_conn_mean_high",
+    "L1_mean_abs_dr", "L1_mean_delta",
+    "L1_clique_density",
+    # L2: pure L2 nodes; outer-layer edges (L1↔L1 + L1→L2)
+    "L2_n_nodes", "L2_n_edges",
     "L2_n_disappear", "L2_n_new", "L2_n_sign_chg",
     "L2_n_strengthen", "L2_n_weaken", "L2_rewire",
     "L2_conn_low", "L2_conn_high", "L2_conn_diff",
-    "L2_conn_mean_low", "L2_conn_mean_high", "L2_mean_abs_dr",
-    "n_direct_edges", "n_l1_to_l1_edges", "n_l1_to_l2_edges",
+    "L2_conn_mean_low", "L2_conn_mean_high",
+    "L2_mean_abs_dr", "L2_mean_delta",
+    # Full 2-layer neighbourhood (direct + L1↔L1 + L1→L2 combined)
+    "full_n_edges", "full_rewire",
+    "full_conn_low", "full_conn_high", "full_conn_diff",
+    "full_mean_abs_dr", "full_mean_delta",
+    # Edge sublayer breakdown
+    "n_l1_to_l1_edges", "n_l1_to_l2_edges",
+    # Ratios
     "L2L1_deg", "L2L1_rewire", "L2L1_conn",
     "HL_conn_L1", "HL_conn_L2",
 ]
@@ -542,7 +563,7 @@ def _write_focus_tsv(
     with open(out_path, "w") as f:
         f.write("\t".join(_FOCUS_TSV_COLS) + "\n")
         for i in sort_idx:
-            if summary["n_sig_total"][i] == 0:
+            if summary["n_sig_edges_diff"][i] == 0:
                 continue
             vals = []
             for col in _FOCUS_TSV_COLS:
@@ -550,13 +571,13 @@ def _write_focus_tsv(
                     vals.append(str(summary["gene_index"][i]))
                 elif col == "gene_id":
                     vals.append(gene_file_names[i])
-                elif col in _INT_KEYS or col in {"n_sig_total", "gene_idx"}:
+                elif col in _INT_KEYS or col in {"n_sig_edges_diff", "gene_idx"}:
                     vals.append(str(int(summary[col][i])))
                 else:
                     vals.append(f"{summary[col][i]:.4f}")
             f.write("\t".join(vals) + "\n")
 
-    n_written = int(np.sum(summary["n_sig_total"] > 0))
+    n_written = int(np.sum(summary["n_sig_edges_diff"] > 0))
     print(f"  Saved {n_written} genes to focus gene TSV")
 
 
