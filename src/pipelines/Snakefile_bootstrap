@@ -25,24 +25,24 @@
 #
 # Usage:
 #   # Toy (local, 4 cores):
-#   snakemake -s src/pipelines/Snakefile_bootstrap --config toy=true -j 4
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_bootstrap --config toy=true -j 4
 #
 #   # ct_voom subset test (15 focus genes):
-#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_bootstrap \
 #       --configfile config/ct_voom_snakemake.yaml --until bootstrap_significant -j 15
 #
 #   # hs_voom full run (all 8763 genes):
-#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_bootstrap \
 #       --configfile config/hs_voom_snakemake.yaml -j 100
 #
 #   # SGE cluster (Snakemake 8+/9+; pip install snakemake-executor-plugin-cluster-generic):
 #   mkdir -p logs
-#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_bootstrap \
 #       --configfile config/hs_voom_snakemake.yaml \
 #       --profile config/sge_profile
 #
 #   # Dry run (show what would be done):
-#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_bootstrap \
 #       --configfile config/ct_voom_snakemake.yaml -n
 # =============================================================================
 
@@ -177,12 +177,13 @@ checkpoint preprocess:
     output:
         EXPR_H5_FINAL,
     resources:
-        mem_mb  = 16000,
+        mem_mb  = 160000,
         runtime = 30,
+        threads = 4,
     run:
         if TOY:
             shell(
-                "python src/scripts/00preprocess/00convert_expr_to_hdf5.py "
+                "python code/dronetanalysis/src/scripts/00preprocess/00convert_expr_to_hdf5.py "
                 "--toy --out-h5 {output}"
             )
         elif EXPR_H5:
@@ -191,7 +192,7 @@ checkpoint preprocess:
             pass
         elif EXPR_TSV:
             shell(
-                "python src/scripts/00preprocess/00convert_expr_to_hdf5.py "
+                "python code/dronetanalysis/src/scripts/00preprocess/00convert_expr_to_hdf5.py "
                 "--expr-tsv {EXPR_TSV} --out-h5 {output} "
                 "--compression gzip --compression-level 4"
             )
@@ -210,11 +211,12 @@ rule bootstrap_indices:
     params:
         batch_flag = f"--batch-size {BATCH_SIZE}" if BATCH_SIZE else "",
     resources:
-        mem_mb  = 12000 if BATCH_SIZE else 30000,
+        mem_mb  = 160000 if BATCH_SIZE else 30000,
         runtime = 60,
+        threads = 4,
     shell:
         """
-        python src/scripts/01subset/01get_extreme_pop_bootstrap.py \
+        python code/dronetanalysis/src/scripts/01subset/01get_extreme_pop_bootstrap.py \
             --in-h5 {input.expr} \
             --out-h5 {output} \
             --low-frac {LOW_FRAC} --high-frac {HIGH_FRAC} \
@@ -239,11 +241,12 @@ rule base_correlations:
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
-        mem_mb  = 32000,
+        mem_mb  = 320000,
         runtime = 240,
+        threads = 4,
     shell:
         """
-        python src/scripts/10spearman_corr/02a_calc_base_correlations.py \
+        python code/dronetanalysis/src/scripts/10spearman_corr/02a_calc_base_correlations.py \
             --expr-h5 {input.expr} \
             --indices-h5 {input.indices} \
             --out-h5 {output} \
@@ -269,11 +272,12 @@ rule bootstrap_significant:
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
-        mem_mb  = 16000,
+        mem_mb  = 160000,
         runtime = 120,
+        threads = 4,
     shell:
         """
-        python src/scripts/10spearman_corr/02b_bootstrap_significant_edges.py \
+        python code/dronetanalysis/src/scripts/10spearman_corr/02b_bootstrap_significant_edges.py \
             --expr-h5 {input.expr} \
             --indices-h5 {input.indices} \
             --base-h5 {input.base} \
@@ -300,11 +304,12 @@ rule reconstruct_single:
     params:
         ci_flag = "--no-ci-filter" if NO_CI_FILTER else "",
     resources:
-        mem_mb  = 4000,
+        mem_mb  = 80000,
         runtime = 30,
+        threads = 4,
     shell:
         """
-        python src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
+        python code/dronetanalysis/src/scripts/10spearman_corr/03_reconstruct_diff_network.py \
             --base-h5 {input.base} \
             --boot-h5 {input.boot} \
             --out-h5 {output} \
@@ -330,11 +335,12 @@ rule collect_networks:
     params:
         annotate_flag = "--annotate" if ANNOTATE else "",
     resources:
-        mem_mb  = 8000,
+        mem_mb  = 80000,
         runtime = 120,
+        threads = 4,
     shell:
         """
-        python src/scripts/10spearman_corr/03b_collect_networks.py \
+        python code/dronetanalysis/src/scripts/10spearman_corr/03b_collect_networks.py \
             --networks-dir {NETWORKS_DIR} \
             --out-h5 {output.h5} \
             --out-focus-tsv {output.tsv} \
@@ -363,11 +369,12 @@ if not SKIP_FOCUS_TOPO:
                 __import__('h5py').File(input.summary, 'r')['meta'].attrs['n_genes']
             ),
         resources:
-            mem_mb  = 8000,
+            mem_mb  = 80000,
             runtime = 120,
+            threads = 4,
         shell:
             """
-            python src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
+            python code/dronetanalysis/src/scripts/10spearman_corr/04_collect_focus_gene_topology.py \
                 --network-dir {NETWORKS_DIR} \
                 --focus-genes {FOCUS_GENES} \
                 --n-genes {params.n_genes} \
@@ -389,11 +396,12 @@ if not SKIP_VIS:
         output:
             directory(VIS_DIR),
         resources:
-            mem_mb  = 8000,
+            mem_mb  = 80000,
             runtime = 60,
+            threads = 4,
         shell:
             """
-            python src/scripts/10spearman_corr/05_prepare_visualization_data.py \
+            python code/dronetanalysis/src/scripts/10spearman_corr/05_prepare_visualization_data.py \
                 --diff-h5 {input} \
                 --out-dir {output} \
                 --corr-threshold {CORR_THRESH}

@@ -27,10 +27,10 @@
 # =============================================================================
 
 # --- Input ---
-expr_tsv: "dataset/processed/VOOM/voomdataCtrl.txt"
+expr_tsv: "data/processed/VOOM/voomdataCtrl.txt"
 
 # --- Output ---
-out_dir: "results_ct_voom"
+out_dir: "tmp/results_ct_voom"
 
 # --- Bootstrap parameters (match original run) ---
 low_frac: 0.2
