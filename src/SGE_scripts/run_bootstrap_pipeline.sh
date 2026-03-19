@@ -3,6 +3,18 @@
 # run_bootstrap_pipeline.sh
 # Complete differential co-expression pipeline with SGE job submission.
 #
+# DEPRECATED: This script uses the old batch-mode Stage 3 interface
+# (--base-dir / --boot-dir), which was removed from 03_reconstruct_diff_network.py.
+# Stage 3 now runs in single-gene mode via Snakemake (one job per gene).
+#
+# RECOMMENDED: Use Snakemake with the SGE profile instead:
+#   mkdir -p logs
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/hs_voom_snakemake.yaml \
+#       --profile config/sge_profile
+#
+# See docs/GUIDE-03-Snakemake-Pipeline.md for full cluster submission guide.
+#
 # Pipeline Stages:
 # Stage 0 (optional)  - Convert TSV to HDF5              -> expression.h5
 # Stage 1 (single)    - Generate bootstrap indices       -> bootstrap_indices.h5
