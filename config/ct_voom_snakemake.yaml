@@ -14,10 +14,10 @@
 #       --configfile config/ct_voom_snakemake.yaml \
 #       --until bootstrap_significant -j 15
 #
-#   # SGE cluster:
+#   # SGE cluster (Snakemake 8+/9+, requires snakemake-executor-plugin-cluster-generic):
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
 #       --configfile config/ct_voom_snakemake.yaml \
-#       --until bootstrap_significant --profile config/sge_profile -j 15
+#       --until bootstrap_significant --profile config/sge_profile
 #
 # Notes:
 #   - expression.h5 and bootstrap_indices.h5 are created in out_dir if absent.
@@ -56,8 +56,8 @@ corr_threshold: 0.0001
 skip_visualization: true
 annotate: false
 
-# --- Stage 4: Focus gene topology (placeholder, not yet wired in Snakemake) ---
-# Requires Stage 3 per-gene single-gene mode output. Keep true for now.
+# --- Stage 4: Focus gene topology (optional) ---
+# Set to false to enable. Reads networks/ output from Stage 3 (reconstruct_single).
 skip_focus_topology: true
 focus_genes: "top:50"    # "top:N", "0,1,2,...", or "range:start:end"
 focus_n_jobs: 4

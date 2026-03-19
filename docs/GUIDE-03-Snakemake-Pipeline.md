@@ -11,9 +11,10 @@ script for most use cases.
 
 ## Prerequisites
 
-- Snakemake ≥ 7.0 installed (`conda install -c bioconda snakemake`)
+- Snakemake ≥ 8.0 installed (`conda install -c bioconda snakemake`)
 - Python dependencies installed (h5py, numpy, scipy)
 - Expression data as TSV or HDF5
+- For SGE cluster submission: `pip install snakemake-executor-plugin-cluster-generic`
 
 ---
 
@@ -142,6 +143,51 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
     --config out_dir=results_new storage_mode=minimal annotate=true \
     -j 15
 ```
+
+### SGE cluster submission (Snakemake 8+/9+)
+
+Snakemake 8+ removed the old `--cluster` flag. Use the `cluster-generic` executor plugin instead.
+
+**Option A — inline (one-off run):**
+
+```bash
+mkdir -p logs
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/hs_voom_snakemake.yaml \
+    --executor cluster-generic \
+    --cluster-generic-submit-cmd "qsub -cwd -j y -q long.q -l h_vmem={resources.mem_mb}M -l h_rt={resources.runtime}:0:0 -o logs/ -e logs/ -N {rule}" \
+    --default-resources mem_mb=8000 runtime=60 \
+    --jobs 200 \
+    --latency-wait 60
+```
+
+**Option B — profile (recommended, reusable):**
+
+A ready-made profile is provided at `config/sge_profile/config.yaml`. Just run:
+
+```bash
+mkdir -p logs
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/hs_voom_snakemake.yaml \
+    --profile config/sge_profile
+```
+
+**Resource mapping:** Each rule's `resources:` block sets `mem_mb` (MB) and `runtime`
+(minutes). These map to SGE's `-l h_vmem` and `-l h_rt` in the submit command.
+
+| Rule | mem_mb | runtime |
+|------|--------|---------|
+| `base_correlations` | 32000 | 240 min |
+| `bootstrap_significant` | 16000 | 120 min |
+| `reconstruct_single` | 4000 | 30 min |
+| `collect_networks` | 8000 | 120 min |
+| `collect_focus_gene_topology` | 8000 | 120 min |
+
+> **Queue name:** Replace `long.q` in `config/sge_profile/config.yaml` with your cluster's
+> actual queue (check with `qstat -g c`).
+
+> **Latency wait:** `--latency-wait 60` (60 seconds) is important on NFS/shared filesystems
+> so Snakemake waits for output files to appear after a job finishes.
 
 ---
 
@@ -299,10 +345,10 @@ After a successful run:
 {out_dir}/
 ├── expression.h5                      # Stage 0
 ├── bootstrap_indices.h5               # Stage 1
-├── base_correlations/                 # Stage 2a (per gene)
+├── base_correlations/                 # Stage 2a (per gene) — temp(), auto-deleted after Stage 3
 │   ├── 0000_FBgn0000001.h5
 │   └── ...
-├── bootstrap_significant/             # Stage 2b (per gene)
+├── bootstrap_significant/             # Stage 2b (per gene) — temp(), auto-deleted after Stage 3
 │   ├── 0000_FBgn0000001.h5
 │   └── ...
 ├── networks/                          # Stage 3 (per gene)

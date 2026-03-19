@@ -12,10 +12,10 @@
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
 #       --configfile config/hs_voom_snakemake.yaml -j 8
 #
-#   # SGE cluster (recommended for full run):
+#   # SGE cluster (Snakemake 8+/9+, requires snakemake-executor-plugin-cluster-generic):
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
 #       --configfile config/hs_voom_snakemake.yaml \
-#       --profile config/sge_profile -j 200
+#       --profile config/sge_profile
 #
 #   # Run only stages 2b (base_correlations already exist):
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
@@ -59,8 +59,8 @@ corr_threshold: 0.0001
 skip_visualization: true
 annotate: false
 
-# --- Stage 4: Focus gene topology (placeholder, not yet wired in Snakemake) ---
-# Requires Stage 3 per-gene single-gene mode output. Keep true for now.
+# --- Stage 4: Focus gene topology (optional) ---
+# Set to false to enable. Reads networks/ output from Stage 3 (reconstruct_single).
 skip_focus_topology: true
 focus_genes: "top:50"    # "top:N", "0,1,2,...", or "range:start:end"
 focus_n_jobs: 4

@@ -1,0 +1,34 @@
+# =============================================================================
+# config/sge_profile/config.yaml
+# Snakemake 8+ cluster profile for SGE/UGE submission.
+#
+# Usage:
+#   snakemake -s src/pipelines/Snakefile_bootstrap \
+#       --configfile config/hs_voom_snakemake.yaml \
+#       --profile config/sge_profile
+#
+# Requirements:
+#   pip install snakemake-executor-plugin-cluster-generic
+#
+# Resource mapping (from each rule's resources: block):
+#   mem_mb   -> h_vmem (MB)
+#   runtime  -> h_rt   (minutes, converted to HH:MM:SS)
+# =============================================================================
+
+executor: cluster-generic
+cluster-generic-submit-cmd: "qsub -cwd -j y -q long.q -l h_vmem={resources.mem_mb}M -l h_rt={resources.runtime}:0:0 -o logs/ -e logs/ -N {rule}"
+
+# Fallback resources if a rule does not specify them
+# runtime = minutes (maps to h_rt as MM:0:0)
+default-resources:
+  - mem_mb=8000
+  - runtime=60
+
+# Maximum simultaneous SGE jobs (not CPU cores)
+jobs: 200
+
+# Seconds to wait for output files to appear on shared filesystem after job finishes
+latency-wait: 60
+
+# Retry failed jobs once before giving up
+retries: 1

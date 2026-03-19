@@ -35,10 +35,11 @@
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
 #       --configfile config/hs_voom_snakemake.yaml -j 100
 #
-#   # SGE cluster (with a Snakemake cluster profile):
+#   # SGE cluster (Snakemake 8+/9+; pip install snakemake-executor-plugin-cluster-generic):
+#   mkdir -p logs
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
 #       --configfile config/hs_voom_snakemake.yaml \
-#       --profile config/sge_profile -j 100
+#       --profile config/sge_profile
 #
 #   # Dry run (show what would be done):
 #   snakemake -s src/pipelines/Snakefile_bootstrap \
