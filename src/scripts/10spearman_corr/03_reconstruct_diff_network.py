@@ -87,7 +87,7 @@ def classify_qualitative_change(
     r_high: np.ndarray,
     sig_low: np.ndarray,
     sig_high: np.ndarray,
-    corr_threshold: float = 0.001,
+    corr_threshold: float = 0.0001,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Classify qualitative changes for each edge (low as reference).
@@ -128,7 +128,7 @@ def classify_qualitative_change(
     mask_both = present_low & present_high
 
     # Sign change (both present, signs differ, neither zero)
-    mask_sign_change = mask_both & (sign_low != sign_high) & (sign_low != 0) & (sign_high != 0)
+    mask_sign_change = mask_both & (sign_low != sign_high) & (np.abs(r_low) >= corr_threshold) & (np.abs(r_high) >= corr_threshold)
     qual_score[mask_sign_change] = QUAL_SIGN_CHANGE
 
     # Strengthen (same sign, |r_high| > |r_low|)
@@ -403,89 +403,6 @@ def compute_all_global_topologies(
     }
 
 
-def compute_per_gene_metrics(
-    gene_i: np.ndarray,
-    gene_j: np.ndarray,
-    qual_score: np.ndarray,
-    r_low: np.ndarray,
-    r_high: np.ndarray,
-    n_genes: int,
-    corr_threshold: float = 0.0001, # Threshold for "present"
-) -> dict:
-    """
-    Compute per-gene topological and rewiring metrics.
-    """
-    # Initialize arrays
-    degree = np.zeros(n_genes, dtype=np.int32)
-    degree_low = np.zeros(n_genes, dtype=np.int32)
-    degree_high = np.zeros(n_genes, dtype=np.int32)
-    n_disappear = np.zeros(n_genes, dtype=np.int32)
-    n_new = np.zeros(n_genes, dtype=np.int32)
-    n_sign_change = np.zeros(n_genes, dtype=np.int32)
-    n_strengthen = np.zeros(n_genes, dtype=np.int32)
-    n_weaken = np.zeros(n_genes, dtype=np.int32)
-    sum_delta = np.zeros(n_genes, dtype=np.float32)
-    sum_abs_delta = np.zeros(n_genes, dtype=np.float32)
-    sum_r_low = np.zeros(n_genes, dtype=np.float32)
-    sum_r_high = np.zeros(n_genes, dtype=np.float32)
-
-    for idx, (i, j) in enumerate(zip(gene_i, gene_j)):
-        # Both genes get this edge
-        for g in [i, j]:
-            degree[g] += 1
-
-            # Count by presence in low/high
-            if np.abs(r_low[idx]) >= corr_threshold:
-                degree_low[g] += 1
-                sum_r_low[g] += np.abs(r_low[idx])
-            if np.abs(r_high[idx]) >= corr_threshold:
-                degree_high[g] += 1
-                sum_r_high[g] += np.abs(r_high[idx])
-
-            # Count by qualitative category
-            if qual_score[idx] == QUAL_DISAPPEAR:
-                n_disappear[g] += 1
-            elif qual_score[idx] == QUAL_NEW:
-                n_new[g] += 1
-            elif qual_score[idx] == QUAL_SIGN_CHANGE:
-                n_sign_change[g] += 1
-            elif qual_score[idx] == QUAL_STRENGTHEN:
-                n_strengthen[g] += 1
-            elif qual_score[idx] == QUAL_WEAKEN:
-                n_weaken[g] += 1
-
-            # Delta metrics
-            delta = r_high[idx] - r_low[idx]
-            sum_delta[g] += delta
-            sum_abs_delta[g] += np.abs(delta)
-
-    # Rewiring score: total qualitative changes (excluding strengthen/weaken)
-    rewiring_score = n_disappear + n_new + n_sign_change
-
-    # Mean metrics (avoid divide-by-zero)
-    mean_r_low = np.where(degree_low > 0, sum_r_low / degree_low, 0.0).astype(np.float32)
-    mean_r_high = np.where(degree_high > 0, sum_r_high / degree_high, 0.0).astype(np.float32)
-    mean_abs_delta = np.where(degree > 0, sum_abs_delta / degree, 0.0).astype(np.float32)
-
-    return {
-        "degree": degree,
-        "degree_low": degree_low,
-        "degree_high": degree_high,
-        "n_disappear": n_disappear,
-        "n_new": n_new,
-        "n_sign_change": n_sign_change,
-        "n_strengthen": n_strengthen,
-        "n_weaken": n_weaken,
-        "rewiring_score": rewiring_score,
-        "sum_delta": sum_delta,
-        "sum_abs_delta": sum_abs_delta,
-        "sum_r_low": sum_r_low,
-        "sum_r_high": sum_r_high,
-        "mean_r_low": mean_r_low,
-        "mean_r_high": mean_r_high,
-        "mean_abs_delta": mean_abs_delta,
-    }
-
 
 # =============================================================================
 # Focus Gene Analysis
@@ -610,14 +527,15 @@ def analyze_focus_gene(
         n_strengthen = int(np.sum(mask_both & (rh > rl)))
         n_weaken = int(np.sum(mask_both & (rh < rl)))
 
-        # str_low / str_high: sum|r| only for "present" edges
-        # if not significant, it is 0
+        # str_low / str_high: sum|r| only for "present" edges in each condition.
+        # "Present" = significant AND |r| >= threshold (matches adj_low/adj_high logic).
+        # When sig_low is None, treat all edges as significant (same as adj_low building).
         if sig_low is not None:
             present_low = sig_low[edge_indices] & (rl >= corr_threshold)
             present_high = sig_high[edge_indices] & (rh >= corr_threshold)
         else:
-            present_low = 0
-            present_high = 0
+            present_low = rl >= corr_threshold
+            present_high = rh >= corr_threshold
         str_sum_low = float(np.sum(rl[present_low]))
         str_sum_high = float(np.sum(rh[present_high]))
         str_mean_low = float(np.mean(rl[present_low]))
@@ -643,17 +561,20 @@ def analyze_focus_gene(
     two_layer_stats = compute_edge_stats(two_layer_edges)
     full_two_layer_stats = compute_edge_stats(full_two_layer_edges)
 
-    # --- L1/L2 degree in diff network ---
-    L1_deg_diff = len(adj_diff.get(focus_gene, set()))
-    # L2 = L1 + partners-of-L1-partners (combined neighborhood size)
-    L1_set = set(adj_diff.get(focus_gene, set()))
-    L2_set = set()
-    for p in L1_set:
-        L2_set.update(adj_diff.get(p, set()))
-    L2_set.discard(focus_gene)
-    L2_deg_diff = len(L2_set)  # all unique nodes in L1+L2
+    # --- L1/L2 node and edge counts in diff network ---
+    # L1_n_nodes: number of direct partner nodes (= degree of focus_gene in diff network)
+    # Note: L1_n_nodes == n_direct_edges since each L1 partner has exactly one edge to focus_gene
+    L1_n_nodes = len(direct_partners)
+    # L2_n_nodes: pure L2 nodes only (partners-of-partners, excluding focus_gene and L1 partners)
+    L2_n_nodes = len(indirect_partners)
+    # L2_n_edges: edges in the L2 outer layer (L1↔L1 + L1→L2)
+    L2_n_edges = len(two_layer_edges)
 
-    # --- Focus gene degree per condition ---
+    # --- Focus gene degree per condition (among differential edges only) ---
+    # Counts how many of focus_gene's DIFFERENTIAL partners are also present in
+    # the low/high condition network. Non-zero for STRENGTHEN/WEAKEN/SIGN_CHANGE
+    # edges (present in both conditions). Use L1_n_disappear/L1_n_new for
+    # partners that exist in only one condition.
     focus_deg_low = len(adj_low.get(focus_gene, set()))
     focus_deg_high = len(adj_high.get(focus_gene, set()))
 
@@ -676,13 +597,37 @@ def analyze_focus_gene(
     L2_mean_abs_dr = two_layer_stats["mean_abs_delta"]
 
     # --- L2/L1 expansion ratios (diff network) ---
-    L2L1_deg = L2_deg_diff / L1_deg_diff if L1_deg_diff > 0 else 0.0
+    # L2L1_deg: pure L2 nodes per L1 partner (can be < 1 for dense local networks)
+    L2L1_deg = L2_n_nodes / L1_n_nodes if L1_n_nodes > 0 else 0.0
     L2L1_rewire = L2_rewire / L1_rewire if L1_rewire > 0 else 0.0
     L2L1_conn = L2_conn_diff / L1_conn_diff if L1_conn_diff > 0 else 0.0
 
     # --- High/Low condition connectivity ratios ---
     HL_conn_L1 = L1_conn_high / L1_conn_low if L1_conn_low > 0 else 0.0
     HL_conn_L2 = L2_conn_high / L2_conn_low if L2_conn_low > 0 else 0.0
+
+    # --- Signed mean delta (directional bias per layer) ---
+    L1_mean_delta = direct_stats["mean_delta"]       # > 0: gains correlation in high; < 0: loses
+    L2_mean_delta = two_layer_stats["mean_delta"]
+
+    # --- Fractional rewiring rates (normalized by L1 node count) ---
+    L1_frac_rewire    = L1_rewire / L1_n_nodes if L1_n_nodes > 0 else 0.0
+    L1_frac_disappear = direct_stats["n_disappear"] / L1_n_nodes if L1_n_nodes > 0 else 0.0
+    L1_frac_new       = direct_stats["n_new"] / L1_n_nodes if L1_n_nodes > 0 else 0.0
+
+    # --- L1 partner clique density ---
+    # Fraction of possible L1↔L1 edges that are actually present in diff network
+    max_l1_pairs = L1_n_nodes * (L1_n_nodes - 1) / 2
+    L1_clique_density = len(l1_to_l1_edges) / max_l1_pairs if max_l1_pairs > 0 else 0.0
+
+    # --- Full 2-layer neighbourhood stats (direct + L1↔L1 + L1→L2) ---
+    full_rewire = (full_two_layer_stats["n_disappear"] + full_two_layer_stats["n_new"]
+                   + full_two_layer_stats["n_sign_change"])
+    full_conn_low    = full_two_layer_stats["conn_sum_low"]
+    full_conn_high   = full_two_layer_stats["conn_sum_high"]
+    full_conn_diff   = full_two_layer_stats["sum_abs_delta"]
+    full_mean_abs_dr = full_two_layer_stats["mean_abs_delta"]
+    full_mean_delta  = full_two_layer_stats["mean_delta"]
 
     # Per-partner breakdown for direct partners
     partner_details = []
@@ -710,25 +655,33 @@ def analyze_focus_gene(
         "full_two_layer_stats": full_two_layer_stats,
         "partner_details": partner_details,
         # --- Flat metrics for TSV collection ---
-        # Tier 1: Focus gene degree per condition
+        # Focus gene degree per condition (among differential edges only)
+        # Non-zero for STRENGTHEN/WEAKEN/SIGN_CHANGE edges (present in both conditions).
+        # Use L1_n_disappear / L1_n_new to find edges present in only one condition.
         "focus_deg_low": focus_deg_low,
         "focus_deg_high": focus_deg_high,
-        # L1 (direct partners)
-        "L1_deg_diff": L1_deg_diff,
+        # L1 (direct partners: node count = L1_n_nodes; L1_n_nodes == n_direct_edges by definition)
+        "L1_n_nodes": L1_n_nodes,
         "L1_n_disappear": direct_stats["n_disappear"],
         "L1_n_new": direct_stats["n_new"],
         "L1_n_sign_chg": direct_stats["n_sign_change"],
         "L1_n_strengthen": direct_stats["n_strengthen"],
         "L1_n_weaken": direct_stats["n_weaken"],
         "L1_rewire": L1_rewire,
+        "L1_frac_disappear": float(L1_frac_disappear),
+        "L1_frac_new": float(L1_frac_new),
+        "L1_frac_rewire": float(L1_frac_rewire),
         "L1_conn_low": float(L1_conn_low),
         "L1_conn_high": float(L1_conn_high),
         "L1_conn_diff": float(L1_conn_diff),
         "L1_conn_mean_low": float(direct_stats["conn_mean_low"]),
         "L1_conn_mean_high": float(direct_stats["conn_mean_high"]),
         "L1_mean_abs_dr": float(L1_mean_abs_dr),
-        # L2 (outer layers: L1↔L1 + L1→L2)
-        "L2_deg_diff": L2_deg_diff,
+        "L1_mean_delta": float(L1_mean_delta),
+        "L1_clique_density": float(L1_clique_density),
+        # L2 (pure L2 nodes + outer-layer edges: L1↔L1 + L1→L2)
+        "L2_n_nodes": L2_n_nodes,
+        "L2_n_edges": L2_n_edges,
         "L2_n_disappear": two_layer_stats["n_disappear"],
         "L2_n_new": two_layer_stats["n_new"],
         "L2_n_sign_chg": two_layer_stats["n_sign_change"],
@@ -741,12 +694,20 @@ def analyze_focus_gene(
         "L2_conn_mean_low": float(two_layer_stats["conn_mean_low"]),
         "L2_conn_mean_high": float(two_layer_stats["conn_mean_high"]),
         "L2_mean_abs_dr": float(L2_mean_abs_dr),
-        # Sublayer edge counts
-        "n_direct_edges": len(direct_edges_list),
+        "L2_mean_delta": float(L2_mean_delta),
+        # Full 2-layer neighbourhood (direct + L1↔L1 + L1→L2)
+        "full_n_edges": len(full_two_layer_edges),
+        "full_rewire": full_rewire,
+        "full_conn_low": float(full_conn_low),
+        "full_conn_high": float(full_conn_high),
+        "full_conn_diff": float(full_conn_diff),
+        "full_mean_abs_dr": float(full_mean_abs_dr),
+        "full_mean_delta": float(full_mean_delta),
+        # Edge sublayer breakdown
         "n_l1_to_l1_edges": len(l1_to_l1_edges),
         "n_l1_to_l2_edges": len(l1_to_l2_edges),
         # Ratios
-        "L2L1_deg": float(L2L1_deg),
+        "L2L1_deg": float(L2L1_deg),  # pure L2 nodes / L1 nodes
         "L2L1_rewire": float(L2L1_rewire),
         "L2L1_conn": float(L2L1_conn),
         "HL_conn_L1": float(HL_conn_L1),
@@ -1173,20 +1134,21 @@ def print_summary(results: dict, all_topo: dict, focus_analysis: dict) -> None:
         print(f"  Degree in LOW: {fa['focus_deg_low']}, HIGH: {fa['focus_deg_high']}")
 
         print(f"\n  L1 (Direct partners) Metrics:")
-        print(f"    Degree (diff): {fa['L1_deg_diff']}")
-        print(f"    Edges — direct: {fa['n_direct_edges']}")
+        print(f"    Nodes: {fa['L1_n_nodes']}")
         print(f"    Disappear: {fa['L1_n_disappear']}, New: {fa['L1_n_new']}, "
               f"Sign change: {fa['L1_n_sign_chg']}")
         print(f"    Strengthen: {fa['L1_n_strengthen']}, Weaken: {fa['L1_n_weaken']}")
-        print(f"    Rewiring: {fa['L1_rewire']}")
+        print(f"    Rewiring: {fa['L1_rewire']} (frac: {fa['L1_frac_rewire']:.3f})")
+        print(f"    Frac disappear: {fa['L1_frac_disappear']:.3f}, frac new: {fa['L1_frac_new']:.3f}")
         print(f"    conn_low: {fa['L1_conn_low']:.4f}, conn_high: {fa['L1_conn_high']:.4f}, "
               f"conn_diff: {fa['L1_conn_diff']:.4f}")
         print(f"    conn_mean_low: {fa['L1_conn_mean_low']:.4f}, "
               f"conn_mean_high: {fa['L1_conn_mean_high']:.4f}")
-        print(f"    Mean |Δr|: {fa['L1_mean_abs_dr']:.4f}")
+        print(f"    Mean |Δr|: {fa['L1_mean_abs_dr']:.4f}, mean Δr: {fa['L1_mean_delta']:.4f}")
+        print(f"    Clique density: {fa['L1_clique_density']:.4f}")
 
         print(f"\n  L2 (Outer layers: L1↔L1 + L1→L2) Metrics:")
-        print(f"    Degree (diff): {fa['L2_deg_diff']}")
+        print(f"    Nodes (pure L2): {fa['L2_n_nodes']}, Edges: {fa['L2_n_edges']}")
         print(f"    Edges — L1↔L1: {fa['n_l1_to_l1_edges']}, L1→L2: {fa['n_l1_to_l2_edges']}")
         print(f"    Disappear: {fa['L2_n_disappear']}, New: {fa['L2_n_new']}, "
               f"Sign change: {fa['L2_n_sign_chg']}")
@@ -1196,7 +1158,13 @@ def print_summary(results: dict, all_topo: dict, focus_analysis: dict) -> None:
               f"conn_diff: {fa['L2_conn_diff']:.4f}")
         print(f"    conn_mean_low: {fa['L2_conn_mean_low']:.4f}, "
               f"conn_mean_high: {fa['L2_conn_mean_high']:.4f}")
-        print(f"    Mean |Δr|: {fa['L2_mean_abs_dr']:.4f}")
+        print(f"    Mean |Δr|: {fa['L2_mean_abs_dr']:.4f}, mean Δr: {fa['L2_mean_delta']:.4f}")
+
+        print(f"\n  Full 2-layer neighbourhood (direct + L1↔L1 + L1→L2):")
+        print(f"    Total edges: {fa['full_n_edges']}, Rewire: {fa['full_rewire']}")
+        print(f"    conn_low: {fa['full_conn_low']:.4f}, conn_high: {fa['full_conn_high']:.4f}, "
+              f"conn_diff: {fa['full_conn_diff']:.4f}")
+        print(f"    Mean |Δr|: {fa['full_mean_abs_dr']:.4f}, mean Δr: {fa['full_mean_delta']:.4f}")
 
         print(f"\n  Ratios:")
         print(f"    L2/L1 deg: {fa['L2L1_deg']:.2f}, rewire: {fa['L2L1_rewire']:.2f}, "
