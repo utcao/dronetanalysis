@@ -16,13 +16,14 @@
 # =============================================================================
 
 executor: cluster-generic
-cluster-generic-submit-cmd: "qsub -cwd -j y -q long.q -l h_vmem={resources.mem_mb}M -l h_rt={resources.runtime}:0:0 -o logs/ -e logs/ -N {rule}"
+cluster-generic-submit-cmd: "qsub -cwd -j y -q long.q -l h_vmem={resources.mem_mb}M -l h_rt={resources.runtime}:0:0 -pe openmpi {resources.threads} -o tmp/logs/job_\\$JOB_ID.out -e tmp/logs/job_\\$JOB_ID.err -N {rule}"
 
 # Fallback resources if a rule does not specify them
 # runtime = minutes (maps to h_rt as MM:0:0)
 default-resources:
   - mem_mb=8000
-  - runtime=60
+  - runtime=8000
+  - threads=8
 
 # Maximum simultaneous SGE jobs (not CPU cores)
 jobs: 200

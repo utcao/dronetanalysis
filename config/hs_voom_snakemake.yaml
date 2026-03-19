@@ -30,12 +30,12 @@
 # =============================================================================
 
 # --- Input ---
-expr_tsv: "dataset/processed/VOOM/voomdataHS.txt"
+expr_tsv: "data/processed/VOOM/voomdataHS.txt"
 # if HDF5 already exists, skip TSV conversion
 # expr_h5: "results_hs_voom/expression.h5"
 
 # --- Output ---
-out_dir: "results_hs_voom"
+out_dir: "tmp/results_hs_voom"
 
 # --- Bootstrap parameters (match original run) ---
 low_frac: 0.2
