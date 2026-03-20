@@ -16,7 +16,7 @@
 # =============================================================================
 
 executor: cluster-generic
-cluster-generic-submit-cmd: "qsub -cwd -j y -q long.q -l h_vmem={resources.mem_mb}M -l h_rt={resources.runtime}:0:0 -pe openmpi {resources.threads} -o tmp/logs/job_\\$JOB_ID.out -e tmp/logs/job_\\$JOB_ID.err -N {rule}"
+cluster-generic-submit-cmd: "qsub -cwd -j y -q long.q -l h_vmem={resources.mem_mb}M -l h_rt={resources.runtime}:0:0 -pe openmpi {resources.threads} -v HDF5_USE_FILE_LOCKING=FALSE -o tmp/logs/job_\\$JOB_ID.out -e tmp/logs/job_\\$JOB_ID.err -N {rule}"
 
 # Fallback resources if a rule does not specify them
 # runtime = minutes (maps to h_rt as MM:0:0)
@@ -29,7 +29,7 @@ default-resources:
 jobs: 200
 
 # Seconds to wait for output files to appear on shared filesystem after job finishes
-latency-wait: 60
+latency-wait: 120
 
 # Retry failed jobs once before giving up
 retries: 1

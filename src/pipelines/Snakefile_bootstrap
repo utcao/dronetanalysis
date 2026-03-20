@@ -177,7 +177,7 @@ checkpoint preprocess:
     output:
         EXPR_H5_FINAL,
     resources:
-        mem_mb  = 160000,
+        mem_mb  = 16000,
         runtime = 30,
         threads = 4,
     run:
@@ -211,7 +211,7 @@ rule bootstrap_indices:
     params:
         batch_flag = f"--batch-size {BATCH_SIZE}" if BATCH_SIZE else "",
     resources:
-        mem_mb  = 160000 if BATCH_SIZE else 30000,
+        mem_mb  = 16000 if BATCH_SIZE else 30000,
         runtime = 60,
         threads = 4,
     shell:
@@ -241,7 +241,7 @@ rule base_correlations:
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
-        mem_mb  = 320000,
+        mem_mb  = 32000,
         runtime = 240,
         threads = 4,
     shell:
@@ -272,7 +272,7 @@ rule bootstrap_significant:
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
-        mem_mb  = 160000,
+        mem_mb  = 16000,
         runtime = 120,
         threads = 4,
     shell:
@@ -304,7 +304,7 @@ rule reconstruct_single:
     params:
         ci_flag = "--no-ci-filter" if NO_CI_FILTER else "",
     resources:
-        mem_mb  = 80000,
+        mem_mb  = 8000,
         runtime = 30,
         threads = 4,
     shell:
@@ -335,7 +335,7 @@ rule collect_networks:
     params:
         annotate_flag = "--annotate" if ANNOTATE else "",
     resources:
-        mem_mb  = 80000,
+        mem_mb  = 8000,
         runtime = 120,
         threads = 4,
     shell:
@@ -369,7 +369,7 @@ if not SKIP_FOCUS_TOPO:
                 __import__('h5py').File(input.summary, 'r')['meta'].attrs['n_genes']
             ),
         resources:
-            mem_mb  = 80000,
+            mem_mb  = 8000,
             runtime = 120,
             threads = 4,
         shell:
