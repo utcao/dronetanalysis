@@ -214,13 +214,14 @@ OPTIMIZATION-02-Storage.md
 OPTIMIZATION-03-Network-Reconstruction.md
 FIX-01-Critical-Issues-Summary.md
 FIX-02-HDF5-Attributes.md
+FIX-03-HPC-SGE-Pipeline.md
 REFERENCE-01-Statistical-Methods.md
 ```
 
 **Examples:**
-- Adding a new GUIDE → `GUIDE-03-[Name].md`
+- Adding a new GUIDE → `GUIDE-04-[Name].md`
 - Adding a new OPTIMIZATION → `OPTIMIZATION-04-[Name].md`
-- Adding a new FIX → `FIX-03-[Name].md`
+- Adding a new FIX → `FIX-04-[Name].md`
 
 ### Step 3: Use Template
 
@@ -455,7 +456,7 @@ docs/
 
 - **GUIDE:** 04
 - **OPTIMIZATION:** 04
-- **FIX:** 03
+- **FIX:** 04
 - **REFERENCE:** 02
 
 *(Update this section when adding new documents)*

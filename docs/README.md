@@ -37,6 +37,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 |----------|-------------|
 | [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) | Executive summary of all three critical pipeline fixes |
 | [FIX-02-HDF5-Attributes.md](FIX-02-HDF5-Attributes.md) | Fix for HDF5 64 KB attribute limit by storing gene names as datasets |
+| [FIX-03-HPC-SGE-Pipeline.md](FIX-03-HPC-SGE-Pipeline.md) | Fix for HDF5 concurrent read failure on NFS and inflated mem_mb values on SGE HPC |
 
 ### 📊 Technical References
 
@@ -90,6 +91,7 @@ Historical development logs and planning documents:
 | Error | Document | Section |
 |-------|----------|---------|
 | `OSError: Unable to synchronously create attribute (object header message is too large)` | [FIX-02-HDF5-Attributes.md](FIX-02-HDF5-Attributes.md) | Root Cause |
+| `OSError: Unable to synchronously open file (bad object header version number)` on HPC | [FIX-03-HPC-SGE-Pipeline.md](FIX-03-HPC-SGE-Pipeline.md) | Fix 1 |
 | `numpy._core._exceptions._ArrayMemoryError: Unable to allocate X GiB` | [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) | Solution |
 | `ValueError: All chunk dimensions must be positive` | [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) | Edge Cases |
 | Out of disk space (files ~1.3 GB each) | [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) | Problem Solved |
@@ -183,6 +185,12 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ---
 
 ## Recent Updates
+
+### 2026-03-20
+- ✅ **HPC SGE Fixes**: Fixed `OSError: bad object header version number` on NFS by adding
+  `HDF5_USE_FILE_LOCKING=FALSE` to SGE submit command; corrected 10× inflated `mem_mb`
+  values in Snakefile; increased `latency-wait` to 120s
+- ✅ **Documentation**: Added [FIX-03-HPC-SGE-Pipeline.md](FIX-03-HPC-SGE-Pipeline.md)
 
 ### 2026-03-11
 - ✅ **Pipeline Refactoring**: Stage 3 split into single-gene `reconstruct_single` (per-gene
