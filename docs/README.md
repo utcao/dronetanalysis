@@ -23,6 +23,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) | Understanding network topology metrics (degree, betweenness, clustering, etc.) |
 | [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) | Snakemake workflow: config reference, all parameters, gene subset filtering, Stage 4 |
 | [GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md) | Qualitative change categories (DISAPPEAR/NEW/SIGN_CHANGE/STRENGTHEN/WEAKEN), partition identities, L1/L2 focus-gene metrics, sanity checks |
+| [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) | Gene-level MAD variability and sample-level ITV (Individual Transcriptomic Variability) across LOW/HIGH expression groups; boxplot + Wilcoxon test |
 
 ### ⚡ Optimization Guides
 
@@ -187,6 +188,12 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ---
 
 ## Recent Updates
+
+### 2026-03-21 (variability analysis)
+- ✅ **New Analysis Scripts**: Added two standalone R scripts for expression variability analysis:
+  - `plot_gene_mad_variability.R` — per-gene MAD across LOW/HIGH sample groups (one dot per gene); Wilcoxon test; `--partner-type` stub for future direct/indirect partner restriction
+  - `plot_sample_variability.R` — per-sample ITV (median/mean/sum of |log-expr − population mean|) across LOW/HIGH groups (one dot per sample); `--summary-metric` embedded in output filename
+- ✅ **Documentation**: Added [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md)
 
 ### 2026-03-21
 - ✅ **Qualitative Metric Fixes** (Stage 3 + 3b):

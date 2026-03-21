@@ -454,7 +454,7 @@ docs/
 
 ### Next Available Numbers
 
-- **GUIDE:** 04
+- **GUIDE:** 06
 - **OPTIMIZATION:** 04
 - **FIX:** 04
 - **REFERENCE:** 02
