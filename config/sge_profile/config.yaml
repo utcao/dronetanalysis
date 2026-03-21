@@ -26,7 +26,7 @@ default-resources:
   - threads=8
 
 # Maximum simultaneous SGE jobs (not CPU cores)
-jobs: 200
+jobs: 2000
 
 # Seconds to wait for output files to appear on shared filesystem after job finishes
 latency-wait: 120
