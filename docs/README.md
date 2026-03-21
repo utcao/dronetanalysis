@@ -22,6 +22,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) | Complete pipeline workflow from expression data to differential network analysis |
 | [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) | Understanding network topology metrics (degree, betweenness, clustering, etc.) |
 | [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) | Snakemake workflow: config reference, all parameters, gene subset filtering, Stage 4 |
+| [GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md) | Qualitative change categories (DISAPPEAR/NEW/SIGN_CHANGE/STRENGTHEN/WEAKEN), partition identities, L1/L2 focus-gene metrics, sanity checks |
 
 ### ⚡ Optimization Guides
 
@@ -80,7 +81,8 @@ Historical development logs and planning documents:
 ### For Advanced Users
 
 1. **[GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md)** - Interpret network topology results
-2. **[REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md)** - Deep dive into statistical methods and pipeline design
+2. **[GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md)** - Understand qualitative change categories and sanity-check identities
+3. **[REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md)** - Deep dive into statistical methods and pipeline design
 
 ---
 
@@ -186,6 +188,13 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 
 ## Recent Updates
 
+### 2026-03-21
+- ✅ **Qualitative Metric Fixes** (Stage 3 + 3b):
+  - Fixed `focus_deg_low` / `focus_deg_high` always being 0 in summary output (were not saved to `focus_gene/metrics/` HDF5 group due to missing prefix in `save_results`)
+  - Fixed inconsistent STRENGTHEN/WEAKEN definition in `compute_edge_stats`: now uses pure `qual_score` codes (consistent with global `qual_summary` and mode-B counts); previously double-counted SIGN_CHANGE edges
+  - Added `L1_n_edges_low`, `L1_n_edges_high`, `L2_n_edges_low`, `L2_n_edges_high` metrics throughout (Stage 3 HDF5, Stage 3b summary HDF5, TSV output)
+- ✅ **Documentation**: Added [GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md) with full documentation of the 6 qualitative categories, partition identities, and L1/L2 sanity checks; updated [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) with differential network section and cross-reference
+
 ### 2026-03-20
 - ✅ **HPC SGE Fixes**: Fixed `OSError: bad object header version number` on NFS by adding
   `HDF5_USE_FILE_LOCKING=FALSE` to SGE submit command; corrected 10× inflated `mem_mb`
@@ -234,6 +243,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2026-03-11
-**Pipeline Version:** 2.1 (single-gene Stage 3, gene subset propagation, Stage 4 wired)
+**Last Updated:** 2026-03-21
+**Pipeline Version:** 2.2 (fixed focus_deg metrics, consistent STRENGTHEN/WEAKEN, added L1/L2 n_edges_low/high)
 **Status:** ✅ All documentation current

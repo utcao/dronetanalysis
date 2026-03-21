@@ -507,6 +507,7 @@ def analyze_focus_gene(
                 "n_edges": 0,
                 "n_disappear": 0, "n_new": 0, "n_sign_change": 0,
                 "n_strengthen": 0, "n_weaken": 0,
+                "n_edges_low": 0, "n_edges_high": 0,
                 "mean_abs_delta": 0.0,
                 "sum_abs_delta": 0.0,
                 "conn_sum_low": 0.0, "conn_sum_high": 0.0,
@@ -521,11 +522,11 @@ def analyze_focus_gene(
         n_new = int(np.sum(qs == QUAL_NEW))
         n_sign_change = int(np.sum(qs == QUAL_SIGN_CHANGE))
 
-        # Strengthen/weaken INDEPENDENT of sign_change:
-        # For all "both present" edges, compare |r_high| vs |r_low|
-        mask_both = ((qs == QUAL_SIGN_CHANGE) | (qs == QUAL_STRENGTHEN) | (qs == QUAL_WEAKEN))
-        n_strengthen = int(np.sum(mask_both & (rh > rl)))
-        n_weaken = int(np.sum(mask_both & (rh < rl)))
+        # Strengthen/weaken: pure qual_score codes, consistent with global qual_summary.
+        # SIGN_CHANGE edges are NOT included here; counted separately in n_sign_change.
+        # This enables the clean partition: D + N + SC + ST + WK + U == n_edges
+        n_strengthen = int(np.sum(qs == QUAL_STRENGTHEN))
+        n_weaken = int(np.sum(qs == QUAL_WEAKEN))
 
         # str_low / str_high: sum|r| only for "present" edges in each condition.
         # "Present" = significant AND |r| >= threshold (matches adj_low/adj_high logic).
@@ -541,6 +542,9 @@ def analyze_focus_gene(
         str_mean_low = float(np.mean(rl[present_low]))
         str_mean_high = float(np.mean(rh[present_high]))
 
+        n_edges_low = int(present_low.sum())
+        n_edges_high = int(present_high.sum())
+
         return {
             "n_edges": len(edge_indices),
             "n_disappear": n_disappear,
@@ -548,6 +552,8 @@ def analyze_focus_gene(
             "n_sign_change": n_sign_change,
             "n_strengthen": n_strengthen,
             "n_weaken": n_weaken,
+            "n_edges_low": n_edges_low,
+            "n_edges_high": n_edges_high,
             "mean_delta": float(np.mean(delta[edge_indices])),
             "mean_abs_delta": float(np.mean(np.abs(delta[edge_indices]))),
             "sum_abs_delta": float(np.sum(np.abs(delta[edge_indices]))),
@@ -679,6 +685,8 @@ def analyze_focus_gene(
         "L1_mean_abs_dr": float(L1_mean_abs_dr),
         "L1_mean_delta": float(L1_mean_delta),
         "L1_clique_density": float(L1_clique_density),
+        "L1_n_edges_low": direct_stats["n_edges_low"],
+        "L1_n_edges_high": direct_stats["n_edges_high"],
         # L2 (pure L2 nodes + outer-layer edges: L1↔L1 + L1→L2)
         "L2_n_nodes": L2_n_nodes,
         "L2_n_edges": L2_n_edges,
@@ -695,6 +703,8 @@ def analyze_focus_gene(
         "L2_conn_mean_high": float(two_layer_stats["conn_mean_high"]),
         "L2_mean_abs_dr": float(L2_mean_abs_dr),
         "L2_mean_delta": float(L2_mean_delta),
+        "L2_n_edges_low": two_layer_stats["n_edges_low"],
+        "L2_n_edges_high": two_layer_stats["n_edges_high"],
         # Full 2-layer neighbourhood (direct + L1↔L1 + L1→L2)
         "full_n_edges": len(full_two_layer_edges),
         "full_rewire": full_rewire,
@@ -1019,7 +1029,7 @@ def save_results(
                 two_layer_grp.attrs[key] = val
 
             # Flat metrics (L1/L2/ratios)
-            flat_keys = [k for k in focus_analysis if k.startswith(("L1_", "L2_", "L2L1_", "HL_"))]
+            flat_keys = [k for k in focus_analysis if k.startswith(("focus_deg_", "L1_", "L2_", "L2L1_", "HL_"))]
             metrics_grp = focus.create_group("metrics")
             for key in flat_keys:
                 metrics_grp.attrs[key] = focus_analysis[key]
