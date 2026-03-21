@@ -29,6 +29,17 @@ and produce a PDF boxplot with a Wilcoxon rank-sum test annotation.
   ```r
   install.packages(c("data.table", "dplyr", "ggplot2", "argparse"))
   ```
+  All packages are already present in the `dronet` conda environment.
+
+- **Python on PATH** (required by R's `argparse` package): when running
+  inside a conda environment, pass the Python path explicitly:
+  ```bash
+  # Linux / HPC
+  export PYTHON=$(which python)
+
+  # Windows + conda (dronet env)
+  conda run -n dronet env PYTHON="$CONDA_PREFIX/python.exe" Rscript ...
+  ```
 - A VOOM-normalized expression matrix (tab-separated, genes × samples). The
   full matrices are at `data/processed/VOOM/voomdataCtrl.txt` and
   `voomdataHS.txt`; test subsets are in `dataset/test/`.
@@ -257,6 +268,7 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 | `LOW group has < 2 samples` | Matrix too small or `--low-frac` too small | Use test data with ≥ 10 samples, or increase `--low-frac` |
 | `Warning: partner-type 'direct' not yet implemented` | Partner restriction stub triggered | Use `--partner-type all` or omit the argument for now |
 | `argparse` error: `could not find function "ArgumentParser"` | `argparse` R package not installed | `install.packages("argparse")` |
+| `Couldn't find a sufficient Python binary` (from argparse) | R's `argparse` package calls Python internally; Python not on PATH | Set the `PYTHON` environment variable: `export PYTHON=$(which python)` before running, or `env PYTHON=$(which python) Rscript ...`; in conda: `conda run -n dronet env PYTHON=... Rscript ...` |
 | PDF produced but violins are very flat | Too few samples or low variance genes | Expected with small test datasets; use full expression matrices for production |
 
 ---
