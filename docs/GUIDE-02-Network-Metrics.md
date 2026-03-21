@@ -489,6 +489,27 @@ def create_topology_comparison_plot(topo_low, topo_high, topo_diff, output_file)
 
 ---
 
+## Differential Network: Qualitative Change Metrics
+
+The topology metrics above (degree, clustering, assortativity) describe the **structure** of a network. For the differential network, you also need **qualitative change metrics** that describe *how* each edge changed between conditions.
+
+Stage 3 classifies every significant differential edge into one of 6 categories:
+
+| Category | Meaning |
+|----------|---------|
+| DISAPPEAR | Present in low, absent in high |
+| NEW | Absent in low, present in high |
+| SIGN_CHANGE | Present in both, correlation sign flips |
+| STRENGTHEN | Present in both, same sign, strength increases |
+| WEAKEN | Present in both, same sign, strength decreases |
+| UNCHANGED | In diff network but not "present" in either condition |
+
+The key partition identity: `disappear + new + sign_change + strengthen + weaken + unchanged = n_sig_edges_diff`
+
+For full documentation of these metrics, the L1/L2 focus-gene neighbourhood metrics, and sanity-check identities, see **[GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md)**.
+
+---
+
 ## What to Report in Your Paper
 
 ### **Essential Metrics (Always)**
@@ -502,10 +523,12 @@ def create_topology_comparison_plot(topo_low, topo_high, topo_diff, output_file)
 6. ✅ **n_components** - Connectivity
 7. ✅ **power_law_exponent** - Scale-free property
 8. ✅ **is_scale_free** (Yes/No)
+9. ✅ **n_disappear / n_new / n_sign_change** - Rewiring summary (see GUIDE-04)
+10. ✅ **L1_rewire / L1_frac_rewire** - Per-gene rewiring rate at L1
 
 ### **Nice to Have**
-9. ⚠️ **assortativity** - Hub organization
-10. ⚠️ **density** - Overall connectivity
+11. ⚠️ **assortativity** - Hub organization
+12. ⚠️ **density** - Overall connectivity
 
 ---
 
@@ -537,26 +560,30 @@ High Expression Network:
   Scale-free:     Yes (γ=2.6, R²=0.89)
   Assortativity:  0.09 (slight hub clustering)
 
-Differential Network (Rewired Edges):
-  Edges:          2,345 (rewired)
+Differential Network:
+  Edges:          2,345  (n_sig_edges_diff)
+    Disappear:    1,102  (46.8%) — lost in high expression
+    New:            687  (29.3%) — gained in high expression
+    Sign change:    210   (8.9%) — flipped direction
+    Strengthen:     198   (8.4%) — intensified, same sign
+    Weaken:         148   (6.3%) — weakened, same sign
   Avg degree:     1.36
   Clustering:     0.12 (less modular)
   Components:     12 (fragmented)
   Scale-free:     No (γ=1.8, R²=0.65)
-  
-Top Rewiring Hubs:
-  1. FOXM1    (degree: 87)
-  2. MYC      (degree: 65)
-  3. CCNB1    (degree: 54)
-  ...
-```
 
-Would you like me to integrate these into your Stage 3 script?
+Top Rewiring Hubs (by L2/L1 ratio):
+  Gene    DiffEdges  L1_nodes  L1_rewire  focus_deg_low  focus_deg_high
+  FOXM1       87        45        38          42               21
+  MYC         65        31        27          29               14
+  CCNB1       54        28        24          26               12
+```
 
 ---
 
 ## Related Reading
 
+- [GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md) - Qualitative change categories, partition identities, L1/L2 focus metrics, sanity checks
 - [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) - Full pipeline workflow and usage
 - [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of enhanced metrics and fixes
 - [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) - Statistical methodology reference
