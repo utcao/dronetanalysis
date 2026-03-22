@@ -24,6 +24,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) | Snakemake workflow: config reference, all parameters, gene subset filtering, Stage 4 |
 | [GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md) | Qualitative change categories (DISAPPEAR/NEW/SIGN_CHANGE/STRENGTHEN/WEAKEN), partition identities, L1/L2 focus-gene metrics, sanity checks |
 | [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) | Gene-level MAD variability and sample-level ITV (Individual Transcriptomic Variability) across LOW/HIGH expression groups; boxplot + Wilcoxon test |
+| [GUIDE-06-Expression-Violin-Plot.md](GUIDE-06-Expression-Violin-Plot.md) | Violin/boxplot with individual selection (top/bottom X%), dot highlighting, and Wilcoxon rank-sum + BH-FDR annotation; exports PDF/SVG/PNG |
 
 ### ⚡ Optimization Guides
 
@@ -189,6 +190,12 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 
 ## Recent Updates
 
+### 2026-03-22
+- ✅ **New Script**: Added `src/scripts/plot_expr_violin.py` — violin/boxplot for expression matrices with individual selection (top/bottom X%), dot highlighting, Wilcoxon rank-sum + BH-FDR, PDF/SVG/PNG export
+- ✅ **`--gene_name` parameter**: human-readable gene symbol auto-appended to output file names (`{prefix}_{gene_id}_{gene_name}.pdf`)
+- ✅ **Output folder** renamed from `boxplot_violinplot/` to `results/expr_violin/`
+- ✅ **Documentation**: Added [GUIDE-06-Expression-Violin-Plot.md](GUIDE-06-Expression-Violin-Plot.md)
+
 ### 2026-03-21 (variability analysis)
 - ✅ **New Analysis Scripts**: Added two standalone R scripts for expression variability analysis:
   - `plot_gene_mad_variability.R` — per-gene MAD across LOW/HIGH sample groups (one dot per gene); Wilcoxon test; `--partner-type` stub for future direct/indirect partner restriction
@@ -250,6 +257,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2026-03-21
+**Last Updated:** 2026-03-22
 **Pipeline Version:** 2.2 (fixed focus_deg metrics, consistent STRENGTHEN/WEAKEN, added L1/L2 n_edges_low/high)
 **Status:** ✅ All documentation current
