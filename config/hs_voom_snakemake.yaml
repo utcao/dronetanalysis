@@ -74,6 +74,10 @@ focus_n_jobs: 4
 # Derived from files in results_ct_voom/base_correlations/.
 # Remove this section to process all genes.
 gene_subset:
+  - FBgn0001197
+  - FBgn0262739
+  - FBgn0087035
+  - FBgn0250816
   - FBgn0002563
   - FBgn0027844
   - FBgn0039016
