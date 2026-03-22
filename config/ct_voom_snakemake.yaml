@@ -30,7 +30,7 @@
 expr_tsv: "data/processed/VOOM/voomdataCtrl.txt"
 
 # --- Output ---
-out_dir: "results_ct_voom"
+out_dir: "tmp/results_ct_voom"
 
 # --- Bootstrap parameters (match original run) ---
 low_frac: 0.2
@@ -62,23 +62,27 @@ skip_focus_topology: true
 focus_genes: "top:50"    # "top:N", "0,1,2,...", or "range:start:end"
 focus_n_jobs: 4
 
-# # --- Gene subset ---
-# # Restrict stages 2a + 2b to these 15 focus genes.
-# # Derived from files in results_ct_voom/base_correlations/.
-# # Remove this section to process all genes.
-# gene_subset:
-#   - FBgn0002563
-#   - FBgn0027844
-#   - FBgn0039016
-#   - FBgn0039562
-#   - FBgn0000559
-#   - FBgn0026761
-#   - FBgn0034246
-#   - FBgn0000406
-#   - FBgn0040007
-#   - FBgn0262972
-#   - FBgn0263106
-#   - FBgn0265800
-#   - FBgn0265999
-#   - FBgn0001233
-#   - FBgn0001248
+# --- Gene subset ---
+# Restrict stages 2a + 2b to these 15 focus genes.
+# Derived from files in results_ct_voom/base_correlations/.
+# Remove this section to process all genes.
+gene_subset:
+  - FBgn0001197
+  - FBgn0262739
+  - FBgn0087035
+  - FBgn0250816
+  - FBgn0002563
+  - FBgn0027844
+  - FBgn0039016
+  - FBgn0039562
+  - FBgn0000559
+  - FBgn0026761
+  - FBgn0034246
+  - FBgn0000406
+  - FBgn0040007
+  - FBgn0262972
+  - FBgn0263106
+  - FBgn0265800
+  - FBgn0265999
+  - FBgn0001233
+  - FBgn0001248
