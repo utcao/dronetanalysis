@@ -209,6 +209,9 @@ Use the next available number in that category:
 GUIDE-01-Complete-Workflow.md
 GUIDE-02-Network-Metrics.md
 GUIDE-03-Snakemake-Pipeline.md
+GUIDE-04-Qualitative-Change-Metrics.md
+GUIDE-05-Expression-Variability-Analysis.md
+GUIDE-06-Expression-Violin-Plot.md
 OPTIMIZATION-01-Memory.md
 OPTIMIZATION-02-Storage.md
 OPTIMIZATION-03-Network-Reconstruction.md
@@ -454,7 +457,7 @@ docs/
 
 ### Next Available Numbers
 
-- **GUIDE:** 06
+- **GUIDE:** 07
 - **OPTIMIZATION:** 04
 - **FIX:** 04
 - **REFERENCE:** 02
@@ -475,7 +478,7 @@ When in doubt, look at existing documents as examples!
 
 ---
 
-**Last Updated:** 2026-03-11
+**Last Updated:** 2026-03-22
 **Status:** ✅ Active documentation standard
 **Related Reading:**
 - [README.md](README.md) - Central navigation hub
