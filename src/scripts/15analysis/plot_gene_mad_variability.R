@@ -230,7 +230,7 @@ p <- ggplot(plot_df, aes(x = group, y = mad_value, fill = group)) +
   geom_boxplot(width = 0.18, alpha = 0.85, outlier.alpha = 0.25, linewidth = 0.4) +
   geom_jitter(width = 0.07, size = 0.45, alpha = 0.12, color = "black") +
   annotate("text", x = 1.5, y = y_star,
-           label = get_sig_stars(wt$p.value), size = 6, vjust = 0) +
+           label = format_pval(wt$p.value), size = 6, vjust = 0) +
   annotate("segment", x = 1, xend = 2, y = y_max * 1.03, yend = y_max * 1.03,
            linewidth = 0.35, color = "grey40") +
   scale_fill_manual(values = colors_groups) +
