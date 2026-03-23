@@ -36,7 +36,7 @@ suppressPackageStartupMessages({
 
 # ----- 2. Helper functions -----
 format_pval <- function(p) {
-  if (p < 0.001) return("p < 0.001 ***")
+  if (p < 0.001) return(sprintf("p = %s ***", formatC(p, format = "e", digits = 2)))
   if (p < 0.01)  return(sprintf("p = %.3f **",  p))
   if (p < 0.05)  return(sprintf("p = %.3f *",   p))
   return(sprintf("p = %.3f (ns)", p))
@@ -206,9 +206,14 @@ gene_label <- if (!is.null(args$gene_symbol)) {
   args$focus_gene
 }
 
+mean_low  <- mean(mad_low,  na.rm = TRUE)
+mean_high <- mean(mad_high, na.rm = TRUE)
+
 title_str    <- paste0("Gene-level MAD Variability\n",
                        "Focus: ", gene_label, "  |  Condition: ", args$condition_label)
-subtitle_str <- format_pval(wt$p.value)
+subtitle_str <- paste0(format_pval(wt$p.value),
+                       "  |  mean LOW = ", round(mean_low, 4),
+                       ",  mean HIGH = ", round(mean_high, 4))
 
 # Append partner type to subtitle if not "all"
 if (args$partner_type != "all")
