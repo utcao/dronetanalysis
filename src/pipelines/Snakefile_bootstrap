@@ -20,8 +20,13 @@
 #                                              summary.h5   rewiring_hubs.tsv
 #                                                           │
 #                                              [optional]   ▼
-#                                                   visualization (Stage 4)
+#                                                   visualization (Stage 5)
 #                                                   visualization_data/
+#
+#                                    [optional, gene_subset only]   ▼
+#                                         gene_mad_variability +
+#                                         gene_sample_variability (Stage 6)
+#                                         variability/
 #
 # Usage:
 #   # Toy (local, 4 cores):
@@ -78,6 +83,12 @@ SKIP_VIS        = config.get("skip_visualization", True)
 SKIP_FOCUS_TOPO = config.get("skip_focus_topology", True)
 FOCUS_GENES     = config.get("focus_genes", "top:50")
 FOCUS_N_JOBS    = config.get("focus_n_jobs", 4)
+
+# Stage 6: Gene/sample variability (gene_subset only; disabled by default)
+SKIP_VARIABILITY     = config.get("skip_variability", True)
+VARIABILITY_SAVE_CSV = config.get("variability_save_csv", False)
+CONDITION_LABEL      = config.get("condition_label", "Condition")
+VARIABILITY_DIR      = f"{OUT}/variability"
 
 # Optional: restrict processing to a named subset of genes (list of FBgn IDs).
 # Stages 0 and 1 always process all genes (bootstrap indices cover the full matrix).
@@ -159,6 +170,15 @@ def _all_targets(wildcards):
         targets.append(VIS_DIR)
     if not SKIP_FOCUS_TOPO:
         targets.append(FOCUS_TOPO_H5)
+    if not SKIP_VARIABILITY and GENE_SUBSET:
+        targets += expand(
+            VARIABILITY_DIR + "/{gene_id}_mad_variability.pdf",
+            gene_id=sorted(GENE_SUBSET)
+        )
+        targets += expand(
+            VARIABILITY_DIR + "/{gene_id}_sample_variability_median.pdf",
+            gene_id=sorted(GENE_SUBSET)
+        )
     return targets
 
 
@@ -405,4 +425,103 @@ if not SKIP_VIS:
                 --diff-h5 {input} \
                 --out-dir {output} \
                 --corr-threshold {CORR_THRESH}
+            """
+
+
+# ---------------------------------------------------------------------------
+# Stage 6: Gene/sample variability analysis (optional; gene_subset only)
+#
+# Runs only when gene_subset is non-empty AND skip_variability: false.
+# One plot per focus gene in the subset:
+#   - <gene_id>_mad_variability.pdf           : gene-level MAD (LOW vs HIGH)
+#   - <gene_id>_sample_variability_median.pdf : sample-level ITV (LOW vs HIGH)
+#
+# Scripts read expr_tsv directly (no pipeline HDF5 required); each rule is
+# one Snakemake job per gene, parallelised natively across available cores.
+# Config: skip_variability (default true), condition_label, variability_save_csv
+# ---------------------------------------------------------------------------
+if not SKIP_VARIABILITY and GENE_SUBSET:
+    if not EXPR_TSV:
+        raise ValueError(
+            "skip_variability: false requires expr_tsv to be set in config "
+            "(the variability R scripts read the TSV directly)."
+        )
+
+    rule gene_mad_variability:
+        input:
+            expr = EXPR_TSV,
+        output:
+            VARIABILITY_DIR + "/{gene_id}_mad_variability.pdf",
+        params:
+            condition_label = CONDITION_LABEL,
+            save_csv_flag   = "--save-csv" if VARIABILITY_SAVE_CSV else "",
+        resources:
+            mem_mb  = 8000,
+            runtime = 30,
+            threads = 1,
+        shell:
+            """
+            Rscript code/dronetanalysis/src/scripts/15analysis/plot_gene_mad_variability.R \
+                --expr-file {input.expr} \
+                --focus-gene {wildcards.gene_id} \
+                --output-dir {VARIABILITY_DIR} \
+                --low-frac {LOW_FRAC} --high-frac {HIGH_FRAC} \
+                --condition-label "{params.condition_label}" \
+                {params.save_csv_flag}
+            """
+
+    rule gene_sample_variability:
+        input:
+            expr = EXPR_TSV,
+        output:
+            VARIABILITY_DIR + "/{gene_id}_sample_variability_median.pdf",
+        params:
+            condition_label = CONDITION_LABEL,
+            save_csv_flag   = "--save-csv" if VARIABILITY_SAVE_CSV else "",
+        resources:
+            mem_mb  = 8000,
+            runtime = 30,
+            threads = 1,
+        shell:
+            """
+            Rscript code/dronetanalysis/src/scripts/15analysis/plot_sample_variability.R \
+                --expr-file {input.expr} \
+                --focus-gene {wildcards.gene_id} \
+                --output-dir {VARIABILITY_DIR} \
+                --low-frac {LOW_FRAC} --high-frac {HIGH_FRAC} \
+                --condition-label "{params.condition_label}" \
+                {params.save_csv_flag}
+            """
+
+
+# ---------------------------------------------------------------------------
+# Stage 7: Cross-condition variability batch (optional)
+#
+# Calls run_variability_batch.py with a dedicated batch config that covers
+# BOTH conditions (CT + HS), all genes with symbols, and all sample metrics.
+# Produces PDFs/CSVs per condition sub-dir and a unified Excel summary.
+#
+# Enable by adding to any condition config:
+#   variability_batch_config: config/variability_batch.yaml
+#   variability_batch_outdir: results/variability_combined  # optional
+#   variability_batch_jobs:   4                             # optional
+# ---------------------------------------------------------------------------
+VARIABILITY_BATCH_CONFIG = config.get("variability_batch_config", None)
+
+if VARIABILITY_BATCH_CONFIG:
+    rule variability_batch:
+        input:
+            cfg = VARIABILITY_BATCH_CONFIG,
+        output:
+            directory(config.get("variability_batch_outdir", "results/variability_combined")),
+        params:
+            jobs = config.get("variability_batch_jobs", 4),
+        resources:
+            mem_mb  = 16000,
+            runtime = 120,
+            threads = 4,
+        shell:
+            """
+            python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+                --config {input.cfg} --jobs {params.jobs}
             """

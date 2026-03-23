@@ -1,0 +1,77 @@
+# =============================================================================
+# variability_batch.yaml
+# Cross-condition variability batch config.
+#
+# Used by run_variability_batch.py (standalone) and optionally by
+# Snakefile_bootstrap (add variability_batch_config: config/variability_batch.yaml).
+#
+# Usage:
+#   # Dry run (print all Rscript commands, no execution):
+#   python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+#       --config config/variability_batch.yaml --dry-run
+#
+#   # Full run:
+#   python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+#       --config config/variability_batch.yaml --jobs 4
+#
+#   # Re-generate Excel only (PDFs and CSVs already exist):
+#   python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+#       --config config/variability_batch.yaml --excel-only
+#
+# Outputs (per condition sub-directory):
+#   {output_dir}/{cond}/  →  {gene_id}_mad_variability.pdf / .csv
+#                         →  {gene_id}_sample_variability_{metric}.pdf / .csv
+#   {output_dir}/variability_summary.xlsx   →  summary stats table
+# =============================================================================
+
+# --- Output ---
+output_dir: results/variability_combined
+
+# --- Bootstrap fractions (should match ct/hs pipeline configs) ---
+low_frac: 0.2
+high_frac: 0.2
+
+# --- Sample-level metrics to run ---
+sample_metrics: [median, mean, sum]
+
+# --- Always save CSVs (required for Excel aggregation) ---
+save_csv: true
+
+# --- Parallel Rscript workers ---
+jobs: 4
+
+# --- Conditions ---
+conditions:
+  CT:
+    expr_file: data/processed/VOOM/voomdataCtrl.txt
+    label: "Control (VOOM)"
+  HS:
+    expr_file: data/processed/VOOM/voomdataHS.txt
+    label: "Heat-Shock (VOOM)"
+
+# --- Focus genes ---
+# All 19 genes from gene_subset. Add symbol where known; null → gene ID used as label.
+genes:
+  - {id: FBgn0001197, symbol: h2a_var}
+  - {id: FBgn0262739, symbol: ago1}
+  - {id: FBgn0087035, symbol: ago2}
+  - {id: FBgn0250816, symbol: ago3}
+  - {id: FBgn0002563, symbol: null}
+  - {id: FBgn0027844, symbol: null}
+  - {id: FBgn0039016, symbol: dicer1}
+  - {id: FBgn0039562, symbol: gp93}
+  - {id: FBgn0000559, symbol: null}
+  - {id: FBgn0026761, symbol: trap1}
+  - {id: FBgn0034246, symbol: dicer2}
+  - {id: FBgn0000406, symbol: null}
+  - {id: FBgn0040007, symbol: null}
+  - {id: FBgn0262972, symbol: null}
+  - {id: FBgn0263106, symbol: DnaJ-1}
+  - {id: FBgn0265800, symbol: null}
+  - {id: FBgn0265999, symbol: null}
+  - {id: FBgn0001233, symbol: hsp83}
+  - {id: FBgn0001248, symbol: null}
+
+# --- Rscript path ---
+# Override if Rscript is not on PATH (e.g. full conda path).
+rscript_path: Rscript
