@@ -50,21 +50,21 @@ dataset/raw/logCPM_HS_Dros.csv     # 8 763 genes × 1 037 individuals
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--individual_sel` | `1.0` | `1` → use all individuals; `0 < x < 1` → select top x% **and** bottom x% per file, ranked by expression of `--gene` (or mean across all genes) |
+| `--individual-sel` | `1.0` | `1` → use all individuals; `0 < x < 1` → select top x% **and** bottom x% per file, ranked by expression of `--gene` (or mean across all genes) |
 
 ### X-axis behaviour
 
 | Condition | X-axis categories |
 |-----------|-------------------|
 | Multiple files | Group names (e.g. CT, HS) |
-| Single file + `individual_sel < 1` | `Bottom X%` and `Top X%` |
-| Single file + `individual_sel = 1` | Single violin (no comparison) |
+| Single file + `individual-sel < 1` | `Bottom X%` and `Top X%` |
+| Single file + `individual-sel = 1` | Single violin (no comparison) |
 
 ### Dot highlighting
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--highlight_sel` | `0` | `0` or `1` → no highlighting; `0 < x < 1` → within the selected individuals, highlight top x% (red) and bottom x% (blue) |
+| `--highlight-sel` | `0` | `0` or `1` → no highlighting; `0 < x < 1` → within the selected individuals, highlight top x% (red) and bottom x% (blue) |
 
 Highlighting is applied **after** individual selection.
 
@@ -73,14 +73,14 @@ Highlighting is applied **after** individual selection.
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--gene GENEID` | *(none)* | FlyBase ID of the gene to plot. If omitted, per-individual mean across all genes is used for both ranking and the y-axis |
-| `--gene_name NAME` | *(none)* | Human-readable gene symbol (e.g. `Hsp70Ab`). When provided, `{GENEID}_{NAME}` is automatically appended to every output file name, making files self-describing without editing `--output_prefix` |
+| `--gene-symbol SYMBOL` | *(none)* | Human-readable gene symbol (e.g. `Hsp70Ab`). Matches `--gene-symbol` in the R variability scripts. When provided, `{GENEID}_{SYMBOL}` is automatically appended to every output file name, making files self-describing without editing `--output-prefix` |
 
 ### Output
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--output_prefix` | `expr_violin` | File name stem (no extension) |
-| `--output_dir` | `results/expr_violin/` | Directory for all outputs |
+| `--output-prefix` | `expr_violin` | File name stem (no extension) |
+| `--output-dir` | `results/expr_violin/` | Directory for all outputs |
 | `--dpi` | `150` | PNG resolution |
 
 ### Plot appearance
@@ -88,11 +88,11 @@ Highlighting is applied **after** individual selection.
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--figsize W H` | auto | Figure size in inches |
-| `--violin_alpha` | `0.55` | Violin fill transparency |
-| `--dot_alpha` | `0.35` | Non-highlighted dot transparency |
-| `--dot_size` | `8` | Non-highlighted dot size (pt²) |
-| `--no_violin` | off | Show box plot only |
-| `--no_box` | off | Show violin only |
+| `--violin-alpha` | `0.55` | Violin fill transparency |
+| `--dot-alpha` | `0.35` | Non-highlighted dot transparency |
+| `--dot-size` | `8` | Non-highlighted dot size (pt²) |
+| `--no-violin` | off | Show box plot only |
+| `--no-box` | off | Show violin only |
 
 ---
 
@@ -116,8 +116,8 @@ Highlighting is applied **after** individual selection.
 python src/scripts/plot_expr_violin.py \
     --files dataset/raw/logCPM_Ctrl_Dros.csv dataset/raw/logCPM_HS_Dros.csv \
     --groups CT HS \
-    --individual_sel 1 \
-    --output_prefix CT_vs_HS_all
+    --individual-sel 1 \
+    --output-prefix CT_vs_HS_all
 ```
 
 Output: `results/expr_violin/CT_vs_HS_all.{pdf,svg,png}` + `_stats.csv`
@@ -133,9 +133,9 @@ then highlights the extreme 5% within that selected pool.
 python src/scripts/plot_expr_violin.py \
     --files dataset/raw/logCPM_Ctrl_Dros.csv dataset/raw/logCPM_HS_Dros.csv \
     --groups CT HS \
-    --individual_sel 0.1 \
-    --highlight_sel 0.05 \
-    --output_prefix CT_vs_HS_top10pct
+    --individual-sel 0.1 \
+    --highlight-sel 0.05 \
+    --output-prefix CT_vs_HS_top10pct
 ```
 
 CT violin: 94 top + 94 bottom = 188 individuals
@@ -149,11 +149,11 @@ HS violin: 104 top + 104 bottom = 208 individuals
 python src/scripts/plot_expr_violin.py \
     --files dataset/raw/logCPM_Ctrl_Dros.csv dataset/raw/logCPM_HS_Dros.csv \
     --groups CT HS \
-    --individual_sel 1 \
-    --highlight_sel 0.2 \
+    --individual-sel 1 \
+    --highlight-sel 0.2 \
     --gene FBgn0039562 \
-    --gene_name Hsp70Ab \
-    --output_prefix CT_vs_HS
+    --gene-symbol Hsp70Ab \
+    --output-prefix CT_vs_HS
 ```
 
 Output files: `results/expr_violin/CT_vs_HS_FBgn0039562_Hsp70Ab.{pdf,svg,png}`
@@ -167,11 +167,11 @@ Title and y-axis label: `FBgn0039562 (Hsp70Ab)`
 python src/scripts/plot_expr_violin.py \
     --files dataset/raw/logCPM_Ctrl_Dros.csv \
     --groups CT \
-    --individual_sel 0.1 \
-    --highlight_sel 0.3 \
+    --individual-sel 0.1 \
+    --highlight-sel 0.3 \
     --gene FBgn0039562 \
-    --gene_name Hsp70Ab \
-    --output_prefix CT_topvsbottom
+    --gene-symbol Hsp70Ab \
+    --output-prefix CT_topvsbottom
 ```
 
 X-axis: `Bottom 10%` (n=94) vs `Top 10%` (n=94)
@@ -181,7 +181,7 @@ Output: `results/expr_violin/CT_topvsbottom_FBgn0039562_Hsp70Ab.{pdf,svg,png}`
 
 ## Output Files
 
-All outputs land in `results/expr_violin/` (or `--output_dir`):
+All outputs land in `results/expr_violin/` (or `--output-dir`):
 
 | File | Description |
 |------|-------------|
@@ -190,10 +190,10 @@ All outputs land in `results/expr_violin/` (or `--output_dir`):
 | `{prefix}.png` | Raster PNG (default 150 dpi) |
 | `{prefix}_stats.csv` | Pairwise test results (raw p, adj p BH-FDR, group n) |
 
-File name structure when `--gene_name` is provided:
+File name structure when `--gene-symbol` is provided:
 
 ```
-{output_prefix}_{gene_id}_{gene_name}.pdf
+{output-prefix}_{gene_id}_{gene_symbol}.pdf
 ```
 
 ---
@@ -237,6 +237,6 @@ Both tests are implemented in pure NumPy/math (no scipy dependency) using:
 
 ---
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-03-23
 **Script:** `src/scripts/plot_expr_violin.py`
 **Status:** ✅ Tested on CT (n=938) and HS (n=1037) expression matrices
