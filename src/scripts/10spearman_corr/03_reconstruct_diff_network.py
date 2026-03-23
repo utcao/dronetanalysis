@@ -508,6 +508,7 @@ def analyze_focus_gene(
                 "n_disappear": 0, "n_new": 0, "n_sign_change": 0,
                 "n_strengthen": 0, "n_weaken": 0,
                 "n_edges_low": 0, "n_edges_high": 0,
+                "mean_delta": 0.0,
                 "mean_abs_delta": 0.0,
                 "sum_abs_delta": 0.0,
                 "conn_sum_low": 0.0, "conn_sum_high": 0.0,
