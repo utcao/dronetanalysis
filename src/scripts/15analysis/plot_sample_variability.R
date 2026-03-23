@@ -33,7 +33,7 @@ suppressPackageStartupMessages({
 
 # ----- 2. Helper functions -----
 format_pval <- function(p) {
-  if (p < 0.001) return("p < 0.001 ***")
+  if (p < 0.001) return(sprintf("p = %s ***", formatC(p, format = "e", digits = 2)))
   if (p < 0.01)  return(sprintf("p = %.3f **",  p))
   if (p < 0.05)  return(sprintf("p = %.3f *",   p))
   return(sprintf("p = %.3f (ns)", p))
@@ -233,7 +233,7 @@ p <- ggplot(plot_df, aes(x = group, y = itv, fill = group)) +
   # Larger, more visible jitter: n_dots = k_low + k_high (~40-80 samples typical)
   geom_jitter(width = 0.10, size = 1.6, alpha = 0.55, color = "black") +
   annotate("text", x = 1.5, y = y_star,
-           label = get_sig_stars(wt$p.value), size = 6, vjust = 0) +
+           label = format_pval(wt$p.value), size = 6, vjust = 0) +
   annotate("segment", x = 1, xend = 2, y = y_max * 1.03, yend = y_max * 1.03,
            linewidth = 0.35, color = "grey40") +
   scale_fill_manual(values = colors_groups) +
