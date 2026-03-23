@@ -35,9 +35,9 @@ Example:
   python src/scripts/plot_expr_violin.py \\
       --files dataset/raw/logCPM_Ctrl_Dros.csv dataset/raw/logCPM_HS_Dros.csv \\
       --groups CT HS \\
-      --individual_sel 0.1 \\
-      --highlight_sel 0.05 \\
-      --output_prefix CT_vs_HS_top10pct
+      --individual-sel 0.1 \\
+      --highlight-sel 0.05 \\
+      --output-prefix CT_vs_HS_top10pct
 """
 
 import argparse
@@ -137,14 +137,14 @@ def parse_args():
                    help="Input CSV files (rows=genes, cols=individuals)")
     p.add_argument("--groups", nargs="+", required=True,
                    help="Group name for each input file (same order as --files)")
-    p.add_argument("--individual_sel", type=float, default=1.0,
+    p.add_argument("--individual-sel", type=float, default=1.0,
                    help=(
                        "Individual selection fraction. "
                        "1 = use all samples; "
                        "0 < x < 1 = select top x%% AND bottom x%% per file "
                        "(ranked by expression). Default: 1.0"
                    ))
-    p.add_argument("--highlight_sel", type=float, default=0.0,
+    p.add_argument("--highlight-sel", type=float, default=0.0,
                    help=(
                        "Dot-highlighting fraction (applied after individual selection). "
                        "0 or 1 = no highlighting; "
@@ -156,15 +156,16 @@ def parse_args():
                        "Gene ID to plot (must be a row index in the CSV). "
                        "If omitted, the mean expression across all genes is used."
                    ))
-    p.add_argument("--gene_name", type=str, default=None,
+    p.add_argument("--gene-symbol", type=str, default=None,
                    help=(
-                       "Human-readable gene name (e.g. Hsp70Ab). When provided together "
-                       "with --gene, the string '{gene_id}_{gene_name}' is automatically "
-                       "appended to the output file names so they are self-describing."
+                       "Human-readable gene symbol (e.g. Hsp83). Matches --gene-symbol in "
+                       "plot_gene_mad_variability.R and plot_sample_variability.R. "
+                       "When provided with --gene, '{gene_id}_{gene_symbol}' is appended "
+                       "to output file names."
                    ))
-    p.add_argument("--output_prefix", type=str, default="expr_violin",
+    p.add_argument("--output-prefix", type=str, default="expr_violin",
                    help="Output file name prefix (no extension). Default: expr_violin")
-    p.add_argument("--output_dir", type=str, default=None,
+    p.add_argument("--output-dir", type=str, default=None,
                    help=(
                        "Output directory. Default: results/expr_violin "
                        "(relative to cwd, or absolute path)."
@@ -174,15 +175,15 @@ def parse_args():
                    help="Figure size in inches. Auto-scaled if omitted.")
     p.add_argument("--dpi", type=int, default=150,
                    help="DPI for PNG output. Default: 150")
-    p.add_argument("--dot_alpha", type=float, default=0.35,
+    p.add_argument("--dot-alpha", type=float, default=0.35,
                    help="Transparency of non-highlighted dots. Default: 0.35")
-    p.add_argument("--dot_size", type=float, default=8,
+    p.add_argument("--dot-size", type=float, default=8,
                    help="Marker size of non-highlighted dots. Default: 8")
-    p.add_argument("--violin_alpha", type=float, default=0.55,
+    p.add_argument("--violin-alpha", type=float, default=0.55,
                    help="Transparency of violin fill. Default: 0.55")
-    p.add_argument("--no_violin", action="store_true",
+    p.add_argument("--no-violin", action="store_true",
                    help="Skip violin layer (show box plot only)")
-    p.add_argument("--no_box", action="store_true",
+    p.add_argument("--no-box", action="store_true",
                    help="Skip box plot layer (show violin only)")
     return p.parse_args()
 
@@ -518,7 +519,7 @@ def main():
 
     # ---- Labels & aesthetics ----
     if args.gene:
-        gene_label = f"{args.gene} ({args.gene_name})" if args.gene_name else args.gene
+        gene_label = f"{args.gene} ({args.gene_symbol})" if args.gene_symbol else args.gene
         y_label = f"{gene_label} expression (logCPM)"
         title = f"Expression of {gene_label}"
     else:
@@ -562,8 +563,8 @@ def main():
 
     # Auto-append gene ID + readable name to file names when --gene_name is given
     file_prefix = args.output_prefix
-    if args.gene_name:
-        gene_tag = f"{args.gene}_{args.gene_name}" if args.gene else args.gene_name
+    if args.gene_symbol:
+        gene_tag = f"{args.gene}_{args.gene_symbol}" if args.gene else args.gene_symbol
         # sanitise: replace spaces/slashes with underscores
         gene_tag = gene_tag.replace(" ", "_").replace("/", "_")
         file_prefix = f"{file_prefix}_{gene_tag}"
