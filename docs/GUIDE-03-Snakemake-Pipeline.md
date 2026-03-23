@@ -24,8 +24,8 @@ All pipeline parameters are set in a YAML config file. Two example configs are p
 
 | Config | Purpose |
 |--------|---------|
-| `config/ct_voom_snakemake.yaml` | Control (ct_voom), 15-gene subset for testing |
-| `config/hs_voom_snakemake.yaml` | Heat-shock (hs_voom), full production run |
+| `config/ct_voom_snakemake.yaml` | Control (ct_voom), 15-gene subset — Stage 6 enabled |
+| `config/hs_voom_snakemake.yaml` | Heat-shock (hs_voom), 15-gene subset — Stage 6 enabled |
 
 ### Complete Config Reference
 
@@ -71,8 +71,16 @@ skip_focus_topology: true
 focus_genes: "top:50"    # "top:N", "0,1,2,...", or "range:start:end"
 focus_n_jobs: 4          # parallel workers for Stage 4
 
+# --- Stage 6: Variability analysis (gene_subset only) ---
+# Runs per-gene MAD and sample-level ITV plots for every gene in gene_subset.
+# Requires expr_tsv to be set (R scripts read the TSV directly, not the HDF5).
+skip_variability: false          # false = enable; true = skip (default)
+condition_label: "Control"       # label shown in plot titles
+variability_save_csv: false      # true = also write per-gene CSV files
+
 # --- Gene subset (optional) ---
 # Restrict per-gene jobs (Stages 2a, 2b, 3, 3b, 4) to a named subset of genes.
+# Also drives Stage 6 (variability) when skip_variability: false.
 # Stages 0 and 1 always process the full expression matrix.
 # Remove gene_subset (or set to []) to process all genes.
 gene_subset:
@@ -134,6 +142,19 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
     -j 15
 ```
 
+### Run Stage 6 variability analysis (gene_subset configs)
+
+```bash
+# Enable variability plots for all genes in gene_subset
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml \
+    --config skip_variability=false \
+    -j 15
+```
+
+> **Requirements:** `expr_tsv` must be set in the config (the R scripts read the TSV
+> directly). `gene_subset` must be non-empty, otherwise Stage 6 is silently skipped.
+
 ### Override config values on the command line
 
 ```bash
@@ -182,6 +203,8 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
 | `reconstruct_single` | 4000 | 30 min |
 | `collect_networks` | 8000 | 120 min |
 | `collect_focus_gene_topology` | 8000 | 120 min |
+| `gene_mad_variability` | 8000 | 30 min |
+| `gene_sample_variability` | 8000 | 30 min |
 
 > **Queue name:** Replace `long.q` in `config/sge_profile/config.yaml` with your cluster's
 > actual queue (check with `qstat -g c`).
@@ -225,6 +248,11 @@ snakemake -s src/pipelines/Snakefile_bootstrap \
         │
         └── [Stage 5: visualization, if skip_visualization: false]
             → visualization_data/
+
+[Stage 6: gene_mad_variability + gene_sample_variability, if gene_subset set
+ and skip_variability: false — reads expr_tsv directly, one job per subset gene]
+→ variability/{gene_id}_mad_variability.pdf
+→ variability/{gene_id}_sample_variability_median.pdf
 ```
 
 ### Why Stage 2 shows as a checkpoint
@@ -258,6 +286,7 @@ gene_subset:
 | Stage 3b (collect_networks) | ✅ Reads only existing per-gene files |
 | Stage 4 (collect_focus_topology) | ✅ Reads only existing per-gene files |
 | Stage 5 (visualization) | Reads aggregated summary, unaffected |
+| Stage 6 (variability) | ✅ Only runs when gene_subset is non-empty |
 
 This uses the `_filter_genes()` function and Snakemake's **checkpoint + aggregate input**
 pattern: each downstream stage's input is resolved dynamically from the gene names in
@@ -335,6 +364,23 @@ Exports the differential network to TSV and GraphML files for R/Cytoscape visual
 - **Output:** `{out_dir}/visualization_data/`
 - **Enable with:** `skip_visualization: false` in config
 
+### Stage 6 — Variability Analysis (optional; gene_subset only)
+
+For each gene in `gene_subset`, produces two variability plots comparing the LOW vs HIGH
+sample groups split by that gene's expression rank:
+
+| Rule | Script | Output |
+|------|--------|--------|
+| `gene_mad_variability` | `plot_gene_mad_variability.R` | `{gene_id}_mad_variability.pdf` — MAD per gene |
+| `gene_sample_variability` | `plot_sample_variability.R` | `{gene_id}_sample_variability_median.pdf` — ITV per sample |
+
+- **Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`
+- **Output:** `{out_dir}/variability/` (one PDF per gene per script)
+- **Enable with:** `skip_variability: false` in config (requires `gene_subset` and `expr_tsv`)
+- **Key params:** `condition_label`, `variability_save_csv`, `low_frac`, `high_frac`
+- **Note:** Scripts read `expr_tsv` directly; no pipeline HDF5 outputs are required.
+  Each rule is one Snakemake job per gene, parallelised natively across available cores.
+
 ---
 
 ## Output Files
@@ -357,11 +403,15 @@ After a successful run:
 ├── differential_network_summary.h5    # Stage 3b — aggregated metrics
 ├── rewiring_hubs.tsv                  # Stage 3b — per-gene TSV (sortable)
 ├── focus_gene_topology.h5             # Stage 4 (if enabled)
-└── visualization_data/                # Stage 5 (if enabled)
-    ├── edges_low.tsv
-    ├── edges_high.tsv
-    ├── edges_diff.tsv
-    └── nodes.tsv
+├── visualization_data/                # Stage 5 (if enabled)
+│   ├── edges_low.tsv
+│   ├── edges_high.tsv
+│   ├── edges_diff.tsv
+│   └── nodes.tsv
+└── variability/                       # Stage 6 (if enabled + gene_subset set)
+    ├── FBgn0001197_mad_variability.pdf
+    ├── FBgn0001197_sample_variability_median.pdf
+    └── ...
 ```
 
 ### rewiring_hubs.tsv columns
@@ -458,5 +508,5 @@ See [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) for storage mode de
 
 ---
 
-**Last Updated:** 2026-03-11
-**Status:** ✅ Active — Stage 4 enabled (conditional on `skip_focus_topology: false`)
+**Last Updated:** 2026-03-23
+**Status:** ✅ Active — Stage 4 enabled (conditional on `skip_focus_topology: false`); Stage 6 enabled (conditional on `skip_variability: false` + `gene_subset` non-empty)

@@ -163,7 +163,125 @@ Rscript src/scripts/15analysis/plot_sample_variability.R \
 
 ---
 
-### 3. Running all focus genes
+### 3. Running via Snakemake (Stage 6 — recommended for gene_subset configs)
+
+When `gene_subset` is set in a config file, the Snakemake pipeline can run both
+variability scripts automatically as **Stage 6**, one job per focus gene in parallel:
+
+```yaml
+# In your config YAML (e.g. config/ct_voom_snakemake.yaml):
+skip_variability: false        # enable Stage 6
+condition_label: "Control (VOOM)"
+variability_save_csv: false    # set true to also write CSV files
+```
+
+```bash
+# Run Stage 6 alongside the full pipeline:
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml \
+    -j 15
+
+# Or run Stage 6 only (skipping network stages 2a–3b):
+snakemake -s src/pipelines/Snakefile_bootstrap \
+    --configfile config/ct_voom_snakemake.yaml \
+    --forcerun gene_mad_variability gene_sample_variability \
+    -j 15
+```
+
+Outputs are written to `{out_dir}/variability/`. Snakemake handles parallelism
+and skips genes whose output PDFs already exist.
+
+> **Requirements:** `expr_tsv` must be set in the config (the R scripts read
+> the expression TSV directly, not the pipeline HDF5). `gene_subset` must be
+> non-empty, otherwise Stage 6 is silently skipped.
+
+---
+
+### 4. Batch analysis: both conditions + Excel summary
+
+For a complete cross-condition analysis (CT + HS, all three metrics, Excel output)
+use `run_variability_batch.py` with `config/variability_batch.yaml`.
+
+#### Standalone usage
+
+```bash
+# Dry run — print all 152 Rscript commands without executing:
+python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+    --config config/variability_batch.yaml --dry-run
+
+# Full run (4 parallel workers):
+python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+    --config config/variability_batch.yaml --jobs 4
+
+# Skip genes that already have a PDF (resume partial run):
+python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+    --config config/variability_batch.yaml --skip-existing --jobs 4
+
+# Re-generate Excel only (all PDFs and CSVs already exist):
+python code/dronetanalysis/src/scripts/15analysis/run_variability_batch.py \
+    --config config/variability_batch.yaml --excel-only
+```
+
+#### Job counts
+
+| Type | Jobs |
+|------|------|
+| Gene-level MAD | 2 conditions × 19 genes = 38 |
+| Sample-level ITV | 2 conditions × 19 genes × 3 metrics = 114 |
+| **Total** | **152** |
+
+#### Output layout
+
+```
+results/variability_combined/
+├── CT/
+│   ├── FBgn0039562_mad_variability.pdf / .csv
+│   ├── FBgn0039562_sample_variability_median.pdf / .csv
+│   ├── FBgn0039562_sample_variability_mean.pdf / .csv
+│   ├── FBgn0039562_sample_variability_sum.pdf / .csv
+│   └── ... (same for all 19 genes)
+├── HS/
+│   └── ... (same structure)
+└── variability_summary.xlsx
+```
+
+#### Excel summary (`variability_summary.xlsx`)
+
+**Sheet `gene_mad`** — one row per (focus_gene × condition):
+
+| Column | Description |
+|--------|-------------|
+| `focus_gene`, `symbol`, `condition` | Gene and condition identifiers |
+| `n_genes` | Number of genes in MAD comparison |
+| `mean_mad_low` / `mean_mad_high` | Mean MAD across LOW / HIGH groups |
+| `median_mad_low` / `median_mad_high` | Median MAD |
+| `wilcoxon_p` | Two-sided Wilcoxon rank-sum p-value |
+
+**Sheet `sample_itv`** — one row per (focus_gene × condition × metric):
+
+| Column | Description |
+|--------|-------------|
+| `focus_gene`, `symbol`, `condition`, `metric` | Identifiers |
+| `n_low`, `n_high` | Sample counts per group |
+| `mean_itv_low` / `mean_itv_high` | Mean ITV score per group |
+| `median_itv_low` / `median_itv_high` | Median ITV score per group |
+| `wilcoxon_p` | Two-sided Wilcoxon rank-sum p-value |
+
+#### Optional Snakemake trigger (Stage 7)
+
+To call the batch script from within `Snakefile_bootstrap`, add to any condition config:
+
+```yaml
+variability_batch_config: config/variability_batch.yaml
+variability_batch_outdir: results/variability_combined   # optional
+variability_batch_jobs:   4                              # optional
+```
+
+The `variability_batch` rule (Stage 7) will then run after Stage 6 completes.
+
+---
+
+### 5. Running all focus genes manually
 
 The 15 focus genes are listed under `gene_subset:` in
 `config/ct_voom_snakemake.yaml` and `config/hs_voom_snakemake.yaml`. To run
@@ -195,7 +313,7 @@ For the heat-shock condition, replace `ct` with `hs` throughout.
 
 ---
 
-### 4. Restricting to a gene subset
+### 6. Restricting to a gene subset
 
 Both scripts accept `--gene-subset` pointing to a plain-text file with one
 gene ID per line. This lets you focus MAD or ITV calculations on a biologically
@@ -282,6 +400,6 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 
 ---
 
-**Last Updated:** 2026-03-21
-**Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`
-**Status:** ✅ Both scripts implemented; partner-type extension is a planned stub
+**Last Updated:** 2026-03-23
+**Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`, `src/scripts/15analysis/run_variability_batch.py`
+**Status:** ✅ Both scripts implemented; integrated as Stage 6 in `Snakefile_bootstrap`; batch script with Excel output available; partner-type extension is a planned stub
