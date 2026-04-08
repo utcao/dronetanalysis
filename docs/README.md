@@ -26,6 +26,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) | Gene-level MAD variability and sample-level ITV (Individual Transcriptomic Variability) across LOW/HIGH expression groups; boxplot + Wilcoxon test |
 | [GUIDE-06-Expression-Violin-Plot.md](GUIDE-06-Expression-Violin-Plot.md) | Violin/boxplot with individual selection (top/bottom X%), dot highlighting, and Wilcoxon rank-sum + BH-FDR annotation; exports PDF/SVG/PNG |
 | [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md) | GO/KEGG/GSEA enrichment on top or bottom N rewiring hub genes ranked by L2L1 ratio metrics; Excel + PDF output |
+| [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md) | Permutation test validating that observed differential co-expression metrics are driven by the expression gradient; null distributions, empirical p-values, histogram plots |
 
 ### ⚡ Optimization Guides
 
@@ -127,9 +128,12 @@ Historical development logs and planning documents:
 | **4** | 04_collect_focus_gene_topology.py | networks/ | focus_gene_topology.h5 | --focus-genes, --n-jobs |
 | **5** | 05_prepare_visualization_data.py | differential_network_summary.h5 | visualization_data/ | - |
 | **6** | 06_annotate_rewiring_table.R | rewiring_hubs.tsv | rewiring_hubs_annotated.tsv | - |
+| **7** | 07_permutation_test.py | expression.h5, networks/ | permutation_null/{gi}_{gene}.h5 | --n-permutations, --perm-genes |
+| **7b** | 08_collect_permutation_pvals.py | permutation_null/ | permutation_pvals.tsv | --alpha |
 
 Stages 2a, 2b, 3, 3b, and 4 respect `gene_subset` config — only named genes are processed.
 Stage 4 is optional; enable with `skip_focus_topology: false` in config.
+Stages 7 and 7b run via `Snakefile_permutation` (independent of `Snakefile_bootstrap`).
 
 For detailed stage information, see [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md).
 
@@ -192,6 +196,12 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ## Recent Updates
 
 ### 2026-04-08
+- ✅ **New Stage 7**: Added permutation test pipeline (`Snakefile_permutation`) to validate that observed differential co-expression metrics are driven by the expression gradient, not random chance
+  - `src/scripts/10spearman_corr/07_permutation_test.py` — per-gene null distribution via focus-row-only computation (O(N×k) not O(N²×k))
+  - `src/scripts/10spearman_corr/08_collect_permutation_pvals.py` — aggregate to `permutation_pvals.tsv` and `rewiring_hubs_with_pvals.tsv`
+  - `src/scripts/15analysis/09_plot_permutation_null.R` — null distribution histograms with observed values
+  - `src/pipelines/Snakefile_permutation` — independent Snakefile (no changes to existing pipeline)
+- ✅ **Documentation**: Added [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md)
 - ✅ **New Script**: Added `src/scripts/15analysis/pathway_enrichment_hubs.R` — GO/KEGG/GSEA enrichment on top/bottom N rewiring hub genes; ranked by any numeric column (default `L2L1_rewire`); cascading p-value cutoffs; optional GO simplification and GSEA; Excel + PDF output
 - ✅ **Documentation**: Added [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md)
 
@@ -263,5 +273,5 @@ When adding new documentation:
 ---
 
 **Last Updated:** 2026-04-08
-**Pipeline Version:** 2.2 (fixed focus_deg metrics, consistent STRENGTHEN/WEAKEN, added L1/L2 n_edges_low/high)
+**Pipeline Version:** 2.3 (permutation test: Stage 7 + Snakefile_permutation)
 **Status:** ✅ All documentation current

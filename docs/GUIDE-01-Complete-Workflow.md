@@ -19,6 +19,8 @@ This pipeline identifies **differential co-expression** between low and high exp
 | 4 | `10spearman_corr/04_collect_focus_gene_topology.py` | `focus_gene_topology.h5` | Collect per-gene topology for focus genes (optional) |
 | 5 | `10spearman_corr/05_prepare_visualization_data.py` | `visualization_data/` | (Optional) Export for R/Cytoscape visualization |
 | 6 | `10spearman_corr/06_annotate_rewiring_table.R` | `*_annotated.tsv` | Annotate gene IDs with symbols/names |
+| 7 | `10spearman_corr/07_permutation_test.py` | `permutation_null/{gi}_{gene}.h5` | Permutation test: null distribution per focus gene (independent Snakefile) |
+| 7b | `10spearman_corr/08_collect_permutation_pvals.py` | `permutation_pvals.tsv`, `rewiring_hubs_with_pvals.tsv` | Aggregate null distributions → empirical p-values |
 
 ---
 
@@ -249,6 +251,35 @@ Rscript visualize_networks.R
 
 ---
 
+## Permutation Test (Stage 7 — Independent Snakefile)
+
+Justifies observed differential co-expression metrics by comparing them against
+a null distribution from random sample assignment. Runs via `Snakefile_permutation`
+independently of the main pipeline.
+
+```bash
+# Run permutation test for selected focus genes
+snakemake -s code/dronetanalysis/src/pipelines/Snakefile_permutation \
+    --config \
+        expr_h5=results/expression.h5 \
+        networks_dir=results/networks \
+        indices_h5=results/bootstrap_indices.h5 \
+        summary_tsv=results/rewiring_hubs.tsv \
+        "perm_genes=[FBgn0001197,FBgn0262739]" \
+        n_permutations=100 \
+    -j 4
+```
+
+**Outputs:**
+- `permutation_null/{gi}_{gene_id}.h5` — null distributions per gene
+- `permutation_pvals.tsv` — empirical p-values for all metrics
+- `rewiring_hubs_with_pvals.tsv` — `rewiring_hubs.tsv` augmented with `pval_*` columns
+- `visualization_data/perm_null/*.pdf` — null distribution histograms with observed values
+
+See [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md) for full documentation.
+
+---
+
 ## Three Network Types
 
 For each analysis, you get **3 networks**:
@@ -451,6 +482,7 @@ python -c "import h5py; h5 = h5py.File('results_test/differential_network.h5', '
 
 - [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) - Snakemake workflow: config reference, stage descriptions, troubleshooting
 - [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) - Understanding network topology metrics
+- [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md) - Permutation test: null distribution method, config, and output interpretation
 - [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) - Memory optimization strategies (vectorized vs batch mode)
 - [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Storage optimization (common, minimal, full modes)
 - [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of critical pipeline fixes
