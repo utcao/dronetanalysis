@@ -212,6 +212,8 @@ GUIDE-03-Snakemake-Pipeline.md
 GUIDE-04-Qualitative-Change-Metrics.md
 GUIDE-05-Expression-Variability-Analysis.md
 GUIDE-06-Expression-Violin-Plot.md
+GUIDE-07-Pathway-Enrichment.md
+GUIDE-08-Permutation-Test.md
 OPTIMIZATION-01-Memory.md
 OPTIMIZATION-02-Storage.md
 OPTIMIZATION-03-Network-Reconstruction.md
@@ -222,7 +224,7 @@ REFERENCE-01-Statistical-Methods.md
 ```
 
 **Examples:**
-- Adding a new GUIDE → `GUIDE-04-[Name].md`
+- Adding a new GUIDE → `GUIDE-09-[Name].md`
 - Adding a new OPTIMIZATION → `OPTIMIZATION-04-[Name].md`
 - Adding a new FIX → `FIX-04-[Name].md`
 
@@ -442,11 +444,17 @@ docs/
 ├── GUIDE-01-Complete-Workflow.md
 ├── GUIDE-02-Network-Metrics.md
 ├── GUIDE-03-Snakemake-Pipeline.md
+├── GUIDE-04-Qualitative-Change-Metrics.md
+├── GUIDE-05-Expression-Variability-Analysis.md
+├── GUIDE-06-Expression-Violin-Plot.md
+├── GUIDE-07-Pathway-Enrichment.md
+├── GUIDE-08-Permutation-Test.md
 ├── OPTIMIZATION-01-Memory.md
 ├── OPTIMIZATION-02-Storage.md
 ├── OPTIMIZATION-03-Network-Reconstruction.md
 ├── FIX-01-Critical-Issues-Summary.md
 ├── FIX-02-HDF5-Attributes.md
+├── FIX-03-HPC-SGE-Pipeline.md
 ├── REFERENCE-01-Statistical-Methods.md
 ├── README.md
 └── archive/
@@ -457,7 +465,7 @@ docs/
 
 ### Next Available Numbers
 
-- **GUIDE:** 07
+- **GUIDE:** 09
 - **OPTIMIZATION:** 04
 - **FIX:** 04
 - **REFERENCE:** 02
