@@ -1,0 +1,291 @@
+# =============================================================================
+# network_metrics/Snakefile
+# Co-expression Network Metrics Pipeline (single-network characterisation).
+#
+# This pipeline is INDEPENDENT of Snakefile_bootstrap (differential pipeline).
+# It builds ONE co-expression network from the full expression matrix and
+# computes per-gene topology metrics (degree, L1/L2 ratios, centrality).
+#
+# Pipeline DAG:
+#
+#   [expr_tsv] ──► preprocess ──► expression.h5
+#       or                              │
+#   [expr_h5] ─────────────────────────►│
+#       or                              ▼
+#   [--config toy=true] ───────► compute_correlations
+#                                       │
+#                                corr_significant.h5
+#                                       │
+#                                       ▼
+#                                 build_network
+#                                       │
+#                               network_edges.h5
+#                                       │
+#                          ┌────────────┤
+#                          │  (per gene │  parallelised)
+#                          ▼            │
+#                    per_gene_metrics   │
+#                          │            │
+#               per_gene/{gi}_{gene}.h5 │
+#                          │            │
+#                          └────────────┘
+#                                       │
+#                                       ▼
+#                                collect_metrics
+#                                       │
+#                         network_metrics_summary.h5
+#                         network_metrics.tsv
+#                                       │
+#                              [optional Stage 4]
+#                                       ▼
+#                                 global_metrics
+#                               global_topology.h5
+#
+# Usage:
+#   # Toy test (local):
+#   snakemake -s network_metrics/Snakefile --config toy=true -j 4
+#
+#   # Real data:
+#   snakemake -s network_metrics/Snakefile \
+#       --configfile network_metrics/config/example.yaml -j 100
+#
+#   # Dry run:
+#   snakemake -s network_metrics/Snakefile \
+#       --configfile network_metrics/config/example.yaml -n
+#
+#   # SGE cluster:
+#   snakemake -s network_metrics/Snakefile \
+#       --configfile network_metrics/config/example.yaml \
+#       --profile config/sge_profile -j 200
+# =============================================================================
+
+import h5py
+
+# ---------------------------------------------------------------------------
+# Configuration with defaults
+# ---------------------------------------------------------------------------
+OUT        = config.get("out_dir", "results/network_metrics")
+TOY        = config.get("toy", False)
+EXPR_TSV   = config.get("expr_tsv", "")
+EXPR_H5    = config.get("expr_h5", "")
+
+FDR_ALPHA        = config.get("fdr_alpha", 0.05)
+CORR_THRESHOLD   = config.get("corr_threshold", 0.0001)
+CHUNK_SIZE       = config.get("chunk_size", None)
+COMPRESSION      = config.get("compression_level", 6)
+
+# Optional subset of genes for Stage 3 (speeds up testing)
+GENE_SUBSET = set(config.get("gene_subset", []))
+
+# Optional Stage 4 (eigenvector centrality + optional betweenness)
+SKIP_GLOBAL_METRICS  = config.get("skip_global_metrics", True)
+COMPUTE_BETWEENNESS  = config.get("compute_betweenness", False)
+BETWEENNESS_NSAMPLES = config.get("betweenness_n_samples", 500)
+
+# Fixed paths
+SCRIPTS_DIR    = "network_metrics/scripts"
+PREPROCESS_SCR = "src/scripts/00preprocess/00convert_expr_to_hdf5.py"
+EXPR_H5_FINAL  = EXPR_H5 if EXPR_H5 else f"{OUT}/expression.h5"
+CORR_H5        = f"{OUT}/corr_significant.h5"
+NETWORK_H5     = f"{OUT}/network_edges.h5"
+PER_GENE_DIR   = f"{OUT}/per_gene"
+SUMMARY_H5     = f"{OUT}/network_metrics_summary.h5"
+SUMMARY_TSV    = f"{OUT}/network_metrics.tsv"
+GLOBAL_TOPO_H5 = f"{OUT}/global_topology.h5"
+
+
+# ---------------------------------------------------------------------------
+# Gene discovery (after checkpoint resolves)
+# ---------------------------------------------------------------------------
+def _read_gene_names(h5_path):
+    with h5py.File(h5_path, "r") as f:
+        if "gene_names" in f:
+            return [x.decode() if isinstance(x, bytes) else x for x in f["gene_names"][:]]
+        n = f["expr"].shape[0]
+        return [f"gene_{i}" for i in range(n)]
+
+
+def _filter_genes(names):
+    """Return (index, name) pairs, optionally filtered by GENE_SUBSET."""
+    pairs = list(enumerate(names))
+    if GENE_SUBSET:
+        pairs = [(i, n) for i, n in pairs if n in GENE_SUBSET]
+    return pairs
+
+
+def all_per_gene_files(wildcards):
+    h5_path = checkpoints.preprocess.get(**wildcards).output[0]
+    names = _read_gene_names(h5_path)
+    return [f"{PER_GENE_DIR}/{i:04d}_{name}.h5" for i, name in _filter_genes(names)]
+
+
+# ---------------------------------------------------------------------------
+wildcard_constraints:
+    gi = r"\d{4}",
+
+
+# ---------------------------------------------------------------------------
+# Target rule
+# ---------------------------------------------------------------------------
+def _all_targets(wildcards):
+    targets = [SUMMARY_H5, SUMMARY_TSV]
+    if not SKIP_GLOBAL_METRICS:
+        targets.append(GLOBAL_TOPO_H5)
+    return targets
+
+
+rule all:
+    input: _all_targets
+
+
+# ---------------------------------------------------------------------------
+# Stage 0: Preprocess — TSV → HDF5 or generate toy data
+#
+# Checkpoint so that downstream per-gene rules can read gene names.
+# If expr_h5 is provided, the file already exists and nothing is done.
+# ---------------------------------------------------------------------------
+checkpoint preprocess:
+    output:
+        EXPR_H5_FINAL,
+    resources:
+        mem_mb  = 16000,
+        runtime = 30,
+        threads = 4,
+    run:
+        if TOY:
+            shell(
+                f"python {PREPROCESS_SCR} --toy --out-h5 {{output}}"
+            )
+        elif EXPR_H5:
+            pass  # file already exists at EXPR_H5_FINAL
+        elif EXPR_TSV:
+            shell(
+                f"python {PREPROCESS_SCR} "
+                f"--expr-tsv {EXPR_TSV} --out-h5 {{output}} "
+                f"--compression gzip --compression-level {COMPRESSION}"
+            )
+        else:
+            raise ValueError("Provide expr_tsv, expr_h5, or toy=true in config.")
+
+
+# ---------------------------------------------------------------------------
+# Stage 1: Full-matrix Spearman + single BH-FDR (single job)
+# ---------------------------------------------------------------------------
+rule compute_correlations:
+    input:
+        expr = EXPR_H5_FINAL,
+    output:
+        CORR_H5,
+    params:
+        chunk_flag = f"--chunk-size {CHUNK_SIZE}" if CHUNK_SIZE else "",
+    resources:
+        mem_mb  = 8000,
+        runtime = 60,
+        threads = 8,
+    shell:
+        """
+        python {SCRIPTS_DIR}/01_compute_correlations.py \
+            --expr-h5 {input.expr} \
+            --out-h5 {output} \
+            --fdr-alpha {FDR_ALPHA} \
+            --corr-threshold {CORR_THRESHOLD} \
+            --compression-level {COMPRESSION} \
+            {params.chunk_flag}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: Build network adjacency index + global topology (single job)
+# ---------------------------------------------------------------------------
+rule build_network:
+    input:
+        corr = CORR_H5,
+    output:
+        NETWORK_H5,
+    resources:
+        mem_mb  = 4000,
+        runtime = 10,
+        threads = 4,
+    shell:
+        """
+        python {SCRIPTS_DIR}/02_build_network.py \
+            --corr-h5 {input.corr} \
+            --out-h5 {output} \
+            --compression-level {COMPRESSION}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: Per-gene L1/L2 metrics (one job per gene, parallelised)
+#
+# Uses CSR adjacency in network_edges.h5 so each job reads O(degree) bytes.
+# Output is temp(): deleted after Stage 3b collects all per-gene files.
+# ---------------------------------------------------------------------------
+rule per_gene_metrics:
+    input:
+        network = NETWORK_H5,
+    output:
+        temp(f"{PER_GENE_DIR}/{{gi}}_{{gene_id}}.h5"),
+    params:
+        gene_index = lambda wc: int(wc.gi),
+    resources:
+        mem_mb  = 512,
+        runtime = 5,
+        threads = 1,
+    shell:
+        """
+        python {SCRIPTS_DIR}/03_per_gene_metrics.py \
+            --network-h5 {input.network} \
+            --gene-index {params.gene_index} \
+            --out-h5 {output}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 3b: Aggregate per-gene files into summary (single job)
+# ---------------------------------------------------------------------------
+rule collect_metrics:
+    input:
+        per_gene_files = all_per_gene_files,
+        network        = NETWORK_H5,
+    output:
+        h5  = SUMMARY_H5,
+        tsv = SUMMARY_TSV,
+    resources:
+        mem_mb  = 8000,
+        runtime = 30,
+        threads = 4,
+    shell:
+        """
+        python {SCRIPTS_DIR}/03b_collect_metrics.py \
+            --per-gene-dir {PER_GENE_DIR} \
+            --network-h5 {input.network} \
+            --out-h5 {output.h5} \
+            --out-tsv {output.tsv}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 4: Global centrality metrics (optional; skip_global_metrics: false)
+# ---------------------------------------------------------------------------
+if not SKIP_GLOBAL_METRICS:
+    rule global_metrics:
+        input:
+            network = NETWORK_H5,
+        output:
+            GLOBAL_TOPO_H5,
+        params:
+            betw_flag   = "--compute-betweenness" if COMPUTE_BETWEENNESS else "",
+            betw_nsamples = BETWEENNESS_NSAMPLES,
+        resources:
+            mem_mb  = 8000,
+            runtime = 60,
+            threads = 4,
+        shell:
+            """
+            python {SCRIPTS_DIR}/04_global_metrics.py \
+                --network-h5 {input.network} \
+                --out-h5 {output} \
+                --betweenness-n-samples {params.betw_nsamples} \
+                {params.betw_flag}
+            """

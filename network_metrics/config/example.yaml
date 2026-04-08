@@ -1,0 +1,46 @@
+# =============================================================================
+# network_metrics/config/example.yaml
+# Example configuration for the co-expression network metrics pipeline.
+#
+# Usage:
+#   snakemake -s network_metrics/Snakefile --configfile network_metrics/config/example.yaml -n
+# =============================================================================
+
+# --- Input (choose ONE of the following) ---
+
+# Option A: TSV expression file (genes × samples; will be converted to HDF5)
+expr_tsv: "data/processed/VOOM/voomdataCtrl.txt"
+
+# Option B: Existing expression.h5 from the differential pipeline (skip preprocessing)
+# expr_h5: "tmp/results_ct_voom/expression.h5"
+
+# Option C: Toy data (20 genes × 80 samples; for fast testing)
+# toy: true
+
+# --- Output directory ---
+out_dir: "tmp/results_network_metrics"
+
+# --- Significance thresholds ---
+fdr_alpha:       0.05    # BH-FDR threshold for significant edges
+corr_threshold:  0.0001  # Minimum |r| to store (pre-filters near-zero edges)
+
+# --- Stage 1 memory mode ---
+# chunk_size: null  # null = single pass (fastest, ~3.8 GB peak for 18K genes)
+# chunk_size: 1000  # chunked mode: ~2 GB peak, ~2× slower
+
+# --- Compression ---
+compression_level: 6   # gzip 1-9 (1=fast/large, 9=slow/small, default 6)
+
+# --- Optional: restrict Stage 3 to a gene subset (speeds up testing) ---
+# gene_subset:
+#   - FBgn0001197
+#   - FBgn0002563
+#   - FBgn0027844
+
+# --- Stage 4: Advanced centrality (disabled by default) ---
+# Enable with:  skip_global_metrics: false
+skip_global_metrics: true
+
+# Approximate betweenness (requires `networkit` package; ~10-30 min)
+compute_betweenness:    false
+betweenness_n_samples:  500   # Higher = more accurate; error ~ 1/sqrt(n_samples)
