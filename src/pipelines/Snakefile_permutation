@@ -1,0 +1,274 @@
+# =============================================================================
+# Snakefile_permutation
+# Permutation test for the differential co-expression pipeline.
+#
+# Purpose: test whether the observed differential co-expression metrics
+# (rewiring, edge counts, effect sizes) for each focus gene exceed what
+# is expected under random sample assignment — i.e., whether the
+# high/low differences are driven by the real expression gradient.
+#
+# This Snakefile is INDEPENDENT of Snakefile_bootstrap. It reads the
+# outputs already produced by that pipeline (expression.h5, bootstrap_indices.h5,
+# networks/) and writes results into a new permutation_null/ directory.
+#
+# Pipeline DAG:
+#
+#   [expression.h5]           ─┐
+#   [bootstrap_indices.h5]    ─┤─► permutation_null_single (per focus gene)
+#   [networks/{gi}_{gid}.h5]  ─┘         │
+#                                         ▼
+#                               permutation_null/{gi}_{gid}.h5
+#                               permutation_null/{gi}_{gid}_null_dist.tsv.gz
+#                                         │
+#              [rewiring_hubs.tsv] ───────►│
+#                                         ▼
+#                               collect_permutation_pvals (single job)
+#                                    │              │
+#                         permutation_pvals.tsv   rewiring_hubs_with_pvals.tsv
+#                                    │
+#                   [optional: not SKIP_PLOT]
+#                                    ▼
+#                           plot_permutation_null (single R job)
+#                           visualization_data/perm_null/
+#
+# Required config keys:
+#   expr_h5       : path to expression.h5 (from Snakefile_bootstrap Stage 0)
+#   networks_dir  : path to networks/ directory (Stage 3 output)
+#   indices_h5    : path to bootstrap_indices.h5 (Stage 1 output)
+#   summary_tsv   : path to rewiring_hubs.tsv (Stage 3b output)
+#   perm_genes    : list of FBgn IDs to run permutation for
+#                   (e.g. [FBgn0001197, FBgn0262739])
+#
+# Optional config keys (with defaults):
+#   perm_out_dir      : "results/permutation_null"
+#   n_permutations    : 100
+#   perm_seed         : 9999
+#   fdr_alpha         : 0.7
+#   corr_threshold    : 0.0001
+#   compute_l2        : False
+#   perm_alpha        : 0.05   (significance threshold in output table)
+#   skip_perm_plot    : False
+#   condition_label   : "Condition"
+#   perm_plot_metrics : ""     (empty = all; comma-separated to restrict)
+#
+# Usage:
+#   # Dry run
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_permutation \
+#       --config \
+#           expr_h5=results/expression.h5 \
+#           networks_dir=results/networks \
+#           indices_h5=results/bootstrap_indices.h5 \
+#           summary_tsv=results/rewiring_hubs.tsv \
+#           "perm_genes=[FBgn0001197,FBgn0262739]" \
+#           n_permutations=100 \
+#       -n
+#
+#   # Run locally (4 parallel genes)
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_permutation \
+#       --configfile config/ct_voom_snakemake.yaml \
+#       --config \
+#           "perm_genes=[FBgn0001197,FBgn0262739]" \
+#           n_permutations=100 \
+#       -j 4
+#
+#   # Run on SGE cluster
+#   snakemake -s code/dronetanalysis/src/pipelines/Snakefile_permutation \
+#       --configfile config/ct_voom_snakemake.yaml \
+#       --config \
+#           "perm_genes=[FBgn0001197,FBgn0262739]" \
+#           n_permutations=100 \
+#       --profile config/sge_profile
+# =============================================================================
+
+import os
+
+# ---------------------------------------------------------------------------
+# Required inputs — point to existing Snakefile_bootstrap results
+# ---------------------------------------------------------------------------
+EXPR_H5      = config["expr_h5"]
+NETWORKS_DIR = config["networks_dir"]
+INDICES_H5   = config["indices_h5"]
+SUMMARY_TSV  = config["summary_tsv"]
+
+# ---------------------------------------------------------------------------
+# Permutation parameters
+# ---------------------------------------------------------------------------
+PERM_GENES   = list(config["perm_genes"])   # required: list of gene IDs
+OUT          = config.get("perm_out_dir",  os.path.join(os.path.dirname(SUMMARY_TSV), "permutation_null"))
+N_PERM       = config.get("n_permutations", 100)
+PERM_SEED    = config.get("perm_seed",      9999)
+FDR_ALPHA    = config.get("fdr_alpha",      0.7)
+CORR_THRESH  = config.get("corr_threshold", 0.0001)
+COMPUTE_L2   = config.get("compute_l2",     False)
+PERM_ALPHA   = config.get("perm_alpha",     0.05)
+SKIP_PLOT    = config.get("skip_perm_plot", False)
+COND_LABEL   = config.get("condition_label", "Condition")
+PLOT_METRICS = config.get("perm_plot_metrics", "")
+
+# ---------------------------------------------------------------------------
+# Derived output paths
+# ---------------------------------------------------------------------------
+PERM_NULL_DIR  = OUT
+PERM_PVALS_TSV = os.path.join(os.path.dirname(SUMMARY_TSV), "permutation_pvals.tsv")
+PERM_AUG_TSV   = os.path.join(os.path.dirname(SUMMARY_TSV), "rewiring_hubs_with_pvals.tsv")
+PERM_PLOT_DIR  = os.path.join(os.path.dirname(SUMMARY_TSV), "visualization_data", "perm_null")
+
+# ---------------------------------------------------------------------------
+# Map gene IDs → (gene_index, gene_id) using the networks directory
+# The per-gene network files are named {gi:04d}_{gene_id}.h5
+# ---------------------------------------------------------------------------
+def _discover_gene_pairs(networks_dir, perm_genes):
+    """
+    Scan the networks directory for files matching known gene IDs.
+    Returns list of (gi_str, gene_id) tuples.
+    """
+    import glob
+    pairs = []
+    perm_set = set(perm_genes)
+    pattern = os.path.join(networks_dir, "*.h5")
+    for fpath in sorted(glob.glob(pattern)):
+        fname = os.path.basename(fpath)
+        stem  = fname[:-3]   # strip .h5
+        parts = stem.split("_", 1)
+        if len(parts) != 2:
+            continue
+        gi_str, gene_id = parts[0], parts[1]
+        if gene_id in perm_set:
+            pairs.append((gi_str, gene_id))
+    missing = perm_set - {p[1] for p in pairs}
+    if missing:
+        import sys
+        print(f"WARNING: The following genes were not found in {networks_dir}: {sorted(missing)}",
+              file=sys.stderr)
+    return pairs
+
+
+GENE_PAIRS = _discover_gene_pairs(NETWORKS_DIR, PERM_GENES)
+
+if len(GENE_PAIRS) == 0:
+    raise ValueError(
+        f"No matching network files found in {NETWORKS_DIR} for genes: {PERM_GENES}. "
+        "Ensure Stage 3 (reconstruct_single) has been run for these genes."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Wildcard constraints
+# ---------------------------------------------------------------------------
+wildcard_constraints:
+    gi = r"\d{4}",
+
+
+# ---------------------------------------------------------------------------
+# Target rule
+# ---------------------------------------------------------------------------
+def _all_targets():
+    targets = [PERM_PVALS_TSV, PERM_AUG_TSV]
+    if not SKIP_PLOT:
+        targets.append(PERM_PLOT_DIR)
+    return targets
+
+
+rule all:
+    input:
+        _all_targets(),
+
+
+# ---------------------------------------------------------------------------
+# Stage 7: Per-gene permutation (one job per focus gene)
+# ---------------------------------------------------------------------------
+rule permutation_null_single:
+    input:
+        expr    = EXPR_H5,
+        indices = INDICES_H5,
+        network = os.path.join(NETWORKS_DIR, "{gi}_{gene_id}.h5"),
+    output:
+        h5  = os.path.join(PERM_NULL_DIR, "{gi}_{gene_id}.h5"),
+        tsv = os.path.join(PERM_NULL_DIR, "{gi}_{gene_id}_null_dist.tsv.gz"),
+    params:
+        gene_index = lambda wc: int(wc.gi),
+        l2_flag    = "--compute-l2" if COMPUTE_L2 else "",
+    resources:
+        mem_mb  = 8000,
+        runtime = 90,      # ~30s per gene for n_perm=100; 90 min upper bound for n_perm=1000
+        threads = 1,
+    shell:
+        """
+        python code/dronetanalysis/src/scripts/10spearman_corr/07_permutation_test.py \
+            --expr-h5 {input.expr} \
+            --indices-h5 {input.indices} \
+            --network-h5 {input.network} \
+            --out-h5 {output.h5} \
+            --out-tsv {output.tsv} \
+            --gene-index {params.gene_index} \
+            --n-permutations {N_PERM} \
+            --fdr-alpha {FDR_ALPHA} \
+            --corr-threshold {CORR_THRESH} \
+            --seed {PERM_SEED} \
+            {params.l2_flag}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Stage 7b: Collect all per-gene results into summary tables (single job)
+# ---------------------------------------------------------------------------
+def all_perm_null_h5_files(wildcards):
+    return [
+        os.path.join(PERM_NULL_DIR, f"{gi}_{gene_id}.h5")
+        for gi, gene_id in GENE_PAIRS
+    ]
+
+
+rule collect_permutation_pvals:
+    input:
+        null_files   = all_perm_null_h5_files,
+        observed_tsv = SUMMARY_TSV,
+    output:
+        pvals     = PERM_PVALS_TSV,
+        augmented = PERM_AUG_TSV,
+    resources:
+        mem_mb  = 4000,
+        runtime = 30,
+        threads = 1,
+    shell:
+        """
+        python code/dronetanalysis/src/scripts/10spearman_corr/08_collect_permutation_pvals.py \
+            --null-dir {PERM_NULL_DIR} \
+            --observed-tsv {input.observed_tsv} \
+            --out-pvals-tsv {output.pvals} \
+            --out-augmented-tsv {output.augmented} \
+            --alpha {PERM_ALPHA}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Plot: Null distribution histograms per gene (optional)
+# ---------------------------------------------------------------------------
+def all_perm_null_tsv_files(wildcards):
+    return [
+        os.path.join(PERM_NULL_DIR, f"{gi}_{gene_id}_null_dist.tsv.gz")
+        for gi, gene_id in GENE_PAIRS
+    ]
+
+
+rule plot_permutation_null:
+    input:
+        tsv_files = all_perm_null_tsv_files,
+        pvals_tsv = PERM_PVALS_TSV,
+    output:
+        directory(PERM_PLOT_DIR),
+    params:
+        metrics_flag = f'--metrics "{PLOT_METRICS}"' if PLOT_METRICS else "",
+    resources:
+        mem_mb  = 4000,
+        runtime = 30,
+        threads = 1,
+    shell:
+        """
+        Rscript code/dronetanalysis/src/scripts/15analysis/09_plot_permutation_null.R \
+            --null-tsv-dir {PERM_NULL_DIR} \
+            --pvals-tsv {input.pvals_tsv} \
+            --output-dir {output} \
+            --condition-label "{COND_LABEL}" \
+            {params.metrics_flag}
+        """
