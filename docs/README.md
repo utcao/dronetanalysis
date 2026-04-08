@@ -25,6 +25,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md) | Qualitative change categories (DISAPPEAR/NEW/SIGN_CHANGE/STRENGTHEN/WEAKEN), partition identities, L1/L2 focus-gene metrics, sanity checks |
 | [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) | Gene-level MAD variability and sample-level ITV (Individual Transcriptomic Variability) across LOW/HIGH expression groups; boxplot + Wilcoxon test |
 | [GUIDE-06-Expression-Violin-Plot.md](GUIDE-06-Expression-Violin-Plot.md) | Violin/boxplot with individual selection (top/bottom X%), dot highlighting, and Wilcoxon rank-sum + BH-FDR annotation; exports PDF/SVG/PNG |
+| [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md) | GO/KEGG/GSEA enrichment on top or bottom N rewiring hub genes ranked by L2L1 ratio metrics; Excel + PDF output |
 
 ### ⚡ Optimization Guides
 
@@ -190,6 +191,10 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 
 ## Recent Updates
 
+### 2026-04-08
+- ✅ **New Script**: Added `src/scripts/15analysis/pathway_enrichment_hubs.R` — GO/KEGG/GSEA enrichment on top/bottom N rewiring hub genes; ranked by any numeric column (default `L2L1_rewire`); cascading p-value cutoffs; optional GO simplification and GSEA; Excel + PDF output
+- ✅ **Documentation**: Added [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md)
+
 ### 2026-03-22
 - ✅ **New Script**: Added `src/scripts/plot_expr_violin.py` — violin/boxplot for expression matrices with individual selection (top/bottom X%), dot highlighting, Wilcoxon rank-sum + BH-FDR, PDF/SVG/PNG export
 - ✅ **`--gene_name` parameter**: human-readable gene symbol auto-appended to output file names (`{prefix}_{gene_id}_{gene_name}.pdf`)
@@ -257,6 +262,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-04-08
 **Pipeline Version:** 2.2 (fixed focus_deg metrics, consistent STRENGTHEN/WEAKEN, added L1/L2 n_edges_low/high)
 **Status:** ✅ All documentation current
