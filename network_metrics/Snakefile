@@ -59,6 +59,7 @@
 #       --profile config/sge_profile -j 200
 # =============================================================================
 
+import os
 import h5py
 
 # ---------------------------------------------------------------------------
@@ -83,8 +84,8 @@ COMPUTE_BETWEENNESS  = config.get("compute_betweenness", False)
 BETWEENNESS_NSAMPLES = config.get("betweenness_n_samples", 500)
 
 # Fixed paths
-SCRIPTS_DIR    = "network_metrics/scripts"
-PREPROCESS_SCR = "src/scripts/00preprocess/00convert_expr_to_hdf5.py"
+SCRIPTS_DIR    = os.path.join(workflow.basedir, "scripts")
+PREPROCESS_SCR = os.path.join(workflow.basedir, "../src/scripts/00preprocess/00convert_expr_to_hdf5.py")
 EXPR_H5_FINAL  = EXPR_H5 if EXPR_H5 else f"{OUT}/expression.h5"
 CORR_H5        = f"{OUT}/corr_significant.h5"
 NETWORK_H5     = f"{OUT}/network_edges.h5"
