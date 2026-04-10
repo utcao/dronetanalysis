@@ -27,6 +27,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-06-Expression-Violin-Plot.md](GUIDE-06-Expression-Violin-Plot.md) | Violin/boxplot with individual selection (top/bottom X%), dot highlighting, and Wilcoxon rank-sum + BH-FDR annotation; exports PDF/SVG/PNG |
 | [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md) | GO/KEGG/GSEA enrichment on top or bottom N rewiring hub genes ranked by L2L1 ratio metrics; Excel + PDF output |
 | [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md) | Permutation test validating that observed differential co-expression metrics are driven by the expression gradient; null distributions, empirical p-values, histogram plots |
+| [GUIDE-09-Multi-Input-Workflow.md](GUIDE-09-Multi-Input-Workflow.md) | Running the pipeline on multiple expression inputs using per-input run directories with symlinks (current limitation + workaround) |
 
 ### ⚡ Optimization Guides
 
@@ -214,6 +215,7 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ### 2026-04-10
 - ✅ **New Script**: Added `src/scripts/15analysis/summarize_all_genes_mad_variability.R` — genome-wide batch MAD variability analysis; loads expression matrix once, iterates over all genes, applies BH-FDR correction, joins gene symbols from a mapping file, writes ranked xlsx table via `openxlsx` (bold headers, auto column widths) with console summary (% significant, % increased/decreased variability)
 - ✅ **Documentation**: Updated [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) — new Script 2 section with argument table, output column reference, spot-check instructions, and `writexl` prerequisite note
+- ✅ **Documentation**: Added [GUIDE-09-Multi-Input-Workflow.md](GUIDE-09-Multi-Input-Workflow.md) — documents the current single-input limitation of `Snakefile_bootstrap` and the per-run-directory + symlink workaround used for `run_voomct` / `run_voomhs`
 
 ### 2026-03-21 (variability analysis)
 - ✅ **New Analysis Scripts**: Added two standalone R scripts for expression variability analysis:
