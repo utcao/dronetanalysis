@@ -16,8 +16,8 @@ logs*
 ## for test data or scripts without synchronization
 src/test/
 
-# gthornes
-Rplots.pdf
+# only for HPC local use
+docs/00-RULES-Documentation-Standards.md
 
 # files
 *chimi*
