@@ -23,7 +23,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) | Understanding network topology metrics (degree, betweenness, clustering, etc.) |
 | [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) | Snakemake workflow: config reference, all parameters, gene subset filtering, Stage 4 |
 | [GUIDE-04-Qualitative-Change-Metrics.md](GUIDE-04-Qualitative-Change-Metrics.md) | Qualitative change categories (DISAPPEAR/NEW/SIGN_CHANGE/STRENGTHEN/WEAKEN), partition identities, L1/L2 focus-gene metrics, sanity checks |
-| [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) | Gene-level MAD variability and sample-level ITV (Individual Transcriptomic Variability) across LOW/HIGH expression groups; boxplot + Wilcoxon test |
+| [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) | Gene-level MAD variability and sample-level ITV across LOW/HIGH expression groups; single-gene violin plot + genome-wide batch xlsx summary with BH-FDR |
 | [GUIDE-06-Expression-Violin-Plot.md](GUIDE-06-Expression-Violin-Plot.md) | Violin/boxplot with individual selection (top/bottom X%), dot highlighting, and Wilcoxon rank-sum + BH-FDR annotation; exports PDF/SVG/PNG |
 | [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md) | GO/KEGG/GSEA enrichment on top or bottom N rewiring hub genes ranked by L2L1 ratio metrics; Excel + PDF output |
 | [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md) | Permutation test validating that observed differential co-expression metrics are driven by the expression gradient; null distributions, empirical p-values, histogram plots |
@@ -211,6 +211,10 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 - ✅ **Output folder** renamed from `boxplot_violinplot/` to `results/expr_violin/`
 - ✅ **Documentation**: Added [GUIDE-06-Expression-Violin-Plot.md](GUIDE-06-Expression-Violin-Plot.md)
 
+### 2026-04-10
+- ✅ **New Script**: Added `src/scripts/15analysis/summarize_all_genes_mad_variability.R` — genome-wide batch MAD variability analysis; loads expression matrix once, iterates over all genes, applies BH-FDR correction, joins gene symbols from a mapping file, writes ranked xlsx table via `openxlsx` (bold headers, auto column widths) with console summary (% significant, % increased/decreased variability)
+- ✅ **Documentation**: Updated [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) — new Script 2 section with argument table, output column reference, spot-check instructions, and `writexl` prerequisite note
+
 ### 2026-03-21 (variability analysis)
 - ✅ **New Analysis Scripts**: Added two standalone R scripts for expression variability analysis:
   - `plot_gene_mad_variability.R` — per-gene MAD across LOW/HIGH sample groups (one dot per gene); Wilcoxon test; `--partner-type` stub for future direct/indirect partner restriction
@@ -272,6 +276,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2026-04-08
+**Last Updated:** 2026-04-10
 **Pipeline Version:** 2.3 (permutation test: Stage 7 + Snakefile_permutation)
 **Status:** ✅ All documentation current

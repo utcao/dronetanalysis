@@ -6,7 +6,6 @@
 results*
 test*
 # project folds
-.*/
 .obsidian/
 dataset/
 manuscript/
@@ -37,3 +36,4 @@ dag.svg
 .snakemake/locks
 .snakemake/tmp
 bashrc_fix
+.*/*.local.json
