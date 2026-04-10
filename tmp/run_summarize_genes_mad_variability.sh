@@ -1,0 +1,1 @@
+Rscript src/scripts/15analysis/summarize_all_genes_mad_variability.R --expr-file data/processed/VOOM/voomdataCtrl.txt --mapping-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv --output-file results/variability/all_genes_mad_summary.xlsx --condition-label "Control"

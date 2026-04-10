@@ -10,16 +10,19 @@ co-expression network results by asking a related but distinct question:
 > *When a focus gene is highly expressed, does the rest of the transcriptome
 > become more or less variable?*
 
-Two complementary views are provided:
+Three complementary tools are provided:
 
-| Script | Unit of observation | Variability measure |
-|--------|--------------------|--------------------|
-| `plot_gene_mad_variability.R` | One dot per gene | MAD across group samples |
-| `plot_sample_variability.R`  | One dot per sample | ITV — deviation from population mean |
+| Script | Scope | Unit of observation | Variability measure | Output |
+|--------|-------|--------------------|--------------------|--------|
+| `plot_gene_mad_variability.R` | Single focus gene | One dot per gene | MAD across group samples | PDF (+ optional CSV) |
+| `plot_sample_variability.R`  | Single focus gene | One dot per sample | ITV — deviation from population mean | PDF (+ optional CSV) |
+| `summarize_all_genes_mad_variability.R` | **All genes at once** | One row per gene | MAD + Wilcoxon + BH-FDR | xlsx table |
 
-Both scripts are self-contained CLI tools. They derive the LOW/HIGH sample
-groups directly from the expression file (no pipeline HDF5 outputs required)
-and produce a PDF boxplot with a Wilcoxon rank-sum test annotation.
+The first two scripts are self-contained CLI tools. They derive the LOW/HIGH
+sample groups directly from the expression file (no pipeline HDF5 outputs
+required) and produce a PDF boxplot with a Wilcoxon rank-sum test annotation.
+The third script runs the MAD analysis genome-wide and consolidates all
+statistics into a single ranked xlsx table.
 
 ---
 
@@ -27,9 +30,10 @@ and produce a PDF boxplot with a Wilcoxon rank-sum test annotation.
 
 - R ≥ 4.0 with the following packages installed:
   ```r
-  install.packages(c("data.table", "dplyr", "ggplot2", "argparse"))
+  install.packages(c("data.table", "dplyr", "ggplot2", "argparse", "openxlsx"))
   ```
   All packages are already present in the `dronet` conda environment.
+  `openxlsx` requires no Java dependency.
 
 - **Python on PATH** (required by R's `argparse` package): when running
   inside a conda environment, pass the Python path explicitly:
@@ -129,7 +133,76 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 
 ---
 
-### 2. Script 2 — Sample-level ITV variability
+### 2. Script 2 — Genome-wide batch MAD summary (all genes → xlsx)
+
+`summarize_all_genes_mad_variability.R` runs the same LOW/HIGH MAD analysis as
+Script 1, but iterates over **every gene** in the expression matrix. The
+expression matrix is loaded once (not once per gene), making this efficient
+even for genome-scale data. A gene_id → SYMBOL mapping file is joined to add
+readable gene names.
+
+**Usage:**
+```bash
+Rscript src/scripts/15analysis/summarize_all_genes_mad_variability.R \
+  --expr-file    data/processed/VOOM/voomdataCtrl.txt \
+  --mapping-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
+  --output-file  results/variability/all_genes_mad_summary_ct.xlsx \
+  --condition-label "Control"
+```
+
+**Key arguments:**
+
+| Argument | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `--expr-file` | yes | — | VOOM expression matrix (TSV, genes × samples) |
+| `--mapping-file` | yes | — | TSV/CSV with `gene_id` and `SYMBOL` columns |
+| `--output-file` | yes | — | Output `.xlsx` path |
+| `--low-frac` | no | 0.2 | Fraction of samples in LOW group |
+| `--high-frac` | no | 0.2 | Fraction of samples in HIGH group |
+| `--condition-label` | no | "Condition" | Added as a constant column in the table |
+
+**Output xlsx columns** (sheet `MAD_variability`, sorted by `wilcoxon_p_adj` ascending):
+
+| Column | Description |
+|--------|-------------|
+| `gene_id` | FlyBase ID |
+| `SYMBOL` | Gene symbol from mapping table (`NA` if absent) |
+| `wilcoxon_p` | Raw Wilcoxon rank-sum p-value |
+| `wilcoxon_stars` | `***` / `**` / `*` / `ns` based on raw p |
+| `wilcoxon_p_adj` | BH-FDR adjusted p-value |
+| `wilcoxon_adj_stars` | Stars based on `wilcoxon_p_adj` |
+| `mean_mad_low` | Mean MAD across LOW-group samples |
+| `mean_mad_high` | Mean MAD across HIGH-group samples |
+| `delta_mean_mad` | `mean_mad_high − mean_mad_low` (positive = more variable when HIGH) |
+| `median_mad_low` | Median MAD (LOW) |
+| `median_mad_high` | Median MAD (HIGH) |
+| `n_genes_compared` | Number of other genes in the MAD pool |
+| `n_low_samples` | Number of samples in LOW group |
+| `n_high_samples` | Number of samples in HIGH group |
+| `condition_label` | Value of `--condition-label` |
+
+**Console summary** printed after the xlsx is saved:
+
+```
+=== Summary ===
+Total genes tested:            N
+Significant (FDR < 0.05):      X  (XX.X%)
+  ↑ Increased variability (HIGH > LOW):  A  (AA.A% of sig)
+  ↓ Decreased variability (LOW > HIGH):  B  (BB.B% of sig)
+Results saved to: <output-file>
+```
+
+**Spot-check:** pick any gene from the xlsx and run Script 1 on that focus gene.
+The `wilcoxon_p`, `mean_mad_low`, and `mean_mad_high` values should match
+exactly (BH-FDR correction changes `wilcoxon_p_adj` only).
+
+**Requires:** `openxlsx` R package (no Java dependency; already present in the
+`dronet` conda environment). All other packages (`data.table`, `argparse`) are
+likewise available.
+
+---
+
+### 3. Script 3 — Sample-level ITV variability
 
 **Basic usage:**
 ```bash
@@ -163,7 +236,7 @@ Rscript src/scripts/15analysis/plot_sample_variability.R \
 
 ---
 
-### 3. Running via Snakemake (Stage 6 — recommended for gene_subset configs)
+### 4. Running via Snakemake (Stage 6 — recommended for gene_subset configs)
 
 When `gene_subset` is set in a config file, the Snakemake pipeline can run both
 variability scripts automatically as **Stage 6**, one job per focus gene in parallel:
@@ -197,7 +270,7 @@ and skips genes whose output PDFs already exist.
 
 ---
 
-### 4. Batch analysis: both conditions + Excel summary
+### 5. Batch analysis: both conditions + Excel summary (subset of focus genes)
 
 For a complete cross-condition analysis (CT + HS, all three metrics, Excel output)
 use `run_variability_batch.py` with `config/variability_batch.yaml`.
@@ -281,7 +354,7 @@ The `variability_batch` rule (Stage 7) will then run after Stage 6 completes.
 
 ---
 
-### 5. Running all focus genes manually
+### 6. Running all focus genes manually
 
 The 15 focus genes are listed under `gene_subset:` in
 `config/ct_voom_snakemake.yaml` and `config/hs_voom_snakemake.yaml`. To run
@@ -313,7 +386,7 @@ For the heat-shock condition, replace `ct` with `hs` throughout.
 
 ---
 
-### 6. Restricting to a gene subset
+### 7. Restricting to a gene subset
 
 Both scripts accept `--gene-subset` pointing to a plain-text file with one
 gene ID per line. This lets you focus MAD or ITV calculations on a biologically
@@ -349,7 +422,7 @@ Both plots share the same visual style:
 
 **Dot interpretation differs between scripts:**
 - Script 1: each dot = one gene's MAD value (expect thousands of dots, shown small)
-- Script 2: each dot = one sample's ITV score (expect ~k_low + k_high dots, shown larger)
+- Script 3: each dot = one sample's ITV score (expect ~k_low + k_high dots, shown larger)
 
 ---
 
@@ -400,6 +473,6 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 
 ---
 
-**Last Updated:** 2026-03-23
-**Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`, `src/scripts/15analysis/run_variability_batch.py`
-**Status:** ✅ Both scripts implemented; integrated as Stage 6 in `Snakefile_bootstrap`; batch script with Excel output available; partner-type extension is a planned stub
+**Last Updated:** 2026-04-10
+**Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/summarize_all_genes_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`, `src/scripts/15analysis/run_variability_batch.py`
+**Status:** ✅ All scripts implemented; integrated as Stage 6 in `Snakefile_bootstrap`; genome-wide batch summary (xlsx + BH-FDR) added 2026-04-10; partner-type extension is a planned stub
