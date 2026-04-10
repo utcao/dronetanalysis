@@ -14,7 +14,8 @@ network_metrics/            ← top-level, independent pipeline
 ├── config/
 │   └── example.yaml        ← example configuration
 ├── docs/
-│   └── GUIDE-NM-01-Overview-and-Metrics.md    ← this file
+│   ├── GUIDE-NM-01-Overview-and-Metrics.md    ← this file
+│   └── PLAN-NM-01-Multi-Dataset-Support.md   ← future: multi-dataset refactor plan
 └── scripts/
     ├── 01_compute_correlations.py    ← Stage 1: Spearman + BH-FDR
     ├── 02_build_network.py           ← Stage 2: global topology + CSR adjacency
@@ -350,7 +351,15 @@ After running, verify:
 
 ---
 
-## 11. Files to Delete After Refactor
+## 11. Future Work
+
+| ID | Description | Document |
+|----|-------------|----------|
+| FTD-NM-01 | Multi-dataset support: run the full pipeline over multiple expression matrices in a single Snakemake invocation, defined via a `datasets:` dict in the config | [PLAN-NM-01-Multi-Dataset-Support.md](PLAN-NM-01-Multi-Dataset-Support.md) |
+
+---
+
+## 12. Files to Delete After Refactor
 
 The directory `src/scripts/20network_metrics/` was created in error and should be deleted:
 
