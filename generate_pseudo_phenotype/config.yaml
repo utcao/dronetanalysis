@@ -1,0 +1,78 @@
+# ==============================================================================
+# config.yaml — Generate Pseudo Phenotype
+# ==============================================================================
+# Each dataset entry points to an input expression file and defines one or more
+# synthetic phenotypes to generate from that file's sample names.
+#
+# Phenotype `tag` values must be unique across the entire config — they become
+# the row identifiers in the output TSV exactly as written here.
+# ==============================================================================
+
+
+# ------------------------------------------------------------------------------
+# Global settings
+# ------------------------------------------------------------------------------
+global:
+  output_dir: "results/pseudo_phenotype"
+  seed: 42              # RNG seed for reproducibility; per-phenotype seed overrides
+
+
+# ------------------------------------------------------------------------------
+# Datasets — one entry per input expression file
+# ------------------------------------------------------------------------------
+# Fields per dataset:
+#   input_file      : path to the expression matrix (relative to this config)
+#   dataset_tag     : label used only in the output filename
+#                     → {output_dir}/{dataset_tag}_pseudo_phenotypes.tsv
+#   sep             : column delimiter in the input file (default: "\t")
+#   skip_first_col  : set true when the first column holds feature IDs (e.g. gene
+#                     IDs) rather than a sample name — sample names then start at
+#                     column index 1 (default: true)
+#
+# Fields per phenotype:
+#   tag             : unique row identifier written verbatim to the output TSV
+#   distribution    : sampling distribution — currently supported: "gaussian"
+#   params          : distribution parameters
+#     gaussian → mean (float), std (float)
+#   seed            : optional per-phenotype seed override (takes precedence over
+#                     global.seed)
+# ------------------------------------------------------------------------------
+
+datasets:
+
+  - input_file: "../../../data/processed/VOOM/voomdataCtrl.txt"
+    dataset_tag: "ct"
+    sep: "\t"
+    skip_first_col: true
+
+    phenotypes:
+      - tag: "ct_body_weight"
+        distribution: "gaussian"
+        params:
+          mean: 25.0
+          std: 3.0
+        # seed: 101
+
+      - tag: "ct_lifespan"
+        distribution: "gaussian"
+        params:
+          mean: 60.0
+          std: 10.0
+
+  - input_file: "../../../data/processed/VOOM/voomdataHS.txt"
+    dataset_tag: "hs"
+    sep: "\t"
+    skip_first_col: true
+
+    phenotypes:
+      - tag: "hs_body_weight"
+        distribution: "gaussian"
+        params:
+          mean: 22.0
+          std: 3.5
+
+      - tag: "hs_lifespan"
+        distribution: "gaussian"
+        params:
+          mean: 50.0
+          std: 12.0
