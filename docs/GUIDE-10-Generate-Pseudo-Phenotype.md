@@ -177,3 +177,60 @@ cut -f1 results/pseudo_phenotype/ctrl_voom_pseudo_phenotypes.tsv
 # → ctrl_body_weight
 # → ctrl_lifespan
 ```
+
+---
+
+## Sample Name Alignment with Other Data Sources
+
+The sample names produced by this script (column headers in the output TSV) come directly from the expression matrix header. These names use the `{lineID}_{wellID}` convention (e.g. `106_A10`, `68_B3`) and are **identical** across all three data sources in this project:
+
+| Data source | Sample name format | File |
+|---|---|---|
+| Expression matrix (CT) | `{lineID}_{wellID}` | `data/processed/VOOM/voomdataCtrl.txt` |
+| Expression matrix (HS) | `{lineID}_{wellID}` | `data/processed/VOOM/voomdataHS.txt` |
+| SNP genotypes | `{lineID}_{wellID}` | `data/snp/Dmel_head_hs_ct_Miss80_MAF5_LD8_HWE_1975ind.vcf` |
+
+This means pseudo-phenotype output files can be immediately joined with SNP-derived phenotypes using the sample name column as the key — no remapping is needed.
+
+### Using real SNP dosage as a phenotype input
+
+Instead of simulating phenotypes, you can extract real SNP genotype values for a target locus and format them to match the pseudo-phenotype TSV layout:
+
+```python
+import allel, pandas as pd
+
+callset = allel.read_vcf(
+    'data/snp/Dmel_head_hs_ct_Miss80_MAF5_LD8_HWE_1975ind.vcf',
+    region='2L:5095-5095',
+    fields=['calldata/GT', 'samples', 'variants/ID']
+)
+gt = allel.GenotypeArray(callset['calldata/GT'])
+dosage = gt.to_n_alt(fill=-1)    # shape: (1, n_samples); -1 = missing
+
+samples = callset['samples']
+snp_id = callset['variants/ID'][0]   # e.g. "2L_5095"
+
+df = pd.DataFrame(
+    dosage,
+    index=[snp_id],
+    columns=samples
+)
+df.index.name = 'phenotype_id'
+df.to_csv(f'results/pseudo_phenotype/snp_{snp_id}_dosage.tsv', sep='\t')
+```
+
+The output has exactly the same shape and sample-name ordering as the pseudo-phenotype TSV, so it can be passed directly to downstream association or network analyses that accept phenotype files.
+
+> **Note:** `-1` encodes missing genotypes (`./.` in VCF). Replace with `NaN` or imputed values before use in models that cannot handle negative dosage codes.
+
+---
+
+## Related Reading
+
+- [GUIDE-09-Multi-Input-Workflow.md](GUIDE-09-Multi-Input-Workflow.md) — Overview of available data sources and the shared sample naming convention
+- [docs/dataset_snp_structure.md](../../../../docs/dataset_snp_structure.md) — Full SNP VCF structure, sample breakdown by line, and genotype encoding
+- [docs/guide_snp_operations.md](../../../../docs/guide_snp_operations.md) — SNP file operations: subsetting by sample name, dosage conversion, sequence reconstruction
+
+---
+
+**Last Updated:** 2026-04-14

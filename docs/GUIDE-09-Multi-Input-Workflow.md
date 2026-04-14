@@ -129,6 +129,20 @@ Open two terminals (or submit both via SGE) and launch each from its own run dir
 | `run_voomct/` | Cell-type voom-normalised expression | `ct_voom_snakemake.yaml` | `results_ct_voom/` |
 | `run_voomhs/` | Host-species voom-normalised expression | `hs_voom_snakemake.yaml` | `results_hs_voom/` |
 
+## Available Data Sources
+
+In addition to the expression matrices, the project contains a SNP genotype file that can be integrated with MAD/ITV results or used as a standalone input for genotype-based analyses:
+
+| File | Location | Samples | SNPs | Notes |
+|------|----------|---------|------|-------|
+| `Dmel_head_hs_ct_Miss80_MAF5_LD8_HWE_1975ind.vcf` | `data/snp/` | 1,975 | 413,348 | Same `{lineID}_{wellID}` sample names as expression matrices |
+
+The SNP file uses the same `{lineID}_{wellID}` naming convention (e.g. `106_A10`) as both `voomdataCtrl.txt` and `voomdataHS.txt`. This means the sample axis can be joined directly between expression MAD results and SNP-derived metrics without any name remapping.
+
+> **Important for multi-input analyses:** 31 inbred lines contribute multiple replicate samples each. When combining expression and SNP data, always group by `lineID` (the numeric prefix) — individual replicates within the same line are near-genetic clones and must not be treated as independent observations. See [`docs/dataset_snp_structure.md`](../../../../docs/dataset_snp_structure.md) for the full sample breakdown per line.
+
+For SNP-specific operations (subsetting, numeric conversion, sequence reconstruction), see [`docs/guide_snp_operations.md`](../../../../docs/guide_snp_operations.md).
+
 ---
 
 ## Troubleshooting
@@ -174,8 +188,10 @@ rm data && ln -s ../data data
 - [GUIDE-01-Complete-Workflow.md](GUIDE-01-Complete-Workflow.md) - Full pipeline workflow from expression data to differential network analysis
 - [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) - Config reference, all parameters, SGE profile setup
 - [FIX-03-HPC-SGE-Pipeline.md](FIX-03-HPC-SGE-Pipeline.md) - HDF5 locking fixes relevant when running on NFS with concurrent jobs
+- [docs/dataset_snp_structure.md](../../../../docs/dataset_snp_structure.md) — SNP VCF structure, sample naming, and joining with expression data
+- [docs/guide_snp_operations.md](../../../../docs/guide_snp_operations.md) — Practical SNP file operations for subsetting and conversion
 
 ---
 
-**Last Updated:** 2026-04-10
+**Last Updated:** 2026-04-14
 **Status:** Active workaround (no native multi-input support in Snakefile_bootstrap)

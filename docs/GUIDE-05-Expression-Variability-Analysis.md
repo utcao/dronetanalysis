@@ -426,6 +426,66 @@ Both plots share the same visual style:
 
 ---
 
+## Correlating MAD Results with SNP Data
+
+The expression-based MAD and ITV scores produced by these scripts can be directly correlated with genetic variation from the SNP VCF file. Both data sources share the same sample naming convention (`{lineID}_{wellID}`, e.g. `106_A10`), making the join straightforward.
+
+### Key SNP dataset facts (for correlation planning)
+
+See [`docs/dataset_snp_structure.md`](../../../../docs/dataset_snp_structure.md) for full details. Summary:
+
+| Property | Value |
+|---|---|
+| File | `data/snp/Dmel_head_hs_ct_Miss80_MAF5_LD8_HWE_1975ind.vcf` |
+| SNPs | 413,348 biallelic sites; IDs in `{CHROM}_{POS}` format |
+| Samples | 1,975 (same `{lineID}_{wellID}` naming as the expression matrix) |
+| Genotype encoding | 0/0 → 0, 0/1 → 1, 1/1 → 2, ./. → missing |
+| Chromosomes | 2L, 2R, 3L, 3R, 4, and **23** (= X in PLINK encoding) |
+
+### Gene-level MAD ↔ SNP variation
+
+The `gene_id` in the expression MAD results (FlyBase IDs) can be linked to genomic positions via the dm6 annotation, then matched to SNPs by genomic overlap:
+
+```bash
+# Step 1: convert FlyBase gene IDs to coordinates
+# (requires dm6 GTF or a pre-built gene BED)
+awk '$3=="gene"' dm6.gtf | awk '{print $1"\t"$4"\t"$5"\t"$NF}' > dm6_genes.bed
+
+# Step 2: link SNPs to genes
+bcftools query -f '%CHROM\t%POS0\t%END\t%ID\n' \
+    data/snp/Dmel_head_hs_ct_Miss80_MAF5_LD8_HWE_1975ind.vcf > snps.bed
+bedtools intersect -a snps.bed -b dm6_genes.bed -wa -wb > snps_with_genes.bed
+
+# Step 3: compute per-gene SNP diversity (mean dosage variance across samples)
+# → join with per-gene mean_mad_high/mean_mad_low from the xlsx output
+```
+
+Once SNP dosage variance and expression MAD are both aggregated at gene level, a Pearson or Spearman correlation can test whether genes with high allelic diversity also show high transcriptomic variability.
+
+> **Important:** Chromosome `23` in the VCF = X chromosome. When intersecting with dm6 annotation (which uses `chrX` or `X`), recode the VCF chromosome label before `bedtools` or filter it separately.
+
+### Sample-level ITV ↔ individual SNP diversity
+
+The per-sample ITV score from `plot_sample_variability.R` can be correlated with a per-sample measure of genetic heterozygosity:
+
+```python
+import allel, numpy as np
+
+callset = allel.read_vcf(
+    'data/snp/Dmel_head_hs_ct_Miss80_MAF5_LD8_HWE_1975ind.vcf',
+    fields=['calldata/GT', 'samples']
+)
+gt = allel.GenotypeArray(callset['calldata/GT'])   # (n_snps, n_samples, 2)
+# Count heterozygous sites per sample
+het_count = gt.count_het(axis=0)                  # shape: (n_samples,)
+samples = callset['samples']
+# Join with ITV CSV output by sample name → correlate het_count with ITV
+```
+
+> **Caution:** multiple samples share the same `lineID` (inbred line replicates). Samples from the same line should be genetically near-identical — differences in ITV between replicates of the same line reflect **technical noise**, not biological variation. For meaningful genetic–transcriptomic correlations, aggregate by `lineID` (mean ITV per line) before correlating with SNP-based diversity, which should also be aggregated per line.
+
+---
+
 ## Partner Restriction (Future)
 
 Script 1 (`plot_gene_mad_variability.R`) accepts `--partner-type direct` or
@@ -470,9 +530,11 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 - [GUIDE-03-Snakemake-Pipeline.md](GUIDE-03-Snakemake-Pipeline.md) — Config reference for `low_frac`, `high_frac`, and `gene_subset` parameters
 - [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) — Network topology metrics that complement these variability results
 - [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) — Statistical background for the bootstrap pipeline and significance testing
+- [docs/dataset_snp_structure.md](../../../../docs/dataset_snp_structure.md) — Full SNP VCF structure reference, sample naming, genotype encoding, and MAD-relevant fields
+- [docs/guide_snp_operations.md](../../../../docs/guide_snp_operations.md) — SNP file operations: subsetting, numeric conversion, sequence reconstruction
 
 ---
 
-**Last Updated:** 2026-04-10
+**Last Updated:** 2026-04-14
 **Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/summarize_all_genes_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`, `src/scripts/15analysis/run_variability_batch.py`
 **Status:** ✅ All scripts implemented; integrated as Stage 6 in `Snakefile_bootstrap`; genome-wide batch summary (xlsx + BH-FDR) added 2026-04-10; partner-type extension is a planned stub

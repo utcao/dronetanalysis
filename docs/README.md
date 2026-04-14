@@ -28,6 +28,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md) | GO/KEGG/GSEA enrichment on top or bottom N rewiring hub genes ranked by L2L1 ratio metrics; Excel + PDF output |
 | [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md) | Permutation test validating that observed differential co-expression metrics are driven by the expression gradient; null distributions, empirical p-values, histogram plots |
 | [GUIDE-09-Multi-Input-Workflow.md](GUIDE-09-Multi-Input-Workflow.md) | Running the pipeline on multiple expression inputs using per-input run directories with symlinks (current limitation + workaround) |
+| [GUIDE-10-Generate-Pseudo-Phenotype.md](GUIDE-10-Generate-Pseudo-Phenotype.md) | Generate simulated phenotype TSVs whose sample IDs match the expression matrix; sample name alignment with SNP VCF; using real SNP dosage as phenotype input |
 
 ### ⚡ Optimization Guides
 
@@ -195,6 +196,15 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ---
 
 ## Recent Updates
+
+### 2026-04-14
+- ✅ **SNP dataset documentation**: Created `docs/` folder at project root with three new reference files:
+  - [`docs/dataset_snp_structure.md`](../../../../docs/dataset_snp_structure.md) — Full VCF structure analysis: 413,348 SNPs, 1,975 samples across 31 inbred lines, chromosome layout (note: chr23 = X), genotype encoding, missing rate, and which fields are relevant for gene-level and sample-level MAD correlation
+  - [`docs/guide_snp_operations.md`](../../../../docs/guide_snp_operations.md) — Practical SNP file operations (bcftools subsetting, file-path sample ID renaming, dosage matrix conversion, sequence reconstruction for transformer/VAE input)
+  - [`docs/guide_dna_sequence_for_model_training.md`](../../../../docs/guide_dna_sequence_for_model_training.md) — Technical guide for making DNA sequences usable for ML: encoding strategies, sliding windows, masking (random vs. span), tokenization, diploid handling, LD-aware data splitting, architecture-specific length recommendations
+- ✅ **Documentation**: Added [GUIDE-10-Generate-Pseudo-Phenotype.md](GUIDE-10-Generate-Pseudo-Phenotype.md) — pseudo-phenotype generator with sample-name alignment notes and SNP dosage phenotype extraction example
+- ✅ **Updated [GUIDE-05](GUIDE-05-Expression-Variability-Analysis.md)**: Added "Correlating MAD with SNP Data" section — how to link gene-level MAD to SNP variation via genomic intersection, and sample-level ITV to heterozygosity; includes lineID grouping warning
+- ✅ **Updated [GUIDE-09](GUIDE-09-Multi-Input-Workflow.md)**: Added "Available Data Sources" table documenting the SNP VCF and its sample-name alignment with expression matrices
 
 ### 2026-04-08
 - ✅ **New Stage 7**: Added permutation test pipeline (`Snakefile_permutation`) to validate that observed differential co-expression metrics are driven by the expression gradient, not random chance
