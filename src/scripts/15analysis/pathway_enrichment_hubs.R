@@ -89,6 +89,11 @@ parser$add_argument("--max-genesetsize",
   help    = "Maximum gene set size for enrichment",
   type    = "integer",
   default = 500)
+parser$add_argument("--universe-file",
+  help    = "Optional path to a background gene list file. One gene ID per line, or a
+             TSV/CSV with a 'gene_id' column. If omitted, the universe defaults to all
+             genes in the input hub file.",
+  default = NULL)
 parser$add_argument("--show-category",
   help    = "Number of top categories to show in plots",
   type    = "integer",
@@ -195,13 +200,33 @@ has_entrezid_col <- "ENTREZID" %in% colnames(hub_tab) &&
 
 if (has_entrezid_col && args$gene_col != "ENTREZID") {
   cat("  Found ENTREZID column — using it directly\n")
-  query_entrez   <- as.character(selected$ENTREZID[!is.na(selected$ENTREZID)])
-  universe_entrez <- as.character(hub_tab$ENTREZID[!is.na(hub_tab$ENTREZID)])
+  query_entrez <- as.character(selected$ENTREZID[!is.na(selected$ENTREZID)])
+  hub_entrez   <- as.character(hub_tab$ENTREZID[!is.na(hub_tab$ENTREZID)])
 } else {
   gene_ids_sel <- as.character(selected[[args$gene_col]])
   gene_ids_all <- as.character(hub_tab[[args$gene_col]])
-  query_entrez   <- map_to_entrez(gene_ids_sel, args$gene_col)
-  universe_entrez <- map_to_entrez(gene_ids_all, args$gene_col)
+  query_entrez <- map_to_entrez(gene_ids_sel, args$gene_col)
+  hub_entrez   <- map_to_entrez(gene_ids_all, args$gene_col)
+}
+
+# Universe: load from file if provided, otherwise fall back to hub table genes
+if (!is.null(args$universe_file)) {
+  if (!file.exists(args$universe_file)) {
+    stop("Universe file not found: ", args$universe_file)
+  }
+  cat("  Loading background universe from:", args$universe_file, "\n")
+  uni_raw <- fread(args$universe_file, header = TRUE)
+  if ("gene_id" %in% colnames(uni_raw)) {
+    uni_ids <- as.character(uni_raw[["gene_id"]])
+  } else {
+    uni_ids <- as.character(uni_raw[[1]])
+  }
+  uni_ids <- uni_ids[!is.na(uni_ids) & uni_ids != ""]
+  cat("  Universe IDs loaded:", length(uni_ids), "\n")
+  universe_entrez <- map_to_entrez(uni_ids, "gene_id")
+  cat("  Universe genes (Entrez):", length(universe_entrez), "\n")
+} else {
+  universe_entrez <- hub_entrez
 }
 
 cat("  Query genes (Entrez)    :", length(query_entrez), "\n")
@@ -216,9 +241,9 @@ if (length(query_entrez) == 0) {
 run_enrichGO <- function(gene_ids, universe_ids, ont,
                          pcut, qcut, min_gs, max_gs, simplify_go) {
   cutoff_tries <- list(
-    list(p = pcut, q = qcut,  label = sprintf("p<%.2g, q<%.2g", pcut, qcut)),
-    list(p = 0.2,  q = 1.0,   label = "p<0.2,  q<1.0  (relaxed)"),
-    list(p = 1.0,  q = 1.0,   label = "p<1.0,  q<1.0  (no cutoff)")
+    list(p = pcut, q = qcut,  label = sprintf("p<%.2g, q<%.2g", pcut, qcut))
+    # list(p = 0.2,  q = 1.0,   label = "p<0.2,  q<1.0  (relaxed)"),
+    # list(p = 1.0,  q = 1.0,   label = "p<1.0,  q<1.0  (no cutoff)")
   )
 
   result <- NULL
