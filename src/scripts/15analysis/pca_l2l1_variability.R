@@ -571,7 +571,7 @@ hs_prefix     <- file.path(args$output_dir, "hs")
 merged_prefix <- file.path(args$output_dir, "merged")
 
 ct_res     <- run_pca_condition(ct_feat,     "CT (Control)",    ct_prefix,     gene_map)
-hs_res     <- run_pca_condition(hs_feat,     "HS (Heat Shock)", hs_prefix,     gene_map)
+hs_res     <- run_pca_condition(hs_feat,     "HS (High Sugar)", hs_prefix,     gene_map)
 merged_res <- run_pca_condition(merged_feat, "CT + HS (Merged)",merged_prefix, gene_map,
                                 feature_groups = merged_feat_groups)
 
