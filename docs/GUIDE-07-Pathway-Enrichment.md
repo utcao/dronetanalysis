@@ -13,6 +13,7 @@ Key features:
 - Runs **GO enrichment** (BP, MF, CC, or all three) and **KEGG pathway enrichment** via clusterProfiler
 - Optional **GSEA** (`gseGO` + `gseKEGG`) using the full ranked gene list
 - Applies **cascading p-value cutoffs** so you always get output even for sparsely annotated gene sets
+- Accepts an **external background gene list** (`--universe-file`) for a biologically correct universe
 - Outputs an Excel workbook (one sheet per ontology), a PDF of dot/bar plots, and a TSV of the
   selected genes for traceability
 
@@ -90,6 +91,16 @@ Other useful sort columns: `L1_rewire`, `n_sig_edges_diff`, `full_rewire`.
 | `--max-genesetsize` | `500` | Maximum gene set size for any analysis |
 | `--show-category` | `20` | Number of top terms to display in plots |
 
+### Background universe
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--universe-file FILE` | `NULL` | Path to a background gene list (one FBgn per line, or TSV/CSV with a `gene_id` column). If omitted, the universe falls back to all genes in the input hub file |
+
+> **Recommended:** always supply `--universe-file dataset/background_gene_list.tsv` (all expressed genes
+> from the voom matrix). Using only the hub file as background under-represents the true universe and
+> can inflate enrichment significance.
+
 ---
 
 ## Output Files
@@ -140,6 +151,28 @@ any results is used:
 
 ---
 
+## Generating the Background Gene List
+
+The voom expression matrix (`data/processed/VOOM/voomdataCtrl.txt`) contains all expressed genes;
+CT and HS share the same gene set. Run this once to create the universe file:
+
+```r
+library(data.table)
+
+expr <- fread("data/processed/VOOM/voomdataCtrl.txt", header = TRUE, select = 1L)
+setnames(expr, 1, "gene_id")
+
+fwrite(expr[, .(gene_id)],
+       "dataset/background_gene_list.tsv",
+       sep = "\t")
+cat("Saved", nrow(expr), "background genes\n")
+```
+
+Save the result to `dataset/background_gene_list.tsv` and pass it via `--universe-file` in every
+enrichment run (see examples below).
+
+---
+
 ## Step-by-Step Examples
 
 ### 1. Top 500 genes by L2L1_rewire — BP enrichment
@@ -152,7 +185,8 @@ Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
   --direction top \
   --output-dir results/enrichment \
   --output-prefix ct_hubs \
-  --ontology BP
+  --ontology BP \
+  --universe-file dataset/background_gene_list.tsv
 ```
 
 Outputs:
@@ -175,7 +209,8 @@ Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
   --output-dir results/enrichment \
   --output-prefix ct_hubs_all_go \
   --ontology ALL \
-  --simplify-go
+  --simplify-go \
+  --universe-file dataset/background_gene_list.tsv
 ```
 
 Sheets in Excel: `GO_BP`, `GO_MF`, `GO_CC`, `KEGG`.
@@ -193,7 +228,8 @@ Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
   --direction bottom \
   --output-dir results/enrichment \
   --output-prefix ct_hubs_low_conn \
-  --ontology BP
+  --ontology BP \
+  --universe-file dataset/background_gene_list.tsv
 ```
 
 ---
@@ -211,7 +247,8 @@ Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
   --direction both \
   --output-dir results/enrichment \
   --output-prefix ct_hubs_extremes \
-  --ontology BP
+  --ontology BP \
+  --universe-file dataset/background_gene_list.tsv
 ```
 
 ---
@@ -229,7 +266,8 @@ Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
   --output-dir results/enrichment \
   --output-prefix ct_hubs_gsea \
   --ontology BP \
-  --run-gsea
+  --run-gsea \
+  --universe-file dataset/background_gene_list.tsv
 ```
 
 Additional outputs:
@@ -248,8 +286,9 @@ Uses a **hypergeometric test** (Fisher's exact test for 2×2 tables) as implemen
 `clusterProfiler::enrichGO()` and `clusterProfiler::enrichKEGG()`.
 
 - **Query set:** selected top/bottom N genes with valid Entrez IDs
-- **Background universe:** all genes in the input file with non-NA `ENTREZID` and `sort-col` values
-  (i.e. all genes that were analysed, not the full genome — a more conservative background)
+- **Background universe:** if `--universe-file` is supplied, all genes in that file (recommended:
+  all expressed genes from the voom matrix); otherwise falls back to all genes in the input hub file.
+  Using the full expression universe is more accurate than restricting to hub-table genes.
 - **Multiple testing:** BH-FDR correction within each ontology separately
 - **GO simplification:** if `--simplify-go`, redundant terms are removed using GOSemSim semantic
   similarity (`clusterProfiler::simplify()`, Wang method, cutoff 0.7, keeping the term with
@@ -285,6 +324,7 @@ One-to-many mappings keep the first match. Unmapped genes are silently excluded 
 |-------|-------|-----|
 | `Columns not found: L2L1_rewire` | Sort column absent from input file | Check `colnames(fread(file))` — use `L2L1_rewire`, `L2L1_conn`, or `L2L1_deg` |
 | `No query genes could be mapped` | All ENTREZID values are NA | Run Stage 6 annotation (`06_annotate_rewiring_table.R`) to populate ENTREZID |
+| `Universe file not found` | Wrong path to `--universe-file` | Generate it first (see "Generating the Background Gene List" above) |
 | Zero KEGG results (even relaxed) | Limited Drosophila KEGG annotation | Expected — only ~80 pathways for *D. melanogaster*; try `--ontology ALL` for GO instead |
 | `simplify()` fails | Python not found in environment | Set `Sys.setenv(PYTHON = ...)` at the top of the script, or skip `--simplify-go` |
 | Very large GSEA output | Many significant terms | Reduce `--max-genesetsize` or increase `--pvalue-cutoff` |
@@ -306,6 +346,6 @@ One-to-many mappings keep the first match. Unmapped genes are silently excluded 
 
 ---
 
-**Last Updated:** 2026-04-08
+**Last Updated:** 2026-04-20
 **Script:** `src/scripts/15analysis/pathway_enrichment_hubs.R`
 **Status:** ✅ Implemented; run against `rewiring_hubs_ct_anno_0408_2026.tsv`
