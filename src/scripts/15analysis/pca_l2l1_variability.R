@@ -23,7 +23,7 @@
 #     --ct-var-file   results/variability/voomct_all_genes_mad_summary.xlsx \
 #     --hs-var-file   results/variability/voomhs_all_genes_mad_summary.xlsx \
 #     --full-stats-file results/variability/full_mad_cv2_ranks.xlsx \
-#     --gene-list     gene_list.txt \
+#     --gene-list     data/candidates/01_devcell_2025_gProfiler_hsapiens_dmelanogaster_0417.csv \
 #     --output-dir    results/pca_gene_metrics
 # ==============================================================================
 
