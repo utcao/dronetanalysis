@@ -532,9 +532,10 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 - [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) — Statistical background for the bootstrap pipeline and significance testing
 - [docs/dataset_snp_structure.md](../../../../docs/dataset_snp_structure.md) — Full SNP VCF structure reference, sample naming, genotype encoding, and MAD-relevant fields
 - [docs/guide_snp_operations.md](../../../../docs/guide_snp_operations.md) — SNP file operations: subsetting, numeric conversion, sequence reconstruction
+- [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) — PCA combining condition-specific expression stats (mean, median, MAD, CV² for CT and HS) with L2L1 network metrics; uses outputs of both `summarize_all_genes_mad_variability.R` and `compute_full_mad_cv2_ranks.R`
 
 ---
 
-**Last Updated:** 2026-04-14
+**Last Updated:** 2026-04-17
 **Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/summarize_all_genes_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`, `src/scripts/15analysis/run_variability_batch.py`
 **Status:** ✅ All scripts implemented; integrated as Stage 6 in `Snakefile_bootstrap`; genome-wide batch summary (xlsx + BH-FDR) added 2026-04-10; partner-type extension is a planned stub

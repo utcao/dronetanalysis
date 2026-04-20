@@ -1163,8 +1163,9 @@ matrices/       - sparse matrix representation for reconstruction
 - [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) - Memory optimization strategies
 - [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Storage optimization guide
 - [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of critical fixes
+- [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) - PCA methodology applied to 22 gene-level features combining network rewiring metrics with condition-specific expression statistics (log1p + z-score preprocessing, broken-stick criterion, biplot interpretation)
 
 ---
 
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-04-17
 **Status:** ✅ Complete technical reference
