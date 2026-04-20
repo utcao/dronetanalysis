@@ -12,13 +12,13 @@
 expr_tsv: "data/processed/VOOM/voomdataCtrl.txt"
 
 # Option B: Existing expression.h5 from the differential pipeline (skip preprocessing)
-# expr_h5: "tmp/results_ct_voom/expression.h5"
+# expr_h5: "results/results_full_network_metrics_CT/expression.h5"
 
 # Option C: Toy data (20 genes × 80 samples; for fast testing)
 # toy: true
 
 # --- Output directory ---
-out_dir: "tmp/results_network_metrics"
+out_dir: "results/results_full_network_metrics_CT"
 
 # --- Significance thresholds ---
 fdr_alpha:       0.05    # BH-FDR threshold for significant edges
@@ -42,5 +42,5 @@ compression_level: 6   # gzip 1-9 (1=fast/large, 9=slow/small, default 6)
 skip_global_metrics: true
 
 # Approximate betweenness (requires `networkit` package; ~10-30 min)
-compute_betweenness:    false
-betweenness_n_samples:  500   # Higher = more accurate; error ~ 1/sqrt(n_samples)
+compute_betweenness:    True
+betweenness_n_samples:  5000   # Higher = more accurate; error ~ 1/sqrt(n_samples)
