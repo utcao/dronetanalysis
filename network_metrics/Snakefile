@@ -80,7 +80,7 @@ GENE_SUBSET = set(config.get("gene_subset", []))
 
 # Optional Stage 4 (eigenvector centrality + optional betweenness)
 SKIP_GLOBAL_METRICS  = config.get("skip_global_metrics", True)
-COMPUTE_BETWEENNESS  = config.get("compute_betweenness", False)
+COMPUTE_BETWEENNESS  = config.get("compute_betweenness", True)
 BETWEENNESS_NSAMPLES = config.get("betweenness_n_samples", 500)
 
 # Fixed paths
@@ -180,8 +180,8 @@ rule compute_correlations:
     params:
         chunk_flag = f"--chunk-size {CHUNK_SIZE}" if CHUNK_SIZE else "",
     resources:
-        mem_mb  = 8000,
-        runtime = 60,
+        mem_mb  = 64000,
+        runtime = 160,
         threads = 8,
     shell:
         """
@@ -204,7 +204,7 @@ rule build_network:
     output:
         NETWORK_H5,
     resources:
-        mem_mb  = 4000,
+        mem_mb  = 64000,
         runtime = 10,
         threads = 4,
     shell:
@@ -230,7 +230,7 @@ rule per_gene_metrics:
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
-        mem_mb  = 512,
+        mem_mb  = 32000,
         runtime = 5,
         threads = 1,
     shell:
@@ -279,7 +279,7 @@ if not SKIP_GLOBAL_METRICS:
             betw_flag   = "--compute-betweenness" if COMPUTE_BETWEENNESS else "",
             betw_nsamples = BETWEENNESS_NSAMPLES,
         resources:
-            mem_mb  = 8000,
+            mem_mb  = 84000,
             runtime = 60,
             threads = 4,
         shell:
