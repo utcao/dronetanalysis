@@ -29,6 +29,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-08-Permutation-Test.md](GUIDE-08-Permutation-Test.md) | Permutation test validating that observed differential co-expression metrics are driven by the expression gradient; null distributions, empirical p-values, histogram plots |
 | [GUIDE-09-Multi-Input-Workflow.md](GUIDE-09-Multi-Input-Workflow.md) | Running the pipeline on multiple expression inputs using per-input run directories with symlinks (current limitation + workaround) |
 | [GUIDE-10-Generate-Pseudo-Phenotype.md](GUIDE-10-Generate-Pseudo-Phenotype.md) | Generate simulated phenotype TSVs whose sample IDs match the expression matrix; sample name alignment with SNP VCF; using real SNP dosage as phenotype input |
+| [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) | PCA on L2L1 network rewiring metrics + expression variability (MAD, CV²); separate CT and HS PCAs plus merged 16-feature PCA; annotated gene list; static + interactive biplots |
 
 ### ⚡ Optimization Guides
 
@@ -51,6 +52,13 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | Document | Description |
 |----------|-------------|
 | [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) | Statistical testing methods (bootstrap, Fisher's Z) and efficient pipeline design |
+
+### 📤 Pipeline Results
+
+| Document | Description |
+|----------|-------------|
+| [RESULT-01-H5-Output-File-Structure.md](RESULT-01-H5-Output-File-Structure.md) | HDF5 output file structures: all datasets, fields, and attributes in the differential network summary and per-gene network files |
+| [RESULT-02-NetworkMetrics-H5-Output-Structure.md](RESULT-02-NetworkMetrics-H5-Output-Structure.md) | HDF5 output structures for the network_metrics sub-pipeline (Stages 1–4): corr_significant, network_edges, per-gene files, summary, global_topology |
 
 ### 📋 Documentation Standards
 
@@ -196,6 +204,11 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 ---
 
 ## Recent Updates
+
+### 2026-04-17
+- ✅ **New Script**: Added `src/scripts/15analysis/compute_full_mad_cv2_ranks.R` — per-gene expression statistics (mean, median, MAD, CV²) computed separately for CT-only samples, HS-only samples, and the combined matrix; includes HS−CT cross-condition differences; union ENSEMBL→SYMBOL mapping; ranked xlsx output with overwrite protection
+- ✅ **New Script**: Added `src/scripts/15analysis/pca_l2l1_variability.R` — PCA on L2L1 network rewiring metrics + condition-specific expression statistics; separate CT and HS PCAs (10 features each) plus a merged 22-feature PCA; colour-coded feature arrows by 7 groups (CT/HS Network, CT/HS Variability, CT/HS Expression, HS−CT Variability); curated gene annotation with gProfiler ortholog CSV support; static PDF plots and interactive plotly HTML biplots
+- ✅ **Documentation**: Added [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) — full guide including feature matrix, preprocessing rationale (log1p + z-score), run command, output reference, plot interpretation, alternative methods (UMAP, MOFA2, Sparse PCA, LASSO, etc.), and troubleshooting
 
 ### 2026-04-14
 - ✅ **SNP dataset documentation**: Created `docs/` folder at project root with three new reference files:

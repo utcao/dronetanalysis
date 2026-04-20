@@ -487,3 +487,4 @@ python -c "import h5py; h5 = h5py.File('results_test/differential_network.h5', '
 - [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) - Storage optimization (common, minimal, full modes)
 - [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) - Summary of critical pipeline fixes
 - [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) - Statistical methodology and pipeline design
+- [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) - Downstream PCA on L2L1 network metrics + expression variability; annotates genes of interest across rewiring and variability axes
