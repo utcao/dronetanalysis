@@ -230,9 +230,9 @@ rule per_gene_metrics:
     params:
         gene_index = lambda wc: int(wc.gi),
     resources:
-        mem_mb  = 32000,
+        mem_mb  = 64000,
         runtime = 5,
-        threads = 1,
+        threads = 2,
     shell:
         """
         python {SCRIPTS_DIR}/03_per_gene_metrics.py \
@@ -253,7 +253,7 @@ rule collect_metrics:
         h5  = SUMMARY_H5,
         tsv = SUMMARY_TSV,
     resources:
-        mem_mb  = 8000,
+        mem_mb  = 64000,
         runtime = 30,
         threads = 4,
     shell:
