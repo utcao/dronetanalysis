@@ -82,7 +82,7 @@ it harder to reach significance.
 |--------|---------|
 | `src/scripts/10spearman_corr/07_permutation_test.py` | Per-gene: builds null distribution |
 | `src/scripts/10spearman_corr/08_collect_permutation_pvals.py` | Aggregates → `permutation_pvals.tsv` |
-| `src/scripts/15analysis/09_plot_permutation_null.R` | Histogram plots per gene |
+| `src/scripts/15analysis/plot_permutation_null_dist.R` | Histogram plots per gene |
 | `src/pipelines/Snakefile_permutation` | Orchestration (independent of Snakefile_bootstrap) |
 
 ---
@@ -139,7 +139,7 @@ python src/scripts/10spearman_corr/08_collect_permutation_pvals.py \
 ### Step 3: Plot null distributions
 
 ```bash
-Rscript src/scripts/15analysis/09_plot_permutation_null.R \
+Rscript src/scripts/15analysis/plot_permutation_null_dist.R \
     --null-tsv-dir results/permutation_null \
     --pvals-tsv results/permutation_pvals.tsv \
     --output-dir results/visualization_data/perm_null \

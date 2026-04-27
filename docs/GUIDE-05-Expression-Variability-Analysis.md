@@ -14,9 +14,9 @@ Three complementary tools are provided:
 
 | Script | Scope | Unit of observation | Variability measure | Output |
 |--------|-------|--------------------|--------------------|--------|
-| `plot_gene_mad_variability.R` | Single focus gene | One dot per gene | MAD across group samples | PDF (+ optional CSV) |
-| `plot_sample_variability.R`  | Single focus gene | One dot per sample | ITV — deviation from population mean | PDF (+ optional CSV) |
-| `summarize_all_genes_mad_variability.R` | **All genes at once** | One row per gene | MAD + Wilcoxon + BH-FDR | xlsx table |
+| `plot_mad_gene_comparison.R` | Single focus gene | One dot per gene | MAD across group samples | PDF (+ optional CSV) |
+| `plot_itv_sample_comparison.R`  | Single focus gene | One dot per sample | ITV — deviation from population mean | PDF (+ optional CSV) |
+| `compute_mad_transcriptomic_variability.R` | **All genes at once** | One row per gene | MAD + Wilcoxon + BH-FDR | xlsx table |
 
 The first two scripts are self-contained CLI tools. They derive the LOW/HIGH
 sample groups directly from the expression file (no pipeline HDF5 outputs
@@ -102,7 +102,7 @@ group show more or less individual deviation from the population norm?
 
 **Basic usage:**
 ```bash
-Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
+Rscript src/scripts/15analysis/plot_mad_gene_comparison.R \
   --expr-file data/processed/VOOM/voomdataCtrl.txt \
   --focus-gene FBgn0002563 \
   --output-dir results/variability \
@@ -135,7 +135,7 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 
 ### 2. Script 2 — Genome-wide batch MAD summary (all genes → xlsx)
 
-`summarize_all_genes_mad_variability.R` runs the same LOW/HIGH MAD analysis as
+`compute_mad_transcriptomic_variability.R` runs the same LOW/HIGH MAD analysis as
 Script 1, but iterates over **every gene** in the expression matrix. The
 expression matrix is loaded once (not once per gene), making this efficient
 even for genome-scale data. A gene_id → SYMBOL mapping file is joined to add
@@ -143,7 +143,7 @@ readable gene names.
 
 **Usage:**
 ```bash
-Rscript src/scripts/15analysis/summarize_all_genes_mad_variability.R \
+Rscript src/scripts/15analysis/compute_mad_transcriptomic_variability.R \
   --expr-file    data/processed/VOOM/voomdataCtrl.txt \
   --mapping-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
   --output-file  results/variability/all_genes_mad_summary_ct.xlsx \
@@ -206,7 +206,7 @@ likewise available.
 
 **Basic usage:**
 ```bash
-Rscript src/scripts/15analysis/plot_sample_variability.R \
+Rscript src/scripts/15analysis/plot_itv_sample_comparison.R \
   --expr-file data/processed/VOOM/voomdataCtrl.txt \
   --focus-gene FBgn0002563 \
   --output-dir results/variability \
@@ -365,14 +365,14 @@ both scripts for every focus gene in a condition, use a shell loop:
 GENES=$(yq '.gene_subset[]' config/ct_voom_snakemake.yaml)
 
 for gene in $GENES; do
-  Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
+  Rscript src/scripts/15analysis/plot_mad_gene_comparison.R \
     --expr-file data/processed/VOOM/voomdataCtrl.txt \
     --focus-gene "$gene" \
     --output-dir results/variability_ct \
     --condition-label "Control" \
     --save-csv
 
-  Rscript src/scripts/15analysis/plot_sample_variability.R \
+  Rscript src/scripts/15analysis/plot_itv_sample_comparison.R \
     --expr-file data/processed/VOOM/voomdataCtrl.txt \
     --focus-gene "$gene" \
     --output-dir results/variability_ct \
@@ -394,7 +394,7 @@ relevant set (e.g. chaperones, a WGCNA module, known interaction partners):
 
 ```bash
 # Compute MAD only for chaperone genes
-Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
+Rscript src/scripts/15analysis/plot_mad_gene_comparison.R \
   --expr-file data/processed/VOOM/voomdataCtrl.txt \
   --focus-gene FBgn0002563 \
   --output-dir results/variability \
@@ -466,7 +466,7 @@ Once SNP dosage variance and expression MAD are both aggregated at gene level, a
 
 ### Sample-level ITV ↔ individual SNP diversity
 
-The per-sample ITV score from `plot_sample_variability.R` can be correlated with a per-sample measure of genetic heterozygosity:
+The per-sample ITV score from `plot_itv_sample_comparison.R` can be correlated with a per-sample measure of genetic heterozygosity:
 
 ```python
 import allel, numpy as np
@@ -488,7 +488,7 @@ samples = callset['samples']
 
 ## Partner Restriction (Future)
 
-Script 1 (`plot_gene_mad_variability.R`) accepts `--partner-type direct` or
+Script 1 (`plot_mad_gene_comparison.R`) accepts `--partner-type direct` or
 `--partner-type indirect`. This will restrict the MAD gene pool to **degree-1**
 or **degree-2** neighbors of the focus gene in the differential co-expression
 network, allowing the variability question to be asked specifically within the
@@ -501,7 +501,7 @@ follow once differential network outputs are finalized.
 
 ```bash
 # Future usage (not yet active):
-Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
+Rscript src/scripts/15analysis/plot_mad_gene_comparison.R \
   --expr-file data/processed/VOOM/voomdataCtrl.txt \
   --focus-gene FBgn0002563 \
   --output-dir results/variability \
@@ -532,10 +532,10 @@ Rscript src/scripts/15analysis/plot_gene_mad_variability.R \
 - [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) — Statistical background for the bootstrap pipeline and significance testing
 - [docs/dataset_snp_structure.md](../../../../docs/dataset_snp_structure.md) — Full SNP VCF structure reference, sample naming, genotype encoding, and MAD-relevant fields
 - [docs/guide_snp_operations.md](../../../../docs/guide_snp_operations.md) — SNP file operations: subsetting, numeric conversion, sequence reconstruction
-- [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) — PCA combining condition-specific expression stats (mean, median, MAD, CV² for CT and HS) with L2L1 network metrics; uses outputs of both `summarize_all_genes_mad_variability.R` and `compute_full_mad_cv2_ranks.R`
+- [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) — PCA combining condition-specific expression stats (mean, median, MAD, CV² for CT and HS) with L2L1 network metrics; uses outputs of both `compute_mad_transcriptomic_variability.R` and `compute_full_mad_cv2_ranks.R`
 
 ---
 
 **Last Updated:** 2026-04-17
-**Scripts:** `src/scripts/15analysis/plot_gene_mad_variability.R`, `src/scripts/15analysis/summarize_all_genes_mad_variability.R`, `src/scripts/15analysis/plot_sample_variability.R`, `src/scripts/15analysis/run_variability_batch.py`
+**Scripts:** `src/scripts/15analysis/plot_mad_gene_comparison.R`, `src/scripts/15analysis/compute_mad_transcriptomic_variability.R`, `src/scripts/15analysis/plot_itv_sample_comparison.R`, `src/scripts/15analysis/run_variability_batch.py`
 **Status:** ✅ All scripts implemented; integrated as Stage 6 in `Snakefile_bootstrap`; genome-wide batch summary (xlsx + BH-FDR) added 2026-04-10; partner-type extension is a planned stub
