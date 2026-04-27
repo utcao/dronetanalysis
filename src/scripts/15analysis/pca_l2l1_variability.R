@@ -3,14 +3,15 @@
 # PCA: L2L1 Network Metrics + Expression Variability
 #
 # Three PCAs are produced:
-#   CT  PCA  (10 features): CT L2L1/HL network + CT delta_mean_mad
-#                           + mean_ct + median_ct + mad_ct + cv2_ct
-#   HS  PCA  (10 features): HS L2L1/HL network + HS delta_mean_mad
-#                           + mean_hs + median_hs + mad_hs + cv2_hs
-#   Merged PCA (22 features): union of both + mad_hs_minus_ct + cv2_hs_minus_ct,
+#   CT  PCA  (15 features): CT L2L1 network + CT full-network metrics
+#                           + CT delta_mean_mad + mean_ct + mad_ct
+#   HS  PCA  (15 features): HS L2L1 network + HS full-network metrics
+#                           + HS delta_mean_mad + mean_hs + mad_hs
+#   Merged PCA (~30 features): union of both + mad_hs_minus_ct,
 #     feature arrows coloured by group:
-#     CT Network | HS Network | CT Variability | HS Variability |
-#     CT Expression | HS Expression | HS-CT Variability
+#     CT Network | HS Network | CT Full Net | HS Full Net |
+#     CT Variability | HS Variability | CT Expression | HS Expression |
+#     HS-CT Variability
 #
 # Preprocessing: log1p on L2L1/HL columns, then z-score all features.
 # Missing values: complete cases only per PCA (sets may differ between CT and HS).
@@ -23,6 +24,8 @@
 #     --ct-var-file   results/variability/voomct_all_genes_mad_summary.xlsx \
 #     --hs-var-file   results/variability/voomhs_all_genes_mad_summary.xlsx \
 #     --full-stats-file results/variability/full_mad_cv2_ranks.xlsx \
+#     --ct-net-file   results/results_full_network_metrics_CT/network_metrics_summary.tsv \
+#     --hs-net-file   results/results_full_network_metrics_HS/network_metrics_summary.tsv \
 #     --gene-list     data/candidates/01_devcell_2025_gProfiler_hsapiens_dmelanogaster_0417.csv \
 #     --output-dir    results/pca_gene_metrics
 # ==============================================================================
@@ -41,13 +44,15 @@ suppressPackageStartupMessages({
 
 # ----- Feature-group colour palette (used in merged PCA) -----
 GROUP_COLORS <- c(
-  "CT Network"              = "#2166AC",
-  "HS Network"              = "#D6604D",
-  "CT Variability"          = "#74ADD1",   # delta_mean_mad_ct (subgroup)
-  "HS Variability"          = "#F4A582",   # delta_mean_mad_hs (subgroup)
-  "CT Expression"           = "#01665E",   # mean_ct, median_ct, mad_ct, cv2_ct
-  "HS Expression"           = "#8C510A",   # mean_hs, median_hs, mad_hs, cv2_hs
-  "HS\u2212CT Variability"  = "#762A83"    # mad_hs_minus_ct, cv2_hs_minus_ct
+  "CT Network"     = "#2166AC",   # L2L1 hub metrics from annotation TSV
+  "HS Network"     = "#D6604D",
+  "CT Full Net"    = "#41AB5D",   # full-network metrics from HDF5 (CT)
+  "HS Full Net"    = "#FD8D3C",   # full-network metrics from HDF5 (HS)
+  "CT Variability" = "#74ADD1",   # delta_mean_mad_ct (subgroup)
+  "HS Variability" = "#F4A582",   # delta_mean_mad_hs (subgroup)
+  "CT Expression"  = "#01665E",   # mean_ct, mad_ct, ...
+  "HS Expression"  = "#8C510A",   # mean_hs, mad_hs, ...
+  "HS−CT"     = "#762A83"    # mad_hs_minus_ct, cv2_hs_minus_ct
 )
 
 # ----- Broken-stick threshold -----
@@ -85,8 +90,8 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
       "(dropped", sum(!complete_idx), "with NA)\n")
   feat_dt <- feat_dt[complete_idx]
 
-  # log1p on L2L1 / HL columns
-  log1p_cols <- grep("^(L2L1|HL_conn)", feat_cols, value = TRUE)
+  # log1p on right-skewed count/sum columns
+  log1p_cols <- grep("^(L2L1|HL_conn|degree|L2_n_edges|L1_conn_sum)", feat_cols, value = TRUE)
   for (col in log1p_cols) feat_dt[, (col) := log1p(get(col))]
 
   # z-score
@@ -425,7 +430,197 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
                   paste0(prefix, "_pca_scores.xlsx"))
 
   cat("  All outputs written with prefix:", basename(prefix), "\n")
-  invisible(list(pca = pca, scores = scores_dt, eig = eig_dt, loadings = load_dt))
+  # feat_mat is post-log1p, pre-z-score; returned for downstream correlation plots
+  feat_log1p_dt <- cbind(feat_dt[, .(gene_id, SYMBOL)], as.data.table(feat_mat))
+  invisible(list(pca       = pca,
+                 scores    = scores_dt,
+                 eig       = eig_dt,
+                 loadings  = load_dt,
+                 feat_log1p = feat_log1p_dt))
+}
+
+# ==============================================================================
+# Helper: load full-network metrics from HDF5
+# ==============================================================================
+
+load_network_tsv <- function(tsv_path, label) {
+  target <- c("gene_id", "degree", "L2_n_edges", "L1_conn_mean", "L1_conn_sum", "mean_abs_corr")
+  dt <- fread(tsv_path, data.table = TRUE)
+  missing <- setdiff(target, names(dt))
+  if (length(missing))
+    stop(label, " TSV: required columns missing: ", paste(missing, collapse = ", "))
+  dt <- dt[, .SD, .SDcols = target]
+  dt[, gene_id := as.character(gene_id)]
+  cat("  ", label, " network TSV: ", nrow(dt), " genes | metrics: degree, L2_n_edges, L1_conn_mean, L1_conn_sum, mean_abs_corr\n", sep = "")
+  dt
+}
+
+# ==============================================================================
+# Helpers: correlation plots
+# ==============================================================================
+
+sig_stars <- function(p) {
+  ifelse(is.na(p), "",
+    ifelse(p < 0.001, "***", ifelse(p < 0.01, "**", ifelse(p < 0.05, "*", ""))))
+}
+
+spearman_matrix <- function(mat) {
+  n   <- ncol(mat)
+  rho <- matrix(1,  n, n, dimnames = list(colnames(mat), colnames(mat)))
+  pv  <- matrix(NA, n, n, dimnames = list(colnames(mat), colnames(mat)))
+  diag(pv) <- 0
+  for (i in seq_len(n - 1)) {
+    for (j in seq(i + 1, n)) {
+      ok <- complete.cases(mat[, c(i, j)])
+      if (sum(ok) < 5) next
+      ct <- suppressWarnings(
+        cor.test(mat[ok, i], mat[ok, j], method = "spearman", exact = FALSE))
+      rho[i, j] <- rho[j, i] <- ct$estimate
+      pv[i, j]  <- pv[j, i]  <- ct$p.value
+    }
+  }
+  list(rho = rho, pval = pv)
+}
+
+make_corr_heatmap_gg <- function(feat_log1p_dt, cond_label, out_path,
+                                  feature_groups = NULL) {
+  meta  <- c("gene_id", "SYMBOL")
+  fcols <- setdiff(colnames(feat_log1p_dt), meta)
+  mat   <- as.matrix(feat_log1p_dt[, ..fcols])
+  cr    <- spearman_matrix(mat)
+
+  n     <- length(fcols)
+  df    <- expand.grid(Var1 = fcols, Var2 = fcols, stringsAsFactors = FALSE)
+  idx     <- cbind(df$Var1, df$Var2)
+  df$rho  <- cr$rho[idx]
+  df$pval <- cr$pval[idx]
+  df$lbl  <- ifelse(df$Var1 == df$Var2, "1.00",
+                    paste0(sprintf("%.2f", df$rho), "\n", sprintf("%.2e", df$pval)))
+
+  # Order by feature group if provided, else keep original order
+  if (!is.null(feature_groups)) {
+    ord <- fcols[order(match(feature_groups[fcols], names(GROUP_COLORS)))]
+  } else {
+    ord <- fcols
+  }
+  df$Var1 <- factor(df$Var1, levels = ord)
+  df$Var2 <- factor(df$Var2, levels = rev(ord))
+
+  txt_sz  <- if (n > 18) 1.8 else if (n > 12) 2.2 else 2.8
+  fig_sz  <- max(7, n * 0.48 + 2.5)
+
+  p <- ggplot(df, aes(x = Var1, y = Var2, fill = rho)) +
+    geom_tile(color = "white", linewidth = 0.25) +
+    geom_text(aes(label = lbl), size = txt_sz, lineheight = 0.85) +
+    scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#D6604D",
+                         midpoint = 0, limits = c(-1, 1), name = "rho") +
+    labs(title    = paste("Feature Correlations —", cond_label),
+         subtitle = "Spearman rho (top) | p-value in scientific notation (bottom)",
+         x = NULL, y = NULL) +
+    theme_bw(base_size = 10) +
+    theme(axis.text.x    = element_text(angle = 45, hjust = 1, size = 7.5),
+          axis.text.y    = element_text(size = 7.5),
+          legend.position = "right")
+  ggsave(out_path, p, width = fig_sz, height = fig_sz * 0.92)
+  invisible(p)
+}
+
+make_ct_vs_hs_scatter <- function(merged_log1p_dt, gene_map, out_dir) {
+  all_cols <- colnames(merged_log1p_dt)
+  ct_cols  <- grep("_ct$", all_cols, value = TRUE)
+  hs_match <- sub("_ct$", "_hs", ct_cols)
+  keep     <- hs_match %in% all_cols
+  ct_cols  <- ct_cols[keep]
+  hs_cols  <- hs_match[keep]
+  base     <- sub("_ct$", "", ct_cols)
+
+  if (!length(ct_cols)) {
+    cat("  CT vs HS: no matched column pairs found.\n"); return(invisible(NULL))
+  }
+
+  sym_up  <- toupper(merged_log1p_dt$SYMBOL)
+  map_up  <- toupper(gene_map$drosophila_symbol)
+  is_ann  <- sym_up %in% map_up
+  lbl_vec <- ifelse(is_ann, gene_map$label[match(sym_up, map_up)], "")
+
+  out_path <- file.path(out_dir, "ct_vs_hs_per_feature.pdf")
+  pdf(out_path, width = 6, height = 6)
+  for (i in seq_along(base)) {
+    xv <- merged_log1p_dt[[ct_cols[i]]]
+    yv <- merged_log1p_dt[[hs_cols[i]]]
+    ok <- !is.na(xv) & !is.na(yv)
+    if (sum(ok) < 5) next
+    ct_r    <- suppressWarnings(
+      cor.test(xv[ok], yv[ok], method = "spearman", exact = FALSE))
+    rho_lbl <- sprintf("rho = %.3f\np = %.2e", ct_r$estimate, ct_r$p.value)
+    df_p    <- data.frame(x = xv, y = yv, ann = is_ann, lbl = lbl_vec)
+    p <- ggplot(df_p, aes(x = x, y = y)) +
+      geom_point(data = df_p[!df_p$ann, ],
+                 color = "grey70", alpha = 0.35, size = 0.7) +
+      geom_point(data = df_p[df_p$ann, ],
+                 color = "#D7191C", size = 2.5) +
+      geom_text_repel(data = df_p[df_p$ann, ],
+                      aes(label = lbl), color = "#D7191C",
+                      size = 3, max.overlaps = 30) +
+      geom_smooth(method = "lm", formula = y ~ x,
+                  color = "#2166AC", se = FALSE, linewidth = 0.8, linetype = "dashed") +
+      annotate("text", x = -Inf, y = Inf, label = rho_lbl,
+               hjust = -0.1, vjust = 1.3, size = 3.5, color = "#2166AC") +
+      labs(title = paste("CT vs HS —", base[i]),
+           x = ct_cols[i], y = hs_cols[i]) +
+      theme_bw(base_size = 12)
+    print(p)
+  }
+  dev.off()
+  cat("  CT vs HS scatter:", basename(out_path), "(", length(ct_cols), "pages)\n")
+}
+
+make_within_diet_scatter <- function(feat_log1p_dt, cond_label, out_dir, gene_map) {
+  meta  <- c("gene_id", "SYMBOL")
+  fcols <- setdiff(colnames(feat_log1p_dt), meta)
+  n     <- length(fcols)
+  if (n < 2) return(invisible(NULL))
+
+  sym_up  <- toupper(feat_log1p_dt$SYMBOL)
+  map_up  <- toupper(gene_map$drosophila_symbol)
+  is_ann  <- sym_up %in% map_up
+  lbl_vec <- ifelse(is_ann, gene_map$label[match(sym_up, map_up)], "")
+
+  slug     <- gsub("[^A-Za-z0-9]", "_", tolower(cond_label))
+  out_path <- file.path(out_dir, paste0(slug, "_within_diet_feature_pairs.pdf"))
+  pdf(out_path, width = 6, height = 6)
+  for (i in seq_len(n - 1)) {
+    for (j in seq(i + 1, n)) {
+      xv <- feat_log1p_dt[[fcols[i]]]
+      yv <- feat_log1p_dt[[fcols[j]]]
+      ok <- !is.na(xv) & !is.na(yv)
+      if (sum(ok) < 5) next
+      ct_r    <- suppressWarnings(
+        cor.test(xv[ok], yv[ok], method = "spearman", exact = FALSE))
+      rho_lbl <- sprintf("rho = %.3f\np = %.2e", ct_r$estimate, ct_r$p.value)
+      df_p    <- data.frame(x = xv, y = yv, ann = is_ann, lbl = lbl_vec)
+      p <- ggplot(df_p, aes(x = x, y = y)) +
+        geom_point(data = df_p[!df_p$ann, ],
+                   color = "grey70", alpha = 0.35, size = 0.7) +
+        geom_point(data = df_p[df_p$ann, ],
+                   color = "#D7191C", size = 2.5) +
+        geom_text_repel(data = df_p[df_p$ann, ],
+                        aes(label = lbl), color = "#D7191C",
+                        size = 3, max.overlaps = 30) +
+        geom_smooth(method = "lm", formula = y ~ x,
+                    color = "grey40", se = FALSE,
+                    linewidth = 0.7, linetype = "dashed") +
+        annotate("text", x = -Inf, y = Inf, label = rho_lbl,
+                 hjust = -0.1, vjust = 1.3, size = 3.5, color = "grey30") +
+        labs(title = paste("Feature pair —", cond_label),
+             x = fcols[i], y = fcols[j]) +
+        theme_bw(base_size = 12)
+      print(p)
+    }
+  }
+  dev.off()
+  n_pairs <- n * (n - 1) / 2
+  cat("  Within-diet scatter:", basename(out_path), "(", n_pairs, "pages)\n")
 }
 
 # ==============================================================================
@@ -442,7 +637,11 @@ parser$add_argument("--ct-var-file",   required = TRUE,
 parser$add_argument("--hs-var-file",   required = TRUE,
                     help = "HS variability summary xlsx (voomhs_all_genes_mad_summary.xlsx)")
 parser$add_argument("--full-stats-file", required = TRUE,
-                    help = "Full-matrix gene stats xlsx (full_mad_cv2_ranks.xlsx): condition-specific and full-matrix mean, median, mad, cv2")
+                    help = "Full-matrix gene stats xlsx (full_mad_cv2_ranks.xlsx): condition-specific mean, median, mad, cv2")
+parser$add_argument("--ct-net-file",   required = TRUE,
+                    help = "CT full-network metrics TSV (must contain: gene_id, degree, L2_n_edges, L1_conn_mean, L1_conn_sum, mean_abs_corr)")
+parser$add_argument("--hs-net-file",   required = TRUE,
+                    help = "HS full-network metrics TSV (must contain: gene_id, degree, L2_n_edges, L1_conn_mean, L1_conn_sum, mean_abs_corr)")
 parser$add_argument("--gene-list",     required = TRUE,
                     help = "Plain text file with one gene SYMBOL per line to annotate")
 parser$add_argument("--output-dir",    required = TRUE,
@@ -451,13 +650,15 @@ args <- parser$parse_args()
 
 cat("=== PCA: L2L1 Metrics + Expression Variability ===\n")
 for (nm in c("ct_file", "hs_file", "ct_var_file", "hs_var_file",
-             "full_stats_file", "gene_list", "output_dir")) {
+             "full_stats_file", "ct_net_file", "hs_net_file",
+             "gene_list", "output_dir")) {
   cat(sprintf("  %-18s %s\n", paste0(nm, ":"), args[[nm]]))
 }
 
 # ----- Validate -----
-for (f in c(args$ct_file, args$hs_file, args$ct_var_file,
-            args$hs_var_file, args$full_stats_file, args$gene_list)) {
+for (f in c(args$ct_file, args$hs_file, args$ct_var_file, args$hs_var_file,
+            args$full_stats_file, args$ct_net_file, args$hs_net_file,
+            args$gene_list)) {
   if (!file.exists(f)) stop("File not found: ", f)
 }
 if (!dir.exists(args$output_dir))
@@ -465,9 +666,10 @@ if (!dir.exists(args$output_dir))
 
 # ----- Load sources -----
 cat("\nLoading data...\n")
+net_cols <- c("L2L1_deg", "L2L1_rewire", "L2L1_conn")
+#"L1_mean_delta", "L2_mean_delta", "HL_deg_L1", "HL_deg_L2","HL_conn_L1", "HL_conn_L2")
 
-l2l1_cols <- c("gene_id", "SYMBOL", "L2L1_deg", "L2L1_rewire",
-               "L2L1_conn", "HL_conn_L1", "HL_conn_L2")
+l2l1_cols <- c("gene_id", "SYMBOL", net_cols)
 
 ct_ann   <- fread(args$ct_file,       data.table = TRUE)[, ..l2l1_cols]
 hs_ann   <- fread(args$hs_file,       data.table = TRUE)[, ..l2l1_cols]
@@ -484,6 +686,9 @@ cat("  HS annotation:   ", nrow(hs_ann),   "genes\n")
 cat("  CT var summary:  ", nrow(ct_var),   "genes\n")
 cat("  HS var summary:  ", nrow(hs_var),   "genes\n")
 cat("  Full stats:      ", nrow(full_var), "genes\n")
+cat("Loading full-network TSV metrics...\n")
+ct_net <- load_network_tsv(args$ct_net_file, "CT")
+hs_net <- load_network_tsv(args$hs_net_file, "HS")
 
 # ----- Load gene list -----
 # Accepts two formats:
@@ -515,54 +720,48 @@ if (grepl("\\.csv$", args$gene_list, ignore.case = TRUE)) {
 }
 
 # ----- Build feature matrices -----
-# Split full_var into condition-specific and cross-condition subsets
-ct_expr_var  <- full_var[, .(gene_id, mean_ct, median_ct, mad_ct, cv2_ct)]
-hs_expr_var  <- full_var[, .(gene_id, mean_hs, median_hs, mad_hs, cv2_hs)]
-cross_var    <- full_var[, .(gene_id, mad_hs_minus_ct, cv2_hs_minus_ct)]
+ct_expr_var <- full_var[, .(gene_id, mean_ct, mad_ct)]
+hs_expr_var <- full_var[, .(gene_id, mean_hs, mad_hs)]
+cross_var   <- full_var[, .(gene_id, mad_hs_minus_ct)]
 
-ct_feat <- Reduce(function(a, b) merge(a, b, by = "gene_id", all = FALSE),
-                  list(ct_ann, ct_var, ct_expr_var))
-hs_feat <- Reduce(function(a, b) merge(a, b, by = "gene_id", all = FALSE),
-                  list(hs_ann, hs_var, hs_expr_var))
+merge_fn <- function(a, b) merge(a, b, by = "gene_id", all = FALSE)
+
+ct_feat <- Reduce(merge_fn, list(ct_ann, ct_var, ct_expr_var, ct_net))
+hs_feat <- Reduce(merge_fn, list(hs_ann, hs_var, hs_expr_var, hs_net))
 
 cat("\nCT feature matrix before NA filter:", nrow(ct_feat), "genes\n")
 cat("HS feature matrix before NA filter:", nrow(hs_feat), "genes\n")
 
-# ----- Build merged feature matrix (CT + HS, 18 features) -----
-# Rename condition-specific columns with _ct / _hs suffix, then inner join.
-net_cols <- c("L2L1_deg", "L2L1_rewire", "L2L1_conn", "HL_conn_L1", "HL_conn_L2")
+# ----- Build merged feature matrix -----
+# All per-condition columns get _ct / _hs suffix; shared cross-condition added last.
+full_net_cols <- c("degree", "L2_n_edges", "L1_conn_mean", "L1_conn_sum", "mean_abs_corr")
+all_cond_cols <- c(net_cols, full_net_cols)   # columns needing suffix renaming
 
 ct_side <- copy(ct_feat)
-setnames(ct_side, net_cols,         paste0(net_cols, "_ct"))
+setnames(ct_side, all_cond_cols,    paste0(all_cond_cols, "_ct"))
 setnames(ct_side, "delta_mean_mad", "delta_mean_mad_ct")
-# mean_ct/median_ct/mad_ct/cv2_ct already carry _ct suffix; no renaming needed
 
 hs_side <- copy(hs_feat)
-setnames(hs_side, net_cols,         paste0(net_cols, "_hs"))
+setnames(hs_side, all_cond_cols,    paste0(all_cond_cols, "_hs"))
 setnames(hs_side, "delta_mean_mad", "delta_mean_mad_hs")
-# mean_hs/median_hs/mad_hs/cv2_hs already carry _hs suffix
-hs_side[, SYMBOL := NULL]   # keep SYMBOL from CT side only
+hs_side[, SYMBOL := NULL]
 
-merged_feat <- Reduce(function(a, b) merge(a, b, by = "gene_id", all = FALSE),
-                      list(ct_side, hs_side, cross_var))
+merged_feat <- Reduce(merge_fn, list(ct_side, hs_side, cross_var))
 cat("\nMerged feature matrix (CT+HS) before NA filter:", nrow(merged_feat), "genes\n")
 
-# Feature → group mapping for the merged PCA (22 features)
+# Feature → group mapping for the merged PCA
 merged_feat_groups <- c(
-  setNames(rep("CT Network",    length(net_cols)), paste0(net_cols, "_ct")),
-  setNames(rep("HS Network",    length(net_cols)), paste0(net_cols, "_hs")),
+  setNames(rep("CT Network",  length(net_cols)),      paste0(net_cols,      "_ct")),
+  setNames(rep("HS Network",  length(net_cols)),      paste0(net_cols,      "_hs")),
+  setNames(rep("CT Full Net", length(full_net_cols)), paste0(full_net_cols, "_ct")),
+  setNames(rep("HS Full Net", length(full_net_cols)), paste0(full_net_cols, "_hs")),
   delta_mean_mad_ct = "CT Variability",
   delta_mean_mad_hs = "HS Variability",
   mean_ct           = "CT Expression",
-  median_ct         = "CT Expression",
   mad_ct            = "CT Expression",
-  cv2_ct            = "CT Expression",
   mean_hs           = "HS Expression",
-  median_hs         = "HS Expression",
   mad_hs            = "HS Expression",
-  cv2_hs            = "HS Expression",
-  mad_hs_minus_ct   = "HS\u2212CT Variability",
-  cv2_hs_minus_ct   = "HS\u2212CT Variability"
+  mad_hs_minus_ct   = "HS−CT"
 )
 
 # ----- Run PCAs -----
@@ -574,5 +773,33 @@ ct_res     <- run_pca_condition(ct_feat,     "CT (Control)",    ct_prefix,     g
 hs_res     <- run_pca_condition(hs_feat,     "HS (High Sugar)", hs_prefix,     gene_map)
 merged_res <- run_pca_condition(merged_feat, "CT + HS (Merged)",merged_prefix, gene_map,
                                 feature_groups = merged_feat_groups)
+
+# ----- Correlation plots (separate subfolders) -----
+cat("\n=== Generating correlation plots ===\n")
+
+dir_heatmap <- file.path(args$output_dir, "corr_heatmaps")
+dir_ct_vs_hs <- file.path(args$output_dir, "corr_ct_vs_hs")
+dir_within   <- file.path(args$output_dir, "corr_within_diet")
+for (d in c(dir_heatmap, dir_ct_vs_hs, dir_within))
+  if (!dir.exists(d)) dir.create(d, recursive = TRUE)
+
+# Correlation heatmaps (one per PCA, on post-log1p pre-z-score values)
+cat("  Heatmaps...\n")
+make_corr_heatmap_gg(ct_res$feat_log1p,  "CT (Control)",
+                     file.path(dir_heatmap, "ct_corr_heatmap.pdf"))
+make_corr_heatmap_gg(hs_res$feat_log1p,  "HS (High Sugar)",
+                     file.path(dir_heatmap, "hs_corr_heatmap.pdf"))
+make_corr_heatmap_gg(merged_res$feat_log1p, "CT + HS (Merged)",
+                     file.path(dir_heatmap, "merged_corr_heatmap.pdf"),
+                     feature_groups = merged_feat_groups)
+
+# CT vs HS scatter (one page per matched feature pair)
+cat("  CT vs HS scatter...\n")
+make_ct_vs_hs_scatter(merged_res$feat_log1p, gene_map, dir_ct_vs_hs)
+
+# Within-diet pairwise feature scatter
+cat("  Within-diet scatter...\n")
+make_within_diet_scatter(ct_res$feat_log1p, "CT (Control)",    dir_within, gene_map)
+make_within_diet_scatter(hs_res$feat_log1p, "HS (High Sugar)", dir_within, gene_map)
 
 cat("\n=== Done. All outputs in:", args$output_dir, "===\n")
