@@ -2,22 +2,23 @@
 
 ## Overview
 
-This guide explains how to run and interpret a principal component analysis (PCA) that integrates two orthogonal views of each gene's behaviour:
+This guide explains how to run and interpret a principal component analysis (PCA) that integrates three orthogonal views of each gene's behaviour:
 
-1. **Network rewiring structure** — how the gene's hub-layer topology (L2L1 ratios and inter-layer connectivity) changes between low- and high-expression sub-groups, separately for CT and HS conditions.
-2. **Expression levels and variability** — condition-specific mean, median, MAD, and CV² (computed on CT-only and HS-only samples), the sub-group delta-MAD, and cross-condition differences (MAD_HS − MAD_CT, CV²_HS − CV²_CT).
+1. **Hub-layer rewiring structure** — L2L1 network metrics from the annotation TSV (degree, rewiring count, connectivity) that describe how each gene's topology changes between low- and high-expression sub-groups.
+2. **Full-network topology** — per-gene metrics from the full-network HDF5 file (degree, L2 edges, L1 connectivity, mean absolute correlation) representing the gene's overall position in the co-expression network.
+3. **Expression levels and variability** — condition-specific mean and MAD (CT-only and HS-only samples), sub-group delta-MAD, and cross-condition MAD difference (MAD_HS − MAD_CT).
 
 **Three PCAs are produced:**
 
 | PCA | Features | Gene set |
 |-----|----------|----------|
-| CT-only (10 features) | CT L2L1/HL network (5) + CT delta-MAD + mean_ct + median_ct + mad_ct + cv2_ct | Genes complete in CT sources |
-| HS-only (10 features) | HS L2L1/HL network (5) + HS delta-MAD + mean_hs + median_hs + mad_hs + cv2_hs | Genes complete in HS sources |
-| Merged (22 features) | All CT + all HS features + MAD_HS−CT + CV²_HS−CT | Genes complete in all sources |
+| CT-only (11 features) | CT L2L1 network (3) + CT full-network metrics (5) + CT delta-MAD + mean_ct + mad_ct | Genes complete in CT sources |
+| HS-only (11 features) | HS L2L1 network (3) + HS full-network metrics (5) + HS delta-MAD + mean_hs + mad_hs | Genes complete in HS sources |
+| Merged (23 features) | All CT + all HS features (suffixed `_ct`/`_hs`) + MAD_HS−CT | Genes complete in all sources |
 
-In the merged PCA, feature arrows are colour-coded by group so you can immediately distinguish network structure from expression level and variability axes.
+In the merged PCA, feature arrows are colour-coded by group (9 groups total) so you can immediately distinguish rewiring structure from full-network topology from expression axes.
 
-**Key outputs per PCA:** scree plot, static biplot (PDF), interactive biplot (HTML, click/hover for gene names), correlation circle, loadings heatmap, and four xlsx tables (feature matrix, eigenvalues, loadings, scores).
+**Key outputs per PCA:** scree plot, static biplot (PDF), interactive biplot (HTML, hover for gene names), correlation circle, loadings heatmap, four xlsx tables, **plus** three subfolders of correlation diagnostic plots (heatmaps, CT-vs-HS scatter, within-diet pairwise scatter).
 
 ---
 
@@ -31,9 +32,10 @@ In the merged PCA, feature arrows are colour-coded by group so you can immediate
 6. [Running the Script](#running-the-script)
 7. [Output Files](#output-files)
 8. [Interpreting the Plots](#interpreting-the-plots)
-9. [Alternative and Complementary Methods](#alternative-and-complementary-methods)
-10. [Troubleshooting](#troubleshooting)
-11. [Related Reading](#related-reading)
+9. [Correlation Diagnostic Plots](#correlation-diagnostic-plots)
+10. [Alternative and Complementary Methods](#alternative-and-complementary-methods)
+11. [Troubleshooting](#troubleshooting)
+12. [Related Reading](#related-reading)
 
 ---
 
@@ -48,15 +50,21 @@ install.packages(c(
   "factoextra", "pheatmap",
   "plotly", "htmlwidgets"
 ))
+# rhdf5 is from Bioconductor (for reading full-network HDF5 files):
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("rhdf5")
 ```
 
-All packages except `plotly` and `htmlwidgets` are already present in the `dronet` conda environment. Install those two once:
+All CRAN packages except `plotly` and `htmlwidgets` are already present in the `dronet` conda environment. Install missing packages once:
 
 ```bash
-conda run -n dronet Rscript -e 'install.packages(c("plotly","htmlwidgets"), repos="https://cloud.r-project.org")'
+conda run -n dronet Rscript -e '
+  install.packages(c("plotly","htmlwidgets"), repos="https://cloud.r-project.org")
+  BiocManager::install("rhdf5")
+'
 ```
 
-Also required: the variability pre-computation scripts must have already been run to generate their output files (see [Input Files](#input-files)).
+Also required: the variability pre-computation scripts must have already been run to generate their output files, and the full-network HDF5 summary files must exist (see [Input Files](#input-files)).
 
 ---
 
@@ -69,8 +77,12 @@ Also required: the variability pre-computation scripts must have already been ru
 | `--ct-var-file` | `results/variability/voomct_all_genes_mad_summary.xlsx` | `summarize_all_genes_mad_variability.R` |
 | `--hs-var-file` | `results/variability/voomhs_all_genes_mad_summary.xlsx` | `summarize_all_genes_mad_variability.R` |
 | `--full-stats-file` | `results/variability/full_mad_cv2_ranks.xlsx` | `compute_full_mad_cv2_ranks.R` |
+| `--ct-net-file` | `results/results_full_network_metrics_CT/network_metrics_summary.h5` | Network metrics sub-pipeline |
+| `--hs-net-file` | `results/results_full_network_metrics_HS/network_metrics_summary.h5` | Network metrics sub-pipeline |
 | `--gene-list` | gProfiler ortholog CSV **or** plain text (one SYMBOL/line) | User-supplied |
 | `--output-dir` | e.g. `results/pca_gene_metrics` | Created automatically |
+
+The two HDF5 files are read with `rhdf5::h5read()`. The script looks for datasets named `gene_ids` (or `gene_id`/`ENSEMBL`) and the five target metrics. Missing datasets produce a warning and are filled with NA rather than causing an error.
 
 ---
 
@@ -101,47 +113,51 @@ In both cases, matching is **case-insensitive** (`Hsp83` matches `HSP83`).
 
 ## Feature Matrix Details
 
-### CT and HS individual PCAs (10 features each)
+### CT and HS individual PCAs (11 features each)
 
 | Feature | Source | log1p? | Notes |
 |---|---|---|---|
-| `L2L1_deg` | Annotation TSV | ✓ | Network degree |
-| `L2L1_rewire` | Annotation TSV | ✓ | Rewiring count |
-| `L2L1_conn` | Annotation TSV | ✓ | Layer connectivity |
-| `HL_conn_L1` | Annotation TSV | ✓ | L1 inter-layer connectivity |
-| `HL_conn_L2` | Annotation TSV | ✓ | L2 inter-layer connectivity |
+| `L2L1_deg` | Annotation TSV | ✓ | Hub degree (rewiring partition) |
+| `L2L1_rewire` | Annotation TSV | ✓ | Rewiring edge count |
+| `L2L1_conn` | Annotation TSV | ✓ | Layer connectivity sum |
+| `degree` | Network HDF5 | ✓ | Full-network degree |
+| `L2_n_edges` | Network HDF5 | ✓ | Number of L2 edges |
+| `L1_conn_mean` | Network HDF5 | — | Mean \|r\| to L1 neighbours (bounded 0–1) |
+| `L1_conn_sum` | Network HDF5 | ✓ | Sum \|r\| to L1 neighbours |
+| `mean_abs_corr` | Network HDF5 | — | Mean absolute correlation genome-wide (bounded 0–1) |
 | `delta_mean_mad` | Variability summary xlsx | — | MAD_high − MAD_low sub-groups |
-| `mean_ct` / `mean_hs` | Full stats xlsx | — | Mean expression (condition-specific) |
-| `median_ct` / `median_hs` | Full stats xlsx | — | Median expression (condition-specific) |
-| `mad_ct` / `mad_hs` | Full stats xlsx | — | MAD across condition samples |
-| `cv2_ct` / `cv2_hs` | Full stats xlsx | — | CV² across condition samples |
+| `mean_ct` / `mean_hs` | Full stats xlsx | — | Mean VOOM expression (condition-specific) |
+| `mad_ct` / `mad_hs` | Full stats xlsx | — | MAD across condition-only samples |
 
-The CT PCA uses the `_ct` columns; the HS PCA uses the `_hs` columns. All four expression columns (`mean`, `median`, `mad`, `cv2`) come from `compute_full_mad_cv2_ranks.R`, which computes them on CT-only and HS-only sample subsets separately.
+`log1p` is applied to right-skewed count and sum columns (`L2L1_deg`, `L2L1_rewire`, `L2L1_conn`, `degree`, `L2_n_edges`, `L1_conn_sum`) before z-scoring. Bounded metrics (`L1_conn_mean`, `mean_abs_corr`) and already-linear metrics are z-scored only.
 
-### Merged PCA (22 features)
+### Merged PCA (23 features)
 
-| Feature | Definition | Group (colour) |
+All 11 CT + all 11 HS features are included (condition-specific columns suffixed `_ct` / `_hs`), plus one cross-condition feature:
+
+| Group | Features | Colour |
 |---|---|---|
-| `L2L1_deg_ct` … `HL_conn_L2_ct` | CT network (5 cols) | CT Network (`#2166AC`) |
-| `L2L1_deg_hs` … `HL_conn_L2_hs` | HS network (5 cols) | HS Network (`#D6604D`) |
-| `delta_mean_mad_ct` | MAD_high − MAD_low within CT sub-groups | CT Variability (`#74ADD1`) |
-| `delta_mean_mad_hs` | MAD_high − MAD_low within HS sub-groups | HS Variability (`#F4A582`) |
-| `mean_ct`, `median_ct`, `mad_ct`, `cv2_ct` | Expression level/variability on CT samples | CT Expression (`#01665E`) |
-| `mean_hs`, `median_hs`, `mad_hs`, `cv2_hs` | Expression level/variability on HS samples | HS Expression (`#8C510A`) |
-| `mad_hs_minus_ct` | MAD(HS) − MAD(CT) | HS−CT Variability (`#762A83`) |
-| `cv2_hs_minus_ct` | CV²(HS) − CV²(CT) | HS−CT Variability (`#762A83`) |
+| CT Network | `L2L1_deg_ct`, `L2L1_rewire_ct`, `L2L1_conn_ct` | `#2166AC` dark blue |
+| HS Network | `L2L1_deg_hs`, `L2L1_rewire_hs`, `L2L1_conn_hs` | `#D6604D` dark red |
+| CT Full Net | `degree_ct`, `L2_n_edges_ct`, `L1_conn_mean_ct`, `L1_conn_sum_ct`, `mean_abs_corr_ct` | `#41AB5D` green |
+| HS Full Net | `degree_hs`, `L2_n_edges_hs`, `L1_conn_mean_hs`, `L1_conn_sum_hs`, `mean_abs_corr_hs` | `#FD8D3C` orange |
+| CT Variability | `delta_mean_mad_ct` | `#74ADD1` light blue |
+| HS Variability | `delta_mean_mad_hs` | `#F4A582` light salmon |
+| CT Expression | `mean_ct`, `mad_ct` | `#01665E` teal |
+| HS Expression | `mean_hs`, `mad_hs` | `#8C510A` brown |
+| HS−CT | `mad_hs_minus_ct` | `#762A83` purple |
 
 ---
 
 ## Preprocessing Rationale
 
-### Why log1p on L2L1 / HL columns?
+### Why log1p on count and sum columns?
 
-Network degree and rewiring counts are right-skewed: a few hub genes have values orders of magnitude larger than average. `log1p` compresses the tail, prevents hub genes from dominating PC1 by raw scale alone, and preserves rank order with zeros mapped to zero.
+Network degree, rewiring counts, and connectivity sums are right-skewed: a few hub genes have values orders of magnitude larger than average. `log1p` compresses the tail, prevents hub genes from dominating PC1 by raw scale alone, and preserves rank order with zeros mapped to zero. Bounded metrics (`L1_conn_mean`, `mean_abs_corr`) are already on a 0–1 scale and do not need log-compression.
 
 ### Why z-score all features?
 
-The 22 features span completely different scales (`L2L1_rewire` after log1p can reach 10+; `delta_mean_mad` is typically ±0.3; `mad_hs_minus_ct` spans roughly ±2; `mean_ct` spans the VOOM log-expression range). Z-scoring (subtract mean, divide by SD) gives each feature equal weight in the PCA covariance matrix regardless of original units.
+The 23 features span completely different scales (`L2L1_rewire` after log1p can reach 10+; `delta_mean_mad` is typically ±0.3; `mad_hs_minus_ct` spans roughly ±2; `mean_ct` spans the VOOM log-expression range; `mean_abs_corr` is bounded 0–1). Z-scoring (subtract mean, divide by SD) gives each feature equal weight in the PCA covariance matrix regardless of original units.
 
 ### Why not use ranks?
 
@@ -149,7 +165,7 @@ Rank transformation imposes a uniform marginal distribution, discarding informat
 
 ### Missing data
 
-Complete cases are used **per PCA independently**. A gene is included in the CT PCA if all 10 CT features are non-NA, and likewise for HS and the merged PCA. The merged PCA (22 features) is the most restrictive.
+Complete cases are used **per PCA independently**. A gene is included in the CT PCA if all 11 CT features are non-NA, and likewise for HS. The merged PCA (23 features) is the most restrictive — genes absent from either the annotation TSV, the H5, or the variability files are dropped. The number of complete cases per PCA is printed to the console.
 
 ---
 
@@ -164,28 +180,36 @@ Rscript src/scripts/15analysis/pca_l2l1_variability.R \
   --ct-var-file     results/variability/voomct_all_genes_mad_summary.xlsx \
   --hs-var-file     results/variability/voomhs_all_genes_mad_summary.xlsx \
   --full-stats-file results/variability/full_mad_cv2_ranks.xlsx \
+  --ct-net-file     results/results_full_network_metrics_CT/network_metrics_summary.h5 \
+  --hs-net-file     results/results_full_network_metrics_HS/network_metrics_summary.h5 \
   --gene-list       run_voomhs/data/01_devcell_2025_gProfiler_hsapiens_dmelanogaster_0417.csv \
   --output-dir      results/pca_gene_metrics
 ```
 
-> `--full-stats-file` must be the output of `compute_full_mad_cv2_ranks.R`, which now contains condition-specific columns (`mean_ct`, `median_ct`, `mad_ct`, `cv2_ct`, `mean_hs`, `median_hs`, `mad_hs`, `cv2_hs`, `mad_hs_minus_ct`, `cv2_hs_minus_ct`). The raw expression matrices are no longer needed as direct inputs to the PCA script.
+> `--full-stats-file` must be the output of `compute_full_mad_cv2_ranks.R` (contains condition-specific `mean_ct`, `mad_ct`, `mean_hs`, `mad_hs`, `mad_hs_minus_ct`, etc.).
 
 > The script refuses to overwrite existing output files. Remove or rename the output directory before re-running.
 
 **Expected console output:**
 
 ```
+Loading full-network HDF5 metrics...
+  CT network H5: 8763 genes | metrics: degree, L2_n_edges, L1_conn_mean, L1_conn_sum, mean_abs_corr
+  HS network H5: 8763 genes | ...
+
 === PCA: CT (Control) ===
-  Complete cases: 8312 (dropped 451 with NA)
-  Variance explained (PC1–5): 32.4%  18.1%  14.2%  9.8%  7.3%
+  Complete cases: 7841 (dropped 922 with NA)
+  Variance explained (PC1–5): 28.3%  16.7%  13.1%  10.2%  8.4%
   Annotated genes found: 33 / 40
 
-=== PCA: HS (Heat Shock) ===
+=== PCA: CT + HS (Merged) ===
+  Complete cases: 7509 (dropped 1254 with NA)
   ...
 
-=== PCA: CT + HS (Merged) ===
-  Complete cases: 7984 (dropped 779 with NA)
-  ...
+=== Generating correlation plots ===
+  Heatmaps...
+  CT vs HS scatter...
+  Within-diet scatter...
 ```
 
 ---
@@ -223,6 +247,33 @@ All outputs land in `--output-dir` with `ct_`, `hs_`, or `merged_` prefix.
 
 Open the HTML files directly in any browser — they are fully self-contained.
 
+### Correlation diagnostic plots (subfolders)
+
+Three subfolders are created inside `--output-dir`. They do not interfere with PCA outputs.
+
+#### `corr_heatmaps/`
+
+| File | Description |
+|---|---|
+| `ct_corr_heatmap.pdf` | Spearman ρ heatmap of all 11 CT features. Each cell shows ρ (2 d.p.) and significance stars. |
+| `hs_corr_heatmap.pdf` | Same for HS features. |
+| `merged_corr_heatmap.pdf` | All 23 merged features; rows ordered by group. |
+
+#### `corr_ct_vs_hs/`
+
+| File | Description |
+|---|---|
+| `ct_vs_hs_per_feature.pdf` | Multi-page PDF — one page per matched `_ct`/`_hs` feature pair. X-axis = CT gene value, Y-axis = HS gene value. Spearman ρ and p-value annotated. Annotated genes highlighted in red. |
+
+#### `corr_within_diet/`
+
+| File | Description |
+|---|---|
+| `ct_control_within_diet_feature_pairs.pdf` | All pairwise scatters between CT features. One page per pair. |
+| `hs_high_sugar_within_diet_feature_pairs.pdf` | Same for HS features. |
+
+All correlation plots use post-log1p, pre-z-score values so that the scatter magnitudes are biologically interpretable.
+
 ---
 
 ## Interpreting the Plots
@@ -251,6 +302,35 @@ Open the HTML files directly in any browser — they are fully self-contained.
 - A PC dominated by a single feature usually reflects a technical axis.
 - Biologically meaningful PCs have mixed contributions from multiple features in the same group, or balanced contributions across groups.
 - In the merged PCA, the group annotation sidebar on the left makes it easy to see whether PC1 separates CT from HS, or variability from network structure.
+
+---
+
+## Correlation Diagnostic Plots
+
+These plots are produced automatically after the three PCAs and live in dedicated subfolders so they do not clutter the main outputs.
+
+### Correlation heatmap
+
+Each cell shows the Spearman ρ (colour: blue = negative, white = 0, red = positive) and significance stars. Use this to:
+
+- **Detect multicollinearity**: pairs with ρ > 0.9 are near-redundant; the PCA collapses them onto the same PC, which is fine, but understanding which features are redundant helps interpret loadings.
+- **Compare feature blocks**: do full-network metrics (CT Full Net group) correlate with the hub-layer metrics (CT Network group)? If yes, the PCA will produce a "network PC" that mixes both.
+- **Spot unexpected inversions**: e.g. `mean_abs_corr` negatively correlated with `degree` could indicate that highly connected genes have lower average correlations (a common hub paradox).
+
+### CT vs HS scatter per feature
+
+For each feature that exists in both conditions (all `_ct`/`_hs` pairs), this scatter shows whether the gene rankings are preserved across conditions. A high ρ means the feature is consistent across diets; a low ρ means the condition drives a gene's position more than its intrinsic biology.
+
+- Genes on the **diagonal** behave similarly in CT and HS.
+- Genes **above** or **below** the diagonal change disproportionately in one condition.
+- Annotated genes (red) far from the diagonal are condition-sensitive candidates for follow-up.
+
+### Within-diet pairwise feature scatter
+
+Pairwise scatter between all feature pairs within CT (or HS). These are complementary to the heatmap: the scatter reveals the shape of the relationship (linear vs. non-linear) which the ρ value alone does not.
+
+- A non-linear scatter with low ρ but visible structure suggests a log or rank transformation might be informative.
+- A tight linear relationship (high ρ) is expected between `degree` and `L1_conn_sum` — genes with more edges tend to have higher total connectivity.
 
 ---
 
