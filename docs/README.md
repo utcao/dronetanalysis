@@ -30,6 +30,10 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-09-Multi-Input-Workflow.md](GUIDE-09-Multi-Input-Workflow.md) | Running the pipeline on multiple expression inputs using per-input run directories with symlinks (current limitation + workaround) |
 | [GUIDE-10-Generate-Pseudo-Phenotype.md](GUIDE-10-Generate-Pseudo-Phenotype.md) | Generate simulated phenotype TSVs whose sample IDs match the expression matrix; sample name alignment with SNP VCF; using real SNP dosage as phenotype input |
 | [GUIDE-11-PCA-Gene-Metrics.md](GUIDE-11-PCA-Gene-Metrics.md) | PCA on L2L1 network rewiring metrics + expression variability (MAD, CV²); separate CT and HS PCAs plus merged 16-feature PCA; annotated gene list; static + interactive biplots |
+| [GUIDE-12-15Analysis-Overview.md](GUIDE-12-15Analysis-Overview.md) | Full inventory of all `src/scripts/15analysis/` scripts: purpose, primary output, and guide links; typical workflow order |
+| [GUIDE-13-Condition-Comparison-Analysis.md](GUIDE-13-Condition-Comparison-Analysis.md) | `analyze_conditions.R` — comprehensive CT vs HS comparison: PCA, delta barplots, violin/box plots, heatmaps, scatterplots, and summary tables |
+| [GUIDE-14-Module-Analysis.md](GUIDE-14-Module-Analysis.md) | Module-level scripts: `module_enrichment.R` (GO/KEGG), `module_overlap_analysis.R` (Jaccard + Fisher), `module_preservation_netrep.R` (NetRep), `visualise_network.R` (igraph) |
+| [GUIDE-15-MAD-Rank-Shift-Plot.md](GUIDE-15-MAD-Rank-Shift-Plot.md) | `figures/plot_mad_rank_shift.R` — dumbbell plot of genome-wide MAD rank with selected gene group highlighted (solid = CT rank, hollow = TR rank) |
 
 ### ⚡ Optimization Guides
 
@@ -52,6 +56,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | Document | Description |
 |----------|-------------|
 | [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) | Statistical testing methods (bootstrap, Fisher's Z) and efficient pipeline design |
+| [REFERENCE-02-Script-Naming-Convention.md](REFERENCE-02-Script-Naming-Convention.md) | Naming convention for `src/scripts/15analysis/` scripts (`<verb>_<metric>_<description>`), rename table, directory layout, and extension guide |
 
 ### 📤 Pipeline Results
 
@@ -205,6 +210,13 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 
 ## Recent Updates
 
+### 2026-04-27
+- ✅ **Script renames**: Applied `<verb>_<metric>_<description>` naming convention to 9 scripts in `src/scripts/15analysis/`; `module_*` and `visualise_network.R` left unchanged; `run_variability_batch.py` unchanged
+- ✅ **New folder**: `src/scripts/15analysis/figures/` — ad-hoc post-pipeline visualization scripts
+- ✅ **New script**: `figures/plot_mad_rank_shift.R` — dumbbell plot showing MAD rank position of selected gene groups (e.g. top rewiring or top MAD-change genes) with CT vs TR rank shift
+- ✅ **New docs**: Added [REFERENCE-02](REFERENCE-02-Script-Naming-Convention.md) (naming convention), [GUIDE-12](GUIDE-12-15Analysis-Overview.md) (script inventory), [GUIDE-13](GUIDE-13-Condition-Comparison-Analysis.md) (`analyze_conditions.R`), [GUIDE-14](GUIDE-14-Module-Analysis.md) (module scripts), [GUIDE-15](GUIDE-15-MAD-Rank-Shift-Plot.md) (rank shift plot)
+- ✅ **Updated docs**: GUIDE-05, GUIDE-07, GUIDE-08, GUIDE-11 — all old script filenames replaced with new names
+
 ### 2026-04-17
 - ✅ **New Script**: Added `src/scripts/15analysis/compute_full_mad_cv2_ranks.R` — per-gene expression statistics (mean, median, MAD, CV²) computed separately for CT-only samples, HS-only samples, and the combined matrix; includes HS−CT cross-condition differences; union ENSEMBL→SYMBOL mapping; ranked xlsx output with overwrite protection
 - ✅ **New Script**: Added `src/scripts/15analysis/pca_l2l1_variability.R` — PCA on L2L1 network rewiring metrics + condition-specific expression statistics; separate CT and HS PCAs (10 features each) plus a merged 22-feature PCA; colour-coded feature arrows by 7 groups (CT/HS Network, CT/HS Variability, CT/HS Expression, HS−CT Variability); curated gene annotation with gProfiler ortholog CSV support; static PDF plots and interactive plotly HTML biplots
@@ -301,6 +313,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2026-04-10
+**Last Updated:** 2026-04-27
 **Pipeline Version:** 2.3 (permutation test: Stage 7 + Snakefile_permutation)
 **Status:** ✅ All documentation current

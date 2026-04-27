@@ -74,9 +74,9 @@ Also required: the variability pre-computation scripts must have already been ru
 |---|---|---|
 | `--ct-file` | `run_voomct/results_ct_voom/rewiring_hubs_ct_anno_*.tsv` | Stage 3b + annotation step |
 | `--hs-file` | `run_voomhs/results_hs_voom/rewiring_hubs_hs_anno_*.tsv` | Stage 3b + annotation step |
-| `--ct-var-file` | `results/variability/voomct_all_genes_mad_summary.xlsx` | `summarize_all_genes_mad_variability.R` |
-| `--hs-var-file` | `results/variability/voomhs_all_genes_mad_summary.xlsx` | `summarize_all_genes_mad_variability.R` |
-| `--full-stats-file` | `results/variability/full_mad_cv2_ranks.xlsx` | `compute_full_mad_cv2_ranks.R` |
+| `--ct-var-file` | `results/variability/voomct_all_genes_mad_summary.xlsx` | `compute_mad_transcriptomic_variability.R` |
+| `--hs-var-file` | `results/variability/voomhs_all_genes_mad_summary.xlsx` | `compute_mad_transcriptomic_variability.R` |
+| `--full-stats-file` | `results/variability/full_mad_cv2_ranks.xlsx` | `compute_mad_variability_ranks.R` |
 | `--ct-net-file` | `results/results_full_network_metrics_CT/network_metrics_summary.h5` | Network metrics sub-pipeline |
 | `--hs-net-file` | `results/results_full_network_metrics_HS/network_metrics_summary.h5` | Network metrics sub-pipeline |
 | `--gene-list` | gProfiler ortholog CSV **or** plain text (one SYMBOL/line) | User-supplied |
@@ -171,10 +171,10 @@ Complete cases are used **per PCA independently**. A gene is included in the CT 
 
 ## Running the Script
 
-**Script:** `src/scripts/15analysis/pca_l2l1_variability.R`
+**Script:** `src/scripts/15analysis/plot_pca_l2l1_variability.R`
 
 ```bash
-Rscript src/scripts/15analysis/pca_l2l1_variability.R \
+Rscript src/scripts/15analysis/plot_pca_l2l1_variability.R \
   --ct-file         run_voomct/results_ct_voom/rewiring_hubs_ct_anno_0408_2026.tsv \
   --hs-file         run_voomhs/results_hs_voom/rewiring_hubs_hs_anno_0413_2026.tsv \
   --ct-var-file     results/variability/voomct_all_genes_mad_summary.xlsx \
@@ -186,7 +186,7 @@ Rscript src/scripts/15analysis/pca_l2l1_variability.R \
   --output-dir      results/pca_gene_metrics
 ```
 
-> `--full-stats-file` must be the output of `compute_full_mad_cv2_ranks.R` (contains condition-specific `mean_ct`, `mad_ct`, `mean_hs`, `mad_hs`, `mad_hs_minus_ct`, etc.).
+> `--full-stats-file` must be the output of `compute_mad_variability_ranks.R` (contains condition-specific `mean_ct`, `mad_ct`, `mean_hs`, `mad_hs`, `mad_hs_minus_ct`, etc.).
 
 > The script refuses to overwrite existing output files. Remove or rename the output directory before re-running.
 
@@ -407,7 +407,7 @@ If genes show a continuous gradient from low-rewiring to high-rewiring, trajecto
 | Problem | Likely cause | Solution |
 |---|---|---|
 | `Output file already exists` | Previous run left partial results | Remove `results/pca_gene_metrics/` or change `--output-dir` |
-| `File not found: ...` | Missing prerequisite output | Run `summarize_all_genes_mad_variability.R` and `compute_full_mad_cv2_ranks.R` first |
+| `File not found: ...` | Missing prerequisite output | Run `compute_mad_transcriptomic_variability.R` and `compute_mad_variability_ranks.R` first |
 | `gProfiler CSV must contain columns: initial_alias, ortholog_name` | Wrong CSV format or wrong file | Confirm the file is the gProfiler ortholog export, not a gene table |
 | Very few annotated genes found (< 5) | Human gene names used; no Drosophila orthologs | Use a gProfiler ortholog CSV (see [Gene List](#gene-list--annotation-file)) |
 | PC1 explains > 80% of variance | One feature dominates after log1p | Inspect loadings heatmap; consider whether that feature carries genuine biology or is a scale artefact |
@@ -428,5 +428,5 @@ If genes show a continuous gradient from low-rewiring to high-rewiring, trajecto
 ---
 
 **Last Updated:** 2026-04-17
-**Script:** `src/scripts/15analysis/pca_l2l1_variability.R`
+**Script:** `src/scripts/15analysis/plot_pca_l2l1_variability.R`
 **Status:** ✅ Implemented — three PCAs (CT, HS, merged), interactive HTML biplots, group-coloured merged plots

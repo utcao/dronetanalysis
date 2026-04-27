@@ -2,7 +2,7 @@
 
 ## Overview
 
-`src/scripts/15analysis/pathway_enrichment_hubs.R` is a standalone R CLI tool that performs
+`src/scripts/15analysis/analyze_hub_enrichment.R` is a standalone R CLI tool that performs
 functional enrichment analysis on rewiring hub genes from the differential co-expression pipeline.
 
 Key features:
@@ -178,7 +178,7 @@ enrichment run (see examples below).
 ### 1. Top 500 genes by L2L1_rewire — BP enrichment
 
 ```bash
-Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
+Rscript src/scripts/15analysis/analyze_hub_enrichment.R \
   --input-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
   --sort-col L2L1_rewire \
   --n-genes 500 \
@@ -201,7 +201,7 @@ results/enrichment/ct_hubs_top500_L2L1_rewire_plots.pdf
 ### 2. All GO ontologies + simplified terms
 
 ```bash
-Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
+Rscript src/scripts/15analysis/analyze_hub_enrichment.R \
   --input-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
   --sort-col L2L1_rewire \
   --n-genes 500 \
@@ -221,7 +221,7 @@ Redundant GO terms are collapsed using semantic similarity (GOSemSim, cutoff 0.7
 ### 3. Bottom 200 genes by L2L1_conn — connectivity-driven selection
 
 ```bash
-Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
+Rscript src/scripts/15analysis/analyze_hub_enrichment.R \
   --input-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
   --sort-col L2L1_conn \
   --n-genes 200 \
@@ -240,7 +240,7 @@ Useful to compare whether the functional composition of high-rewiring vs low-rew
 Inspect the `_selected_genes.tsv` to see which end each gene came from.
 
 ```bash
-Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
+Rscript src/scripts/15analysis/analyze_hub_enrichment.R \
   --input-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
   --sort-col L2L1_rewire \
   --n-genes 300 \
@@ -258,7 +258,7 @@ Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
 GSEA uses all background genes ranked by `--sort-col` (not just the selected top/bottom subset).
 
 ```bash
-Rscript src/scripts/15analysis/pathway_enrichment_hubs.R \
+Rscript src/scripts/15analysis/analyze_hub_enrichment.R \
   --input-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
   --sort-col L2L1_rewire \
   --n-genes 500 \
@@ -347,5 +347,5 @@ One-to-many mappings keep the first match. Unmapped genes are silently excluded 
 ---
 
 **Last Updated:** 2026-04-20
-**Script:** `src/scripts/15analysis/pathway_enrichment_hubs.R`
+**Script:** `src/scripts/15analysis/analyze_hub_enrichment.R`
 **Status:** ✅ Implemented; run against `rewiring_hubs_ct_anno_0408_2026.tsv`
