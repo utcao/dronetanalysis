@@ -17,6 +17,17 @@
 # Missing values: complete cases only per PCA (sets may differ between CT and HS).
 # Gene annotation: gProfiler ortholog CSV (ortholog_name col) or plain text (one SYMBOL/line).
 #
+# Per-PCA outputs (prefix = {output-dir}/{ct|hs|merged}):
+#   {prefix}_feature_matrix_prenorm.xlsx  — post-log1p, PRE-z-score features
+#                                           (human-readable values; feed to
+#                                            figures/plot_mad_rank_shift.R with any
+#                                            column as --highlight-col, e.g. delta_mean_mad_hs)
+#   {prefix}_feature_matrix.xlsx          — post-log1p + z-scored features (PCA input)
+#   {prefix}_pca_eigenvalues.xlsx / _pca_loadings.xlsx / _pca_scores.xlsx
+#   {prefix}_pca_scree.pdf / _pca_biplot_*.pdf / _pca_biplot_*_interactive.html
+#   {prefix}_pca_correlation_circle.pdf / _pca_loadings_heatmap.pdf
+#   {prefix}_pca_annotated_scores.pdf
+#
 # Usage:
 #   Rscript pca_l2l1_variability.R \
 #     --ct-file       run_voomct/results_ct_voom/rewiring_hubs_ct_anno_0408_2026.tsv \
@@ -429,9 +440,14 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
   write_xlsx_safe(list(scores = scores_dt),
                   paste0(prefix, "_pca_scores.xlsx"))
 
-  cat("  All outputs written with prefix:", basename(prefix), "\n")
-  # feat_mat is post-log1p, pre-z-score; returned for downstream correlation plots
+  # Pre-z-score (post-log1p) feature matrix — exported for downstream use.
+  # Columns retain human-readable units (not standardized), making them suitable
+  # as --highlight-col / --ct-mad-col / --tr-mad-col in plot_mad_rank_shift.R.
   feat_log1p_dt <- cbind(feat_dt[, .(gene_id, SYMBOL)], as.data.table(feat_mat))
+  write_xlsx_safe(list(feature_matrix_prenorm = feat_log1p_dt),
+                  paste0(prefix, "_feature_matrix_prenorm.xlsx"))
+
+  cat("  All outputs written with prefix:", basename(prefix), "\n")
   invisible(list(pca       = pca,
                  scores    = scores_dt,
                  eig       = eig_dt,
