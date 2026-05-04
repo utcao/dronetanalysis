@@ -222,6 +222,7 @@ All outputs land in `--output-dir` with `ct_`, `hs_`, or `merged_` prefix.
 
 | File | Content |
 |---|---|
+| `{cond}_feature_matrix_prenorm.xlsx` | Post-log1p, **pre-z-score** feature matrix in human-readable units — suitable as input to `figures/plot_mad_rank_shift.R` |
 | `{cond}_feature_matrix.xlsx` | z-scored feature matrix used as PCA input |
 | `{cond}_pca_eigenvalues.xlsx` | Per-PC: std dev, variance, % variance, cumulative %, broken-stick threshold |
 | `{cond}_pca_loadings.xlsx` | Variable loadings for all PCs |
@@ -272,7 +273,7 @@ Three subfolders are created inside `--output-dir`. They do not interfere with P
 | `ct_control_within_diet_feature_pairs.pdf` | All pairwise scatters between CT features. One page per pair. |
 | `hs_high_sugar_within_diet_feature_pairs.pdf` | Same for HS features. |
 
-All correlation plots use post-log1p, pre-z-score values so that the scatter magnitudes are biologically interpretable.
+All correlation plots use post-log1p, pre-z-score values so that the scatter magnitudes are biologically interpretable. These are the same values exported in `{cond}_feature_matrix_prenorm.xlsx`.
 
 ---
 
@@ -419,6 +420,7 @@ If genes show a continuous gradient from low-rewiring to high-rewiring, trajecto
 
 ## Related Reading
 
+- [GUIDE-15-MAD-Rank-Shift-Plot.md](GUIDE-15-MAD-Rank-Shift-Plot.md) — Downstream dumbbell plot using `{cond}_feature_matrix_prenorm.xlsx` as input; explore any feature column as `--highlight-col`
 - [GUIDE-05-Expression-Variability-Analysis.md](GUIDE-05-Expression-Variability-Analysis.md) — MAD and ITV variability scripts that generate the variability inputs consumed here
 - [GUIDE-07-Pathway-Enrichment.md](GUIDE-07-Pathway-Enrichment.md) — Enrichment analysis on top/bottom hub genes; complementary downstream step after identifying PCA outliers
 - [GUIDE-02-Network-Metrics.md](GUIDE-02-Network-Metrics.md) — Definitions of L2L1 degree, rewiring, connectivity, and inter-layer metrics used as PCA features
@@ -427,6 +429,6 @@ If genes show a continuous gradient from low-rewiring to high-rewiring, trajecto
 
 ---
 
-**Last Updated:** 2026-04-17
+**Last Updated:** 2026-05-04
 **Script:** `src/scripts/15analysis/plot_pca_l2l1_variability.R`
 **Status:** ✅ Implemented — three PCAs (CT, HS, merged), interactive HTML biplots, group-coloured merged plots

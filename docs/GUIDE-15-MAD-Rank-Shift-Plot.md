@@ -15,7 +15,6 @@ This is a **dumbbell plot**:
 - **● solid dot** — each gene's CT MAD rank
 - **○ hollow dot** — the same gene's TR MAD rank
 - **Segment** — connects CT rank to TR rank, showing direction and magnitude of the shift
-- **Grey rug** — all background genes at their CT MAD rank (density reference)
 
 The script lives in `figures/` because it is an ad-hoc post-pipeline
 visualization tool, not part of the main analysis workflow.
@@ -28,10 +27,15 @@ visualization tool, not part of the main analysis workflow.
 install.packages(c("data.table", "ggplot2", "argparse", "openxlsx"))
 ```
 
-Input file: the xlsx output of `compute_mad_variability_ranks.R`, which
-contains the columns `mad_ct`, `mad_hs`, `mad_hs_minus_ct`, `gene_id`, and
-`SYMBOL`. Any other table with numeric MAD columns works, provided you specify
-the correct column names.
+Two typical input sources:
+
+1. **`compute_mad_variability_ranks.R` xlsx** — genome-wide, all genes.
+   Contains `mad_ct`, `mad_hs`, `mad_hs_minus_ct`, `gene_id`, `SYMBOL`.
+2. **`plot_pca_l2l1_variability.R` `{prefix}_feature_matrix_prenorm.xlsx`** — inner-joined subset.
+   Contains all L2L1/network/expression features in human-readable units (post-log1p, pre-z-score).
+   Useful for exploring `--highlight-col` options such as `delta_mean_mad_hs` or `L2L1_rewire_ct`.
+
+Any other table with numeric columns works, provided you specify the correct column names via `--ct-ref-col`, `--tr-ref-col`, and `--highlight-col`.
 
 ---
 
@@ -40,8 +44,8 @@ the correct column names.
 | Argument | Default | Description |
 |---|---|---|
 | `-i` / `--input` | required | Input table: xlsx, CSV, or TSV |
-| `--ct-mad-col` | `mad_ct` | Column with reference-condition MAD values |
-| `--tr-mad-col` | `mad_hs` | Column with treatment MAD values (any condition) |
+| `--ct-ref-col` | `mad_ct` | Column used to rank genes for the X-axis (any numeric feature column) |
+| `--tr-ref-col` | `mad_hs` | Column used to compute treatment-condition rank (any numeric feature column) |
 | `--highlight-col` | required | Column used to rank and select genes |
 | `--top-n` | `100` | Number of top genes to highlight |
 | `--bottom-n` | `0` | Number of bottom genes to highlight in a contrasting colour |
@@ -54,11 +58,47 @@ the correct column names.
 
 ### `--highlight-col` choices
 
-| Use case | `--highlight-col` value |
-|---|---|
-| Top MAD increase CT → HS | `mad_hs_minus_ct` |
-| Top MAD in CT | `mad_ct` |
-| Top rewiring hubs | Column from hub metrics TSV (join first) |
+| Use case | `--highlight-col` value | Input source |
+|---|---|---|
+| Top MAD increase CT → HS | `mad_hs_minus_ct` | `compute_mad_variability_ranks.R` xlsx |
+| Top MAD in CT | `mad_ct` | Either source |
+| High intra-condition variability spread in HS | `delta_mean_mad_hs` | `_feature_matrix_prenorm.xlsx` |
+| Top rewiring hubs (by rewire count) | `L2L1_rewire_ct` | `_feature_matrix_prenorm.xlsx` |
+
+---
+
+## Using the PCA Feature Matrix as Input
+
+`plot_pca_l2l1_variability.R` exports a `{prefix}_feature_matrix_prenorm.xlsx` file
+alongside the standard z-scored feature matrix. This pre-normalization file contains
+all features in post-log1p, pre-z-score units — values are still on a biologically
+interpretable scale and can be passed directly to this script.
+
+The merged PCA prenorm matrix (`merged_feature_matrix_prenorm.xlsx`) covers all
+columns needed for flexible exploration:
+
+```bash
+# Select top 100 genes by delta_mean_mad_hs (intra-condition variability spread in HS)
+# and show their position on the MAD rank axis (CT vs HS):
+Rscript src/scripts/15analysis/figures/plot_mad_rank_shift.R \
+    --input results/pca_gene_metrics/merged_feature_matrix_prenorm.xlsx \
+    --ct-ref-col mad_ct  --tr-ref-col mad_hs \
+    --highlight-col delta_mean_mad_hs \
+    --top-n 100 --tr-label HS \
+    --output results/figures/mad_rank_shift_delta_mean_mad_hs.pdf
+
+# Select top 100 rewiring hubs (by L2L1_rewire_ct) and show their rewiring-rank shift:
+Rscript src/scripts/15analysis/figures/plot_mad_rank_shift.R \
+    --input results/pca_gene_metrics/merged_feature_matrix_prenorm.xlsx \
+    --ct-ref-col L2L1_rewire_ct  --tr-ref-col L2L1_rewire_hs \
+    --highlight-col delta_mean_mad_hs \
+    --top-n 100 --ct-label CT --tr-label HS \
+    --output results/figures/mad_rank_shift_rewire_hubs.pdf
+```
+
+The `--ct-ref-col` and `--tr-ref-col` arguments accept **any numeric column** in the
+input table — they are not restricted to MAD columns. The X-axis label automatically
+displays the chosen column name.
 
 ---
 
@@ -69,8 +109,8 @@ the correct column names.
 ```bash
 Rscript src/scripts/15analysis/figures/plot_mad_rank_shift.R \
     --input results/variability/mad_ranks.xlsx \
-    --ct-mad-col mad_ct \
-    --tr-mad-col mad_hs \
+    --ct-ref-col mad_ct \
+    --tr-ref-col mad_hs \
     --highlight-col mad_hs_minus_ct \
     --top-n 100 \
     --tr-label HS \
@@ -93,14 +133,14 @@ The top group (increased MAD) is shown in purple-red; the bottom group
 
 ### Using a different treatment condition
 
-Change `--tr-mad-col` and `--tr-label` to point to any other condition's MAD
-column and its display name:
+Change `--tr-ref-col` and `--tr-label` to point to any other condition's column
+and its display name:
 
 ```bash
 Rscript src/scripts/15analysis/figures/plot_mad_rank_shift.R \
     --input results/variability/mad_ranks.xlsx \
     --ct-mad-col mad_ct \
-    --tr-mad-col mad_hsugar \
+    --tr-ref-col mad_hsugar \
     --highlight-col mad_hsugar_minus_ct \
     --tr-label "High Sugar" \
     --output results/figures/mad_rank_shift_hsugar.pdf
@@ -132,11 +172,7 @@ plot has the highest value of the selection metric. For `mad_hs_minus_ct`, the
 top gene gained the most variability; for a rewiring score, the top gene was the
 most rewired hub.
 
-### Grey rug
 
-The rug at the bottom shows the density of all background genes across the CT
-MAD rank axis. A gap in the rug suggests few genes have intermediate variability
-(which would be unusual). The rug is plotted at CT ranks only.
 
 ---
 
@@ -152,7 +188,7 @@ MAD rank axis. A gap in the rug suggests few genes have intermediate variability
 
 | Issue | Fix |
 |---|---|
-| `Missing columns in input table` | Run `names(readxl::read_xlsx(...))` to list available columns; pass correct `--ct-mad-col` / `--tr-mad-col` |
+| `Missing columns in input table` | Run `names(readxl::read_xlsx(...))` to list available columns; pass correct `--ct-ref-col` / `--tr-ref-col` / `--highlight-col` |
 | Gene labels overlap | Reduce `--top-n` or the plot will scale height automatically; alternatively filter to fewer genes |
 | `--highlight-col` has many NAs | Script automatically excludes genes with NA in highlight/MAD columns before selecting top N |
 | Label column is all NA | Pass `--label-col gene_id` to use gene IDs instead of symbols |
@@ -168,5 +204,5 @@ MAD rank axis. A gap in the rug suggests few genes have intermediate variability
 
 ---
 
-**Last Updated:** 2026-04-27
+**Last Updated:** 2026-05-04
 **Status:** ✅ Active
