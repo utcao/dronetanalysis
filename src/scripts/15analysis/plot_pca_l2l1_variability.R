@@ -742,6 +742,9 @@ cross_var   <- full_var[, .(gene_id, mad_hs_minus_ct)]
 
 merge_fn <- function(a, b) merge(a, b, by = "gene_id", all = FALSE)
 
+# ct_feat <- Reduce(merge_fn, list(ct_ann, ct_var, ct_expr_var))
+# hs_feat <- Reduce(merge_fn, list(hs_ann, hs_var, hs_expr_var))
+
 ct_feat <- Reduce(merge_fn, list(ct_ann, ct_var, ct_expr_var, ct_net))
 hs_feat <- Reduce(merge_fn, list(hs_ann, hs_var, hs_expr_var, hs_net))
 
