@@ -543,62 +543,85 @@ make_corr_heatmap_gg <- function(feat_log1p_dt, cond_label, out_path,
   invisible(p)
 }
 
-make_ct_vs_hs_scatter <- function(merged_log1p_dt, gene_map, out_dir, top_n = 100) {
-  all_cols <- colnames(merged_log1p_dt)
-  ct_cols  <- grep("_ct$", all_cols, value = TRUE)
-  hs_match <- sub("_ct$", "_hs", ct_cols)
-  keep     <- hs_match %in% all_cols
-  ct_cols  <- ct_cols[keep]
-  hs_cols  <- hs_match[keep]
-  base     <- sub("_ct$", "", ct_cols)
+make_cond_scatter <- function(merged_log1p_dt, gene_map, out_dir,
+                              ctrl_suffix = "_ct", trt_suffix = "_hs",
+                              top_n = 100) {
+  # --- pair discovery: find columns with ctrl_suffix that have a trt partner ---
+  all_cols       <- colnames(merged_log1p_dt)
+  ctrl_cols      <- grep(paste0(ctrl_suffix, "$"), all_cols, value = TRUE)
+  trt_cols_cand  <- sub(paste0(ctrl_suffix, "$"), trt_suffix, ctrl_cols)
+  pair_exists    <- trt_cols_cand %in% all_cols
+  ctrl_cols      <- ctrl_cols[pair_exists]
+  trt_cols       <- trt_cols_cand[pair_exists]
+  feature_names  <- sub(paste0(ctrl_suffix, "$"), "", ctrl_cols)
 
-  if (!length(ct_cols)) {
-    cat("  CT vs HS: no matched column pairs found.\n"); return(invisible(NULL))
+  if (!length(ctrl_cols)) {
+    cat("  Condition scatter: no matched column pairs found.\n")
+    return(invisible(NULL))
   }
 
-  sym_up  <- toupper(merged_log1p_dt$SYMBOL)
-  map_up  <- toupper(gene_map$drosophila_symbol)
-  is_ann  <- sym_up %in% map_up
-  lbl_vec <- ifelse(is_ann, gene_map$label[match(sym_up, map_up)], "")
+  # --- annotation: computed once, shared across all feature pairs ---
+  symbol_uc   <- toupper(merged_log1p_dt$SYMBOL)
+  map_uc      <- toupper(gene_map$drosophila_symbol)
+  is_ann      <- symbol_uc %in% map_uc
+  gene_labels <- ifelse(is_ann, gene_map$label[match(symbol_uc, map_uc)], "")
 
-  out_path <- file.path(out_dir, "ct_vs_hs_per_feature.pdf")
+  out_path <- file.path(out_dir, "ctrl_vs_trt_per_feature.pdf")
   pdf(out_path, width = 6, height = 6)
-  for (i in seq_along(base)) {
-    xv <- merged_log1p_dt[[ct_cols[i]]]
-    yv <- merged_log1p_dt[[hs_cols[i]]]
-    ok <- !is.na(xv) & !is.na(yv)
-    if (sum(ok) < 5) next
-    ct_r    <- suppressWarnings(
-      cor.test(xv[ok], yv[ok], method = "spearman", exact = FALSE))
-    rho_lbl <- sprintf("rho = %.3f\np = %.2e", ct_r$estimate, ct_r$p.value)
-    # different ranking metric (e.g. distance from origin sqrt(x²+y²), or max of x/y) can be applied
-    score   <- (xv + yv) / 2
-    top_idx <- order(score, decreasing = TRUE, na.last = TRUE)[seq_len(min(top_n, sum(ok)))]
-    is_top  <- seq_along(xv) %in% top_idx
-    df_p    <- data.frame(x = xv, y = yv, ann = is_ann, top = is_top, lbl = lbl_vec)
-    p <- ggplot(df_p, aes(x = x, y = y)) +
-      geom_point(data = df_p[!df_p$top & !df_p$ann, ],
+  for (i in seq_along(feature_names)) {
+    # --- per-iteration: values specific to this feature pair ---
+    ctrl_vals <- merged_log1p_dt[[ctrl_cols[i]]]
+    trt_vals  <- merged_log1p_dt[[trt_cols[i]]]
+    complete  <- !is.na(ctrl_vals) & !is.na(trt_vals)
+    if (sum(complete) < 5) next
+
+    cor_result <- suppressWarnings(
+      cor.test(ctrl_vals[complete], trt_vals[complete],
+               method = "spearman", exact = FALSE))
+    cor_label  <- sprintf("rho = %.3f\np = %.2e",
+                          cor_result$estimate, cor_result$p.value)
+
+    # rank by mean of ctrl and trt (arithmetic mean; Spearman rank is invariant to monotone transforms)
+    # ALT: distance from origin
+    # score <- sqrt(ctrl_vals^2 + trt_vals^2)
+    # ALT: max of the two conditions
+    # score <- pmax(ctrl_vals, trt_vals, na.rm = TRUE)
+    score   <- (ctrl_vals + trt_vals) / 2
+    top_idx <- order(score, decreasing = TRUE, na.last = TRUE)[seq_len(min(top_n, sum(complete)))]
+    is_top  <- logical(length(ctrl_vals))
+    is_top[top_idx] <- TRUE
+
+    plot_df <- data.frame(
+      x   = ctrl_vals,
+      y   = trt_vals,
+      ann = is_ann,
+      top = is_top,
+      lbl = gene_labels
+    )
+    p <- ggplot(plot_df, aes(x = x, y = y)) +
+      geom_point(data = plot_df[!plot_df$top & !plot_df$ann, ],
                  color = "grey70", alpha = 0.35, size = 0.7) +
-      geom_point(data = df_p[df_p$top & !df_p$ann, ],
+      geom_point(data = plot_df[plot_df$top & !plot_df$ann, ],
                  color = "#FFB6C1", alpha = 0.8, size = 1.5) +
-      geom_point(data = df_p[df_p$ann, ],
+      geom_point(data = plot_df[plot_df$ann, ],
                  color = "#D7191C", size = 2.5) +
-      geom_text_repel(data = df_p[df_p$ann, ],
+      geom_text_repel(data = plot_df[plot_df$ann, ],
                       aes(label = lbl), color = "#D7191C",
                       size = 5, max.overlaps = 30) +
       geom_abline(intercept = 0, slope = 1,
                   color = "grey50", linetype = "dashed", linewidth = 0.6) +
       geom_smooth(method = "lm", formula = y ~ x,
                   color = "#2166AC", se = FALSE, linewidth = 0.8, linetype = "dashed") +
-      annotate("text", x = -Inf, y = Inf, label = rho_lbl,
+      annotate("text", x = -Inf, y = Inf, label = cor_label,
                hjust = -0.1, vjust = 1.3, size = 3.5, color = "#2166AC") +
-      labs(title = paste("CT vs HS —", base[i]),
-           x = ct_cols[i], y = hs_cols[i]) +
+      labs(title = paste(sub("_$", "", ctrl_suffix), "vs",
+                         sub("_$", "", trt_suffix), "—", feature_names[i]),
+           x = ctrl_cols[i], y = trt_cols[i]) +
       theme_bw(base_size = 16)
     print(p)
   }
   dev.off()
-  cat("  CT vs HS scatter:", basename(out_path), "(", length(ct_cols), "pages)\n")
+  cat("  Condition scatter:", basename(out_path), "(", length(cols_c1), "pages)\n")
 }
 
 make_within_diet_scatter <- function(feat_log1p_dt, cond_label, out_dir, gene_map) {
@@ -829,7 +852,8 @@ make_corr_heatmap_gg(merged_res$feat_log1p, "CT + HS (Merged)",
 
 # CT vs HS scatter (one page per matched feature pair)
 cat("  CT vs HS scatter...\n")
-make_ct_vs_hs_scatter(merged_res$feat_log1p, gene_map, dir_ct_vs_hs)
+make_cond_scatter(merged_res$feat_log1p, gene_map, dir_ct_vs_hs,
+                  ctrl_suffix = "_ct", trt_suffix = "_hs")
 
 # Within-diet pairwise feature scatter
 cat("  Within-diet scatter...\n")
