@@ -35,8 +35,8 @@
 #     --ct-var-file   results/variability/voomct_all_genes_mad_summary.xlsx \
 #     --hs-var-file   results/variability/voomhs_all_genes_mad_summary.xlsx \
 #     --full-stats-file results/variability/full_mad_cv2_ranks.xlsx \
-#     --ct-net-file   results/results_full_network_metrics_CT/network_metrics_summary.tsv \
-#     --hs-net-file   results/results_full_network_metrics_HS/network_metrics_summary.tsv \
+#     --ct-net-file   results/results_full_network_metrics_CT/full_network_metrics_ct.tsv \
+#     --hs-net-file   results/results_full_network_metrics_HS/full_network_metrics_hs.tsv \
 #     --gene-list     data/candidates/01_devcell_2025_gProfiler_hsapiens_dmelanogaster_0417.csv \
 #     --output-dir    results/pca_gene_metrics
 # ==============================================================================
@@ -210,7 +210,8 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
                      linewidth = 0.85, show.legend = TRUE) +
         geom_text(data = load_df,
                   aes(x = x * 1.08, y = y * 1.08, label = feature, color = group),
-                  size = 3.2, fontface = "bold", show.legend = FALSE) +
+                  size = 4.2, fontface = "bold", show.legend = FALSE,
+                  position = position_jitter(width = 0.5, height = 0.9), vjust = 1.5) +
         scale_color_manual("Feature group", values = GROUP_COLORS,
                            drop = FALSE)
     } else {
@@ -221,7 +222,8 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
                      color = "#2C7BB6", linewidth = 0.75) +
         geom_text(data = load_df,
                   aes(x = x * 1.08, y = y * 1.08, label = feature),
-                  color = "#2C7BB6", size = 3.2, fontface = "bold")
+                  color = "#2C7BB6", size = 4.2, fontface = "bold",
+                  position = position_jitter(width = 0.5, height = 0.9), vjust = 1.5)
     }
 
     p +
@@ -237,7 +239,7 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
       labs(title = paste("Biplot —", cond_label),
            x = paste0(pc_x, " (", pct_var[xi], "%)"),
            y = paste0(pc_y, " (", pct_var[yi], "%)")) +
-      theme_bw(base_size = 12) +
+      theme_bw(base_size = 18) +
       theme(legend.position = if (use_groups) "right" else "none")
   }
   ggsave(paste0(prefix, "_pca_biplot_PC1_PC2.pdf"),
@@ -577,14 +579,16 @@ make_ct_vs_hs_scatter <- function(merged_log1p_dt, gene_map, out_dir) {
                  color = "#D7191C", size = 2.5) +
       geom_text_repel(data = df_p[df_p$ann, ],
                       aes(label = lbl), color = "#D7191C",
-                      size = 3, max.overlaps = 30) +
+                      size = 5, max.overlaps = 30) +
+      geom_abline(intercept = 0, slope = 1,
+                  color = "grey50", linetype = "dashed", linewidth = 0.6) +
       geom_smooth(method = "lm", formula = y ~ x,
                   color = "#2166AC", se = FALSE, linewidth = 0.8, linetype = "dashed") +
       annotate("text", x = -Inf, y = Inf, label = rho_lbl,
                hjust = -0.1, vjust = 1.3, size = 3.5, color = "#2166AC") +
       labs(title = paste("CT vs HS —", base[i]),
            x = ct_cols[i], y = hs_cols[i]) +
-      theme_bw(base_size = 12)
+      theme_bw(base_size = 16)
     print(p)
   }
   dev.off()
@@ -682,7 +686,7 @@ if (!dir.exists(args$output_dir))
 
 # ----- Load sources -----
 cat("\nLoading data...\n")
-net_cols <- c("L2L1_deg", "L2L1_rewire", "L2L1_conn")
+net_cols <- c("L2L1_deg", "L2L1_rewire", "L2L1_conn", "L1_n_nodes", "L1_rewire")
 #"L1_mean_delta", "L2_mean_delta", "HL_deg_L1", "HL_deg_L2","HL_conn_L1", "HL_conn_L2")
 
 l2l1_cols <- c("gene_id", "SYMBOL", net_cols)
@@ -742,11 +746,11 @@ cross_var   <- full_var[, .(gene_id, mad_hs_minus_ct)]
 
 merge_fn <- function(a, b) merge(a, b, by = "gene_id", all = FALSE)
 
-# ct_feat <- Reduce(merge_fn, list(ct_ann, ct_var, ct_expr_var))
-# hs_feat <- Reduce(merge_fn, list(hs_ann, hs_var, hs_expr_var))
+# ct_feat <- Reduce(merge_fn, list(ct_ann, ct_var, ct_expr_var, ct_net))
+# hs_feat <- Reduce(merge_fn, list(hs_ann, hs_var, hs_expr_var, hs_net))
 
-ct_feat <- Reduce(merge_fn, list(ct_ann, ct_var, ct_expr_var, ct_net))
-hs_feat <- Reduce(merge_fn, list(hs_ann, hs_var, hs_expr_var, hs_net))
+ct_feat <- Reduce(merge_fn, list(ct_ann, ct_var, ct_expr_var))
+hs_feat <- Reduce(merge_fn, list(hs_ann, hs_var, hs_expr_var))
 
 cat("\nCT feature matrix before NA filter:", nrow(ct_feat), "genes\n")
 cat("HS feature matrix before NA filter:", nrow(hs_feat), "genes\n")
@@ -754,7 +758,12 @@ cat("HS feature matrix before NA filter:", nrow(hs_feat), "genes\n")
 # ----- Build merged feature matrix -----
 # All per-condition columns get _ct / _hs suffix; shared cross-condition added last.
 full_net_cols <- c("degree", "L2_n_edges", "L1_conn_mean", "L1_conn_sum", "mean_abs_corr")
-all_cond_cols <- c(net_cols, full_net_cols)   # columns needing suffix renaming
+full_net_cols <- NA
+if(is.na(full_net_cols)){
+  all_cond_cols <- c(net_cols)
+}else{
+  all_cond_cols <- c(net_cols, full_net_cols)   # columns needing suffix renaming
+}
 
 ct_side <- copy(ct_feat)
 setnames(ct_side, all_cond_cols,    paste0(all_cond_cols, "_ct"))
