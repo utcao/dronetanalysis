@@ -46,8 +46,8 @@ compute_mad_stats <- function(focus_gene, expr_mat, gene_ids,
     other_idx <- which(gene_ids != focus_gene)
     expr_other <- expr_mat[other_idx, , drop = FALSE]
 
-    mad_low  <- log2(apply(2^expr_other[, low_idx,  drop = FALSE], 1, mad, na.rm = TRUE))
-    mad_high <- log2(apply(2^expr_other[, high_idx, drop = FALSE], 1, mad, na.rm = TRUE))
+    mad_low  <- log2(apply(2^expr_other[, low_idx,  drop = FALSE], 1, mad, na.rm = TRUE) + 1)
+    mad_high <- log2(apply(2^expr_other[, high_idx, drop = FALSE], 1, mad, na.rm = TRUE) + 1)
 
     wt <- wilcox.test(mad_low, mad_high, paired = FALSE, exact = FALSE)
 
@@ -220,14 +220,14 @@ pct_sig  <- round(100 * n_sig / n_tested, 1)
 
 n_increased <- sum(sig_dt$transcriptomic_mad_shift > 0, na.rm = TRUE)
 n_decreased <- sum(sig_dt$transcriptomic_mad_shift < 0, na.rm = TRUE)
-pct_inc  <- if (n_sig > 0) round(100 * n_increased / n_sig, 1) else 0
-pct_dec  <- if (n_sig > 0) round(100 * n_decreased / n_sig, 1) else 0
+pct_inc  <- round(100 * n_increased / n_tested, 1)
+pct_dec  <- round(100 * n_decreased / n_tested, 1)
 
 cat("\n=== Summary ===\n")
 cat("Total genes tested:            ", n_tested, "\n")
 cat("Significant (FDR < 0.05):      ", n_sig, " (", pct_sig, "%)\n", sep = "")
 cat("  \u2191 Increased variability (HIGH > LOW):  ",
-    n_increased, " (", pct_inc, "% of sig)\n", sep = "")
+    n_increased, " (", pct_inc, "% of total)\n", sep = "")
 cat("  \u2193 Decreased variability (LOW > HIGH):  ",
-    n_decreased, " (", pct_dec, "% of sig)\n", sep = "")
+    n_decreased, " (", pct_dec, "% of total)\n", sep = "")
 cat("Results saved to: ", args$output_file, "\n")
