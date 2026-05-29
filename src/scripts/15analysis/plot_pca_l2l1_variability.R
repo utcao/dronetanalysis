@@ -543,7 +543,7 @@ make_corr_heatmap_gg <- function(feat_log1p_dt, cond_label, out_path,
   invisible(p)
 }
 
-make_ct_vs_hs_scatter <- function(merged_log1p_dt, gene_map, out_dir) {
+make_ct_vs_hs_scatter <- function(merged_log1p_dt, gene_map, out_dir, top_n = 100) {
   all_cols <- colnames(merged_log1p_dt)
   ct_cols  <- grep("_ct$", all_cols, value = TRUE)
   hs_match <- sub("_ct$", "_hs", ct_cols)
@@ -571,10 +571,16 @@ make_ct_vs_hs_scatter <- function(merged_log1p_dt, gene_map, out_dir) {
     ct_r    <- suppressWarnings(
       cor.test(xv[ok], yv[ok], method = "spearman", exact = FALSE))
     rho_lbl <- sprintf("rho = %.3f\np = %.2e", ct_r$estimate, ct_r$p.value)
-    df_p    <- data.frame(x = xv, y = yv, ann = is_ann, lbl = lbl_vec)
+    # different ranking metric (e.g. distance from origin sqrt(x²+y²), or max of x/y) can be applied
+    score   <- (xv + yv) / 2
+    top_idx <- order(score, decreasing = TRUE, na.last = TRUE)[seq_len(min(top_n, sum(ok)))]
+    is_top  <- seq_along(xv) %in% top_idx
+    df_p    <- data.frame(x = xv, y = yv, ann = is_ann, top = is_top, lbl = lbl_vec)
     p <- ggplot(df_p, aes(x = x, y = y)) +
-      geom_point(data = df_p[!df_p$ann, ],
+      geom_point(data = df_p[!df_p$top & !df_p$ann, ],
                  color = "grey70", alpha = 0.35, size = 0.7) +
+      geom_point(data = df_p[df_p$top & !df_p$ann, ],
+                 color = "#FFB6C1", alpha = 0.8, size = 1.5) +
       geom_point(data = df_p[df_p$ann, ],
                  color = "#D7191C", size = 2.5) +
       geom_text_repel(data = df_p[df_p$ann, ],
