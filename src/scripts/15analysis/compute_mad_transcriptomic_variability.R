@@ -9,10 +9,10 @@
 # Results are written to a single xlsx file (one row per focus gene).
 #
 # Usage:
-#   Rscript summarize_all_genes_mad_variability.R \
+#   Rscript compute_mad_transcriptomic_variability.R \
 #     --expr-file    data/processed/VOOM/voomdataCtrl.txt \
-#     --mapping-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
-#     --output-file  results/variability/all_genes_mad_summary.xlsx \
+#     --mapping-file run_voomct/results_ct_voom/rewiring_hubs_ct_anno_0408_2026.tsv \
+#     --output-file  results/variability/voomct_all_genes_mad_summary.xlsx \
 #     --condition-label "Control"
 # ==============================================================================
 
@@ -56,7 +56,7 @@ compute_mad_stats <- function(focus_gene, expr_mat, gene_ids,
       wilcoxon_p       = wt$p.value,
       mean_mad_low     = mean(mad_low,    na.rm = TRUE),
       mean_mad_high    = mean(mad_high,   na.rm = TRUE),
-      delta_mean_mad   = mean(mad_high,   na.rm = TRUE) - mean(mad_low, na.rm = TRUE),
+      transcriptomic_mad_shift   = mean(mad_high,   na.rm = TRUE) - mean(mad_low, na.rm = TRUE),
       median_mad_low   = median(mad_low,  na.rm = TRUE),
       median_mad_high  = median(mad_high, na.rm = TRUE),
       n_genes_compared = length(mad_low),
@@ -69,7 +69,7 @@ compute_mad_stats <- function(focus_gene, expr_mat, gene_ids,
       wilcoxon_p       = NA_real_,
       mean_mad_low     = NA_real_,
       mean_mad_high    = NA_real_,
-      delta_mean_mad   = NA_real_,
+      transcriptomic_mad_shift   = NA_real_,
       median_mad_low   = NA_real_,
       median_mad_high  = NA_real_,
       n_genes_compared = NA_integer_,
@@ -196,7 +196,7 @@ col_order <- c(
   "gene_id", "SYMBOL",
   "wilcoxon_p", "wilcoxon_stars",
   "wilcoxon_p_adj", "wilcoxon_adj_stars",
-  "mean_mad_low", "mean_mad_high", "delta_mean_mad",
+  "mean_mad_low", "mean_mad_high", "transcriptomic_mad_shift",
   "median_mad_low", "median_mad_high",
   "n_genes_compared", "n_low_samples", "n_high_samples",
   "condition_label"
@@ -218,8 +218,8 @@ sig_dt   <- results_dt[!is.na(wilcoxon_p_adj) & wilcoxon_p_adj < 0.05]
 n_sig    <- nrow(sig_dt)
 pct_sig  <- round(100 * n_sig / n_tested, 1)
 
-n_increased <- sum(sig_dt$delta_mean_mad > 0, na.rm = TRUE)
-n_decreased <- sum(sig_dt$delta_mean_mad < 0, na.rm = TRUE)
+n_increased <- sum(sig_dt$transcriptomic_mad_shift > 0, na.rm = TRUE)
+n_decreased <- sum(sig_dt$transcriptomic_mad_shift < 0, na.rm = TRUE)
 pct_inc  <- if (n_sig > 0) round(100 * n_increased / n_sig, 1) else 0
 pct_dec  <- if (n_sig > 0) round(100 * n_decreased / n_sig, 1) else 0
 
