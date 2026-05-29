@@ -32,7 +32,7 @@
 # Usage:
 #   Rscript compute_mad_permute_transcriptomic_noise.R \
 #     --expr-file    data/processed/VOOM/voomdataCtrl.txt \
-#     --mapping-file results/result_voomct/rewiring_hubs_ct_anno_0408_2026.tsv \
+#     --mapping-file run_voomct/results_ct_voom/rewiring_hubs_ct_anno_0408_2026.tsv \
 #     --output-file  results/variability/mad_permutation_ct.xlsx \
 #     --n-perms      500 \
 #     --seed         42 \
@@ -68,7 +68,7 @@ run_permutation_test <- function(focus_gene, expr_mat, gene_ids,
                                  k_low, k_high, n_perms) {
   tryCatch({
     focus_idx  <- which(gene_ids == focus_gene)
-    focus_vec  <- expr_mat[focus_idx, ]        # length = N samples
+    focus_vec  <- expr_mat[focus_idx, ]
     other_idx  <- which(gene_ids != focus_gene)
     expr_other <- expr_mat[other_idx, , drop = FALSE]
 
@@ -85,8 +85,8 @@ run_permutation_test <- function(focus_gene, expr_mat, gene_ids,
 
     # Parametric Wilcoxon on observed groups (for direct comparison with
     # compute_mad_transcriptomic_variability.R output)
-    wt           <- wilcox.test(mad_obs_low, mad_obs_high, paired = FALSE, exact = FALSE)
-    obs_wilcox_p <- wt$p.value
+    wilcox_result <- wilcox.test(mad_obs_low, mad_obs_high, paired = FALSE, exact = FALSE)
+    obs_wilcox_p  <- wilcox_result$p.value
 
     # ---- Permutation null ----
     # Shuffle focus_vec across samples, re-rank → random LOW/HIGH partition.
@@ -101,7 +101,6 @@ run_permutation_test <- function(focus_gene, expr_mat, gene_ids,
       mean(mad_h, na.rm = TRUE) - mean(mad_l, na.rm = TRUE)
     }, FUN.VALUE = numeric(1L))
 
-    # Two-sided permutation p-value
     perm_p <- sum(abs(null_deltas) >= abs(obs_delta)) / n_perms
 
     list(
@@ -251,7 +250,8 @@ if (!is.null(args$focus_genes)) {
   focus_gene_list <- gene_ids
 }
 
-n_total <- length(focus_gene_list)
+n_total   <- length(focus_gene_list)
+n_example <- min(5L, n_total)   # keep null_deltas for first 5 genes (plot examples)
 cat("Running permutation MAD analysis for", n_total, "genes",
     "(", args$n_perms, "permutations each)...\n")
 
@@ -261,6 +261,7 @@ set.seed(args$seed)
 # ----- Main loop -----
 results_list <- vector("list", n_total)
 pvals_rows   <- vector("list", n_total)   # for permutation_pvals.tsv
+example_data <- vector("list", n_example) # null_deltas retained for plots
 
 for (i in seq_along(focus_gene_list)) {
   if (i %% 50 == 0 || i == n_total)
@@ -297,6 +298,10 @@ for (i in seq_along(focus_gene_list)) {
     )
   }
 
+  # Retain null_deltas for the first n_example genes (used for distribution plots)
+  if (!is.null(args$focus_genes) && i <= n_example)
+    example_data[[i]] <- res
+
   # Drop null_deltas before accumulating to avoid memory bloat
   res$null_deltas <- NULL
   results_list[[i]] <- as.data.table(res)
@@ -310,6 +315,47 @@ if (!is.null(args$null_dist_dir) && any(!sapply(pvals_rows, is.null))) {
     sep = "\t"
   )
   cat("Null distribution TSVs saved to:", args$null_dist_dir, "\n\n")
+}
+
+# ----- Distribution plots for first 5 focus genes (when --focus-genes used) -----
+if (!is.null(args$focus_genes) && any(!sapply(example_data, is.null))) {
+  suppressPackageStartupMessages(library(ggplot2))
+  plot_file <- sub("\\.xlsx$", "_example_distributions.pdf", args$output_file)
+
+  pdf(plot_file, width = 7, height = 4.5)
+  for (ex in example_data[!sapply(example_data, is.null)]) {
+    if (is.null(ex$null_deltas)) {
+      next
+    }
+
+    sym_row      <- mapping_dt[gene_id == ex$focus_gene]
+    gene_sym     <- if (nrow(sym_row) > 0 && !is.na(sym_row$SYMBOL[1])) sym_row$SYMBOL[1] else ex$focus_gene
+    gene_label   <- sprintf("%s  (%s)", gene_sym, ex$focus_gene)
+    obs_delta    <- ex$obs_delta_mean_mad
+    null_deltas  <- ex$null_deltas
+    pval_label   <- sprintf("p = %.4f  (n_perms = %d)", ex$perm_p, ex$n_perms)
+
+    null_plot_df <- data.frame(delta = null_deltas)
+    gg <- ggplot(null_plot_df, aes(x = delta)) +
+      geom_histogram(aes(y = after_stat(density)), bins = 40,
+                     fill = "steelblue", colour = "white", alpha = 0.8) +
+      geom_density(colour = "steelblue4", linewidth = 0.7) +
+      geom_vline(xintercept =  obs_delta,      colour = "firebrick", linewidth = 1.2) +
+      geom_vline(xintercept = -abs(obs_delta), colour = "firebrick", linewidth = 0.8,
+                 linetype = "dashed") +
+      annotate("text", x = obs_delta, y = Inf,
+               label  = sprintf("obs = %.4f", obs_delta),
+               colour = "firebrick", vjust = 1.5, hjust = -0.08, size = 3.2) +
+      labs(title    = gene_label,
+           subtitle = pval_label,
+           x        = expression(Delta * " mean MAD (permuted)"),
+           y        = "Density") +
+      theme_bw(base_size = 12) +
+      theme(plot.title = element_text(face = "bold"))
+    print(gg)
+  }
+  invisible(dev.off())
+  cat("Distribution plots (first", n_example, "focus genes) saved to:", plot_file, "\n\n")
 }
 
 # ----- Assemble results table -----
