@@ -103,7 +103,7 @@ cond_stats <- function(mat) {
     mean   = mn,
     median = apply(mat, 1, median, na.rm = TRUE),
     sd     = sd_,
-    mad    = apply(mat, 1, mad,    na.rm = TRUE),
+    mad    = log2(apply(2^mat, 1, mad, na.rm = TRUE)),
     cv2    = (sd_ / mn)^2
   )
 }
