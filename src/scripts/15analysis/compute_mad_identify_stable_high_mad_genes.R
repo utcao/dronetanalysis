@@ -49,9 +49,9 @@ suppressPackageStartupMessages({
 
 # ----- Row-wise MAD: use matrixStats if available, else apply fallback -----
 row_mads <- if (requireNamespace("matrixStats", quietly = TRUE)) {
-  function(mat) log2(matrixStats::rowMads(2^mat, na.rm = TRUE))
+  function(mat) log2(matrixStats::rowMads(2^mat, na.rm = TRUE) + 1)
 } else {
-  function(mat) log2(apply(2^mat, 1, mad, na.rm = TRUE))
+  function(mat) log2(apply(2^mat, 1, mad, na.rm = TRUE) + 1)
 }
 
 # ----- CLI arguments -----
