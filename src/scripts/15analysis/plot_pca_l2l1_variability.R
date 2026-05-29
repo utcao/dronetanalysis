@@ -116,15 +116,15 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
   # PCA
   pca   <- prcomp(feat_mat_scaled, center = FALSE, scale. = FALSE)
   n_pcs <- ncol(pca$rotation)
-  imp   <- summary(pca)$importance
+  pca_imp   <- summary(pca)$importance
 
   # Eigenvalue table
   eig_dt <- data.table(
     PC               = paste0("PC", seq_len(n_pcs)),
     std_dev          = pca$sdev,
     variance         = pca$sdev^2,
-    pct_variance     = imp["Proportion of Variance", ] * 100,
-    cum_pct_variance = imp["Cumulative Proportion", ]  * 100,
+    pct_variance     = pca_imp["Proportion of Variance", ] * 100,
+    cum_pct_variance = pca_imp["Cumulative Proportion", ]  * 100,
     broken_stick_pct = broken_stick(length(feat_cols))  * 100
   )
   cat("  Variance explained (PC1–", min(5, n_pcs), "): ",
@@ -132,29 +132,29 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
              collapse = "  "), "\n", sep = "")
 
   # Loadings
-  load_dt <- as.data.table(pca$rotation, keep.rownames = "feature")
+  loadings_dt <- as.data.table(pca$rotation, keep.rownames = "feature")
 
   # Scores + gene annotation
   scores_dt <- as.data.table(pca$x, keep.rownames = "gene_id")
   scores_dt <- merge(feat_dt[, .(gene_id, SYMBOL)], scores_dt, by = "gene_id")
   # Match by Drosophila ortholog name (case-insensitive); display label from gene_map
-  sym_upper <- toupper(scores_dt$SYMBOL)
-  map_upper <- toupper(gene_map$drosophila_symbol)
-  scores_dt[, is_annotated := sym_upper %in% map_upper]
+  symbol_uc <- toupper(scores_dt$SYMBOL)
+  map_uc <- toupper(gene_map$drosophila_symbol)
+  scores_dt[, is_annotated := symbol_uc %in% map_uc]
   scores_dt[, label := {
-    idx <- match(sym_upper, map_upper)
+    idx <- match(symbol_uc, map_uc)
     ifelse(is_annotated, gene_map$label[idx], "")
   }]
   n_found <- sum(scores_dt$is_annotated)
   cat("  Annotated genes found:", n_found, "/", nrow(gene_map), "\n")
-  missing_sym <- gene_map$drosophila_symbol[!map_upper %in% sym_upper]
+  missing_sym <- gene_map$drosophila_symbol[!map_uc %in% symbol_uc]
   if (length(missing_sym))
     cat("  Not in dataset:", paste(missing_sym, collapse = ", "), "\n")
 
   # ------------------------------------------------------------------ Plots --
 
-  ann_df <- as.data.frame(scores_dt[is_annotated == TRUE])
-  non_df <- as.data.frame(scores_dt[is_annotated == FALSE])
+  ann_genes_df <- as.data.frame(scores_dt[is_annotated == TRUE])
+  bg_genes_df <- as.data.frame(scores_dt[is_annotated == FALSE])
 
   pct_var <- round(eig_dt$pct_variance, 1)
 
@@ -180,35 +180,35 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
 
   # -- Biplot helper --
   make_biplot <- function(pc_x, pc_y) {
-    xi <- as.integer(sub("PC", "", pc_x))
-    yi <- as.integer(sub("PC", "", pc_y))
+    pc_x_idx <- as.integer(sub("PC", "", pc_x))
+    pc_y_idx <- as.integer(sub("PC", "", pc_y))
     score_range <- max(abs(c(scores_dt[[pc_x]], scores_dt[[pc_y]])), na.rm = TRUE)
     load_scale  <- score_range * 0.8
-    load_df <- data.frame(
-      feature = load_dt$feature,
-      x       = load_dt[[pc_x]] * load_scale,
-      y       = load_dt[[pc_y]] * load_scale,
+    loadings_df <- data.frame(
+      feature = loadings_dt$feature,
+      x       = loadings_dt[[pc_x]] * load_scale,
+      y       = loadings_dt[[pc_y]] * load_scale,
       stringsAsFactors = FALSE
     )
     # Attach group when feature_groups is provided
     use_groups <- !is.null(feature_groups)
     if (use_groups) {
-      load_df$group <- factor(feature_groups[load_df$feature],
+      loadings_df$group <- factor(feature_groups[loadings_df$feature],
                               levels = names(GROUP_COLORS))
     }
 
     p <- ggplot() +
-      geom_point(data = non_df,
+      geom_point(data = bg_genes_df,
                  aes(x = .data[[pc_x]], y = .data[[pc_y]]),
                  color = "grey70", alpha = 0.4, size = 0.6)
 
     if (use_groups) {
       p <- p +
-        geom_segment(data = load_df,
+        geom_segment(data = loadings_df,
                      aes(x = 0, y = 0, xend = x, yend = y, color = group),
                      arrow = arrow(length = unit(0.18, "cm"), type = "closed"),
                      linewidth = 0.85, show.legend = TRUE) +
-        geom_text(data = load_df,
+        geom_text(data = loadings_df,
                   aes(x = x * 1.08, y = y * 1.08, label = feature, color = group),
                   size = 4.2, fontface = "bold", show.legend = FALSE,
                   position = position_jitter(width = 0.5, height = 0.9), vjust = 1.5) +
@@ -216,29 +216,29 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
                            drop = FALSE)
     } else {
       p <- p +
-        geom_segment(data = load_df,
+        geom_segment(data = loadings_df,
                      aes(x = 0, y = 0, xend = x, yend = y),
                      arrow = arrow(length = unit(0.18, "cm"), type = "closed"),
                      color = "#2C7BB6", linewidth = 0.75) +
-        geom_text(data = load_df,
+        geom_text(data = loadings_df,
                   aes(x = x * 1.08, y = y * 1.08, label = feature),
                   color = "#2C7BB6", size = 4.2, fontface = "bold",
                   position = position_jitter(width = 0.5, height = 0.9), vjust = 1.5)
     }
 
     p +
-      geom_point(data = ann_df,
+      geom_point(data = ann_genes_df,
                  aes(x = .data[[pc_x]], y = .data[[pc_y]]),
                  color = "#D7191C", size = 2.5, alpha = 0.9) +
-      geom_text_repel(data = ann_df,
+      geom_text_repel(data = ann_genes_df,
                       aes(x = .data[[pc_x]], y = .data[[pc_y]], label = label),
                       color = "#D7191C", size = 3.2, max.overlaps = 60,
                       box.padding = 0.3, segment.color = "grey50") +
       geom_hline(yintercept = 0, linetype = "dashed", color = "grey55", linewidth = 0.4) +
       geom_vline(xintercept = 0, linetype = "dashed", color = "grey55", linewidth = 0.4) +
       labs(title = paste("Biplot —", cond_label),
-           x = paste0(pc_x, " (", pct_var[xi], "%)"),
-           y = paste0(pc_y, " (", pct_var[yi], "%)")) +
+           x = paste0(pc_x, " (", pct_var[pc_x_idx], "%)"),
+           y = paste0(pc_y, " (", pct_var[pc_y_idx], "%)")) +
       theme_bw(base_size = 18) +
       theme(legend.position = if (use_groups) "right" else "none")
   }
@@ -250,39 +250,39 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
 
   # -- Interactive biplot (plotly → HTML) --
   make_interactive_biplot <- function(pc_x, pc_y) {
-    xi <- as.integer(sub("PC", "", pc_x))
-    yi <- as.integer(sub("PC", "", pc_y))
+    pc_x_idx <- as.integer(sub("PC", "", pc_x))
+    pc_y_idx <- as.integer(sub("PC", "", pc_y))
     score_range <- max(abs(c(scores_dt[[pc_x]], scores_dt[[pc_y]])), na.rm = TRUE)
     load_scale  <- score_range * 0.8
 
-    load_df <- data.frame(
-      feature = load_dt$feature,
-      x       = load_dt[[pc_x]] * load_scale,
-      y       = load_dt[[pc_y]] * load_scale,
+    loadings_df <- data.frame(
+      feature = loadings_dt$feature,
+      x       = loadings_dt[[pc_x]] * load_scale,
+      y       = loadings_dt[[pc_y]] * load_scale,
       stringsAsFactors = FALSE
     )
     if (!is.null(feature_groups)) {
-      load_df$group <- factor(feature_groups[load_df$feature],
+      loadings_df$group <- factor(feature_groups[loadings_df$feature],
                               levels = names(GROUP_COLORS))
-      arrow_colors <- GROUP_COLORS[as.character(load_df$group)]
+      feat_colors <- GROUP_COLORS[as.character(loadings_df$group)]
     } else {
-      arrow_colors <- rep("#2C7BB6", nrow(load_df))
+      feat_colors <- rep("#2C7BB6", nrow(loadings_df))
     }
 
     # Hover text for all genes: SYMBOL + PC scores
-    scores_df <- as.data.frame(scores_dt)
-    scores_df$hover <- paste0(
-      "<b>", scores_df$SYMBOL, "</b><br>",
-      pc_x, ": ", round(scores_df[[pc_x]], 3), "<br>",
-      pc_y, ": ", round(scores_df[[pc_y]], 3)
+    scores_plot_df <- as.data.frame(scores_dt)
+    scores_plot_df$hover <- paste0(
+      "<b>", scores_plot_df$SYMBOL, "</b><br>",
+      pc_x, ": ", round(scores_plot_df[[pc_x]], 3), "<br>",
+      pc_y, ": ", round(scores_plot_df[[pc_y]], 3)
     )
 
-    non_df2 <- scores_df[!scores_df$is_annotated, ]
-    ann_df2  <- scores_df[ scores_df$is_annotated, ]
+    bg_genes_df2 <- scores_plot_df[!scores_plot_df$is_annotated, ]
+    ann_genes_df2  <- scores_plot_df[ scores_plot_df$is_annotated, ]
 
     p <- plot_ly() |>
       # Background genes (grey, hover only)
-      add_markers(data       = non_df2,
+      add_markers(data       = bg_genes_df2,
                   x          = ~.data[[pc_x]],
                   y          = ~.data[[pc_y]],
                   text       = ~hover,
@@ -291,7 +291,7 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
                   name       = "All genes",
                   showlegend = TRUE) |>
       # Annotated genes (red, hover + permanent label)
-      add_markers(data       = ann_df2,
+      add_markers(data       = ann_genes_df2,
                   x          = ~.data[[pc_x]],
                   y          = ~.data[[pc_y]],
                   text       = ~hover,
@@ -300,7 +300,7 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
                                     line = list(color = "white", width = 1)),
                   name       = "Annotated genes",
                   showlegend = TRUE) |>
-      add_text(data      = ann_df2,
+      add_text(data      = ann_genes_df2,
                x         = ~.data[[pc_x]],
                y         = ~.data[[pc_y]],
                text      = ~label,
@@ -310,15 +310,15 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
                showlegend = FALSE)
 
     # Add one arrow per feature via add_annotations
-    for (i in seq_len(nrow(load_df))) {
+    for (i in seq_len(nrow(loadings_df))) {
       p <- p |> add_annotations(
-        x          = load_df$x[i],
-        y          = load_df$y[i],
+        x          = loadings_df$x[i],
+        y          = loadings_df$y[i],
         ax         = 0, ay = 0,
         xref = "x", yref = "y", axref = "x", ayref = "y",
-        text       = load_df$feature[i],
-        font       = list(color = arrow_colors[i], size = 11),
-        arrowcolor = arrow_colors[i],
+        text       = loadings_df$feature[i],
+        font       = list(color = feat_colors[i], size = 11),
+        arrowcolor = feat_colors[i],
         arrowwidth = 1.8,
         arrowhead  = 2,
         arrowsize  = 1,
@@ -329,10 +329,10 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
     p <- p |> layout(
       title  = paste("Interactive Biplot —", cond_label,
                      paste0("(", pc_x, " vs ", pc_y, ")")),
-      xaxis  = list(title      = paste0(pc_x, " (", pct_var[xi], "%)"),
+      xaxis  = list(title      = paste0(pc_x, " (", pct_var[pc_x_idx], "%)"),
                     zeroline   = TRUE, zerolinecolor = "#cccccc",
                     showgrid   = FALSE),
-      yaxis  = list(title      = paste0(pc_y, " (", pct_var[yi], "%)"),
+      yaxis  = list(title      = paste0(pc_y, " (", pct_var[pc_y_idx], "%)"),
                     zeroline   = TRUE, zerolinecolor = "#cccccc",
                     showgrid   = FALSE),
       legend = list(orientation = "v", x = 1.02, y = 1),
@@ -341,7 +341,7 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
 
     if (!is.null(feature_groups)) {
       # Add invisible dummy traces for the group colour legend
-      present_groups <- unique(as.character(load_df$group))
+      present_groups <- unique(as.character(loadings_df$group))
       for (grp in present_groups) {
         p <- p |> add_markers(x = NA_real_, y = NA_real_,
                                marker = list(color = GROUP_COLORS[grp], size = 10),
@@ -384,21 +384,21 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
   dev.off()
 
   # -- Loadings heatmap --
-  n_show   <- min(5, n_pcs)
-  load_mat <- as.matrix(load_dt[, paste0("PC", seq_len(n_show)), with = FALSE])
-  rownames(load_mat) <- load_dt$feature
-  annot_row <- if (!is.null(feature_groups)) {
-    data.frame(Group = factor(feature_groups[rownames(load_mat)],
+  n_pcs_show   <- min(5, n_pcs)
+  loadings_mat <- as.matrix(loadings_dt[, paste0("PC", seq_len(n_pcs_show)), with = FALSE])
+  rownames(loadings_mat) <- loadings_dt$feature
+  heatmap_row_annot <- if (!is.null(feature_groups)) {
+    data.frame(Group = factor(feature_groups[rownames(loadings_mat)],
                               levels = names(GROUP_COLORS)),
-               row.names = rownames(load_mat))
+               row.names = rownames(loadings_mat))
   } else NULL
-  annot_colors <- if (!is.null(feature_groups))
-    list(Group = GROUP_COLORS[names(GROUP_COLORS) %in% levels(annot_row$Group)])
+  heatmap_annot_colors <- if (!is.null(feature_groups))
+    list(Group = GROUP_COLORS[names(GROUP_COLORS) %in% levels(heatmap_row_annot$Group)])
   else NULL
-  hm_width  <- if (!is.null(feature_groups)) 8.5 else 7
-  hm_height <- if (!is.null(feature_groups)) 6   else 5
-  pdf(paste0(prefix, "_pca_loadings_heatmap.pdf"), width = hm_width, height = hm_height)
-  pheatmap(load_mat,
+  heatmap_width  <- if (!is.null(feature_groups)) 8.5 else 7
+  heatmap_height <- if (!is.null(feature_groups)) 6   else 5
+  pdf(paste0(prefix, "_pca_loadings_heatmap.pdf"), width = heatmap_width, height = heatmap_height)
+  pheatmap(loadings_mat,
            main             = paste("Loadings —", cond_label),
            cluster_cols     = FALSE,
            color            = colorRampPalette(c("#2166AC", "white", "#D6604D"))(100),
@@ -406,17 +406,17 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
            number_format    = "%.2f",
            fontsize         = 10,
            border_color     = "grey85",
-           annotation_row   = annot_row,
-           annotation_colors = annot_colors)
+           annotation_row   = heatmap_row_annot,
+           annotation_colors = heatmap_annot_colors)
   dev.off()
 
   # -- Annotated scores plot --
-  p_ann <- ggplot() +
-    geom_point(data = non_df, aes(x = PC1, y = PC2),
+  scores_plot <- ggplot() +
+    geom_point(data = bg_genes_df, aes(x = PC1, y = PC2),
                color = "grey75", alpha = 0.45, size = 0.65) +
-    geom_point(data = ann_df, aes(x = PC1, y = PC2),
+    geom_point(data = ann_genes_df, aes(x = PC1, y = PC2),
                color = "#D7191C", size = 2.5) +
-    geom_text_repel(data = ann_df, aes(x = PC1, y = PC2, label = label),
+    geom_text_repel(data = ann_genes_df, aes(x = PC1, y = PC2, label = label),
                     color = "#D7191C", size = 3.5, max.overlaps = 60,
                     box.padding = 0.4, segment.color = "grey55",
                     segment.linewidth = 0.4) +
@@ -426,18 +426,18 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
          x = paste0("PC1 (", pct_var[1], "%)"),
          y = paste0("PC2 (", pct_var[2], "%)")) +
     theme_bw(base_size = 12)
-  ggsave(paste0(prefix, "_pca_annotated_scores.pdf"), p_ann, width = 8, height = 7)
+  ggsave(paste0(prefix, "_pca_annotated_scores.pdf"), scores_plot, width = 8, height = 7)
 
   # ------------------------------------------------------------------ xlsx ---
 
-  feat_out_dt <- cbind(feat_dt[, .(gene_id, SYMBOL)],
+  scaled_feat_dt <- cbind(feat_dt[, .(gene_id, SYMBOL)],
                        as.data.table(feat_mat_scaled))
 
-  write_xlsx_safe(list(feature_matrix = feat_out_dt),
+  write_xlsx_safe(list(feature_matrix = scaled_feat_dt),
                   paste0(prefix, "_feature_matrix.xlsx"))
   write_xlsx_safe(list(eigenvalues = eig_dt),
                   paste0(prefix, "_pca_eigenvalues.xlsx"))
-  write_xlsx_safe(list(loadings = load_dt),
+  write_xlsx_safe(list(loadings = loadings_dt),
                   paste0(prefix, "_pca_loadings.xlsx"))
   write_xlsx_safe(list(scores = scores_dt),
                   paste0(prefix, "_pca_scores.xlsx"))
@@ -453,7 +453,7 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
   invisible(list(pca       = pca,
                  scores    = scores_dt,
                  eig       = eig_dt,
-                 loadings  = load_dt,
+                 loadings  = loadings_dt,
                  feat_log1p = feat_log1p_dt))
 }
 
@@ -462,15 +462,15 @@ run_pca_condition <- function(feat_dt, cond_label, prefix, gene_map,
 # ==============================================================================
 
 load_network_tsv <- function(tsv_path, label) {
-  target <- c("gene_id", "degree", "L2_n_edges", "L1_conn_mean", "L1_conn_sum", "mean_abs_corr")
-  dt <- fread(tsv_path, data.table = TRUE)
-  missing <- setdiff(target, names(dt))
-  if (length(missing))
-    stop(label, " TSV: required columns missing: ", paste(missing, collapse = ", "))
-  dt <- dt[, .SD, .SDcols = target]
-  dt[, gene_id := as.character(gene_id)]
-  cat("  ", label, " network TSV: ", nrow(dt), " genes | metrics: degree, L2_n_edges, L1_conn_mean, L1_conn_sum, mean_abs_corr\n", sep = "")
-  dt
+  required_cols <- c("gene_id", "degree", "L2_n_edges", "L1_conn_mean", "L1_conn_sum", "mean_abs_corr")
+  net_dt <- fread(tsv_path, data.table = TRUE)
+  missing_cols <- setdiff(required_cols, names(net_dt))
+  if (length(missing_cols))
+    stop(label, " TSV: required columns missing: ", paste(missing_cols, collapse = ", "))
+  net_dt <- net_dt[, .SD, .SDcols = required_cols]
+  net_dt[, gene_id := as.character(gene_id)]
+  cat("  ", label, " network TSV: ", nrow(net_dt), " genes | metrics: degree, L2_n_edges, L1_conn_mean, L1_conn_sum, mean_abs_corr\n", sep = "")
+  net_dt
 }
 
 # ==============================================================================
@@ -483,53 +483,53 @@ sig_stars <- function(p) {
 }
 
 spearman_matrix <- function(mat) {
-  n   <- ncol(mat)
-  rho <- matrix(1,  n, n, dimnames = list(colnames(mat), colnames(mat)))
-  pv  <- matrix(NA, n, n, dimnames = list(colnames(mat), colnames(mat)))
-  diag(pv) <- 0
-  for (i in seq_len(n - 1)) {
-    for (j in seq(i + 1, n)) {
-      ok <- complete.cases(mat[, c(i, j)])
-      if (sum(ok) < 5) next
-      ct <- suppressWarnings(
-        cor.test(mat[ok, i], mat[ok, j], method = "spearman", exact = FALSE))
-      rho[i, j] <- rho[j, i] <- ct$estimate
-      pv[i, j]  <- pv[j, i]  <- ct$p.value
+  n_feat   <- ncol(mat)
+  rho_mat <- matrix(1,  n_feat, n_feat, dimnames = list(colnames(mat), colnames(mat)))
+  pval_mat  <- matrix(NA, n_feat, n_feat, dimnames = list(colnames(mat), colnames(mat)))
+  diag(pval_mat) <- 0
+  for (i in seq_len(n_feat - 1)) {
+    for (j in seq(i + 1, n_feat)) {
+      complete <- complete.cases(mat[, c(i, j)])
+      if (sum(complete) < 5) next
+      cor_result <- suppressWarnings(
+        cor.test(mat[complete, i], mat[complete, j], method = "spearman", exact = FALSE))
+      rho_mat[i, j] <- rho_mat[j, i] <- cor_result$estimate
+      pval_mat[i, j]  <- pval_mat[j, i]  <- cor_result$p.value
     }
   }
-  list(rho = rho, pval = pv)
+  list(rho = rho_mat, pval = pval_mat)
 }
 
 make_corr_heatmap_gg <- function(feat_log1p_dt, cond_label, out_path,
                                   feature_groups = NULL) {
-  meta  <- c("gene_id", "SYMBOL")
-  fcols <- setdiff(colnames(feat_log1p_dt), meta)
-  mat   <- as.matrix(feat_log1p_dt[, ..fcols])
-  cr    <- spearman_matrix(mat)
+  meta_cols  <- c("gene_id", "SYMBOL")
+  feature_cols <- setdiff(colnames(feat_log1p_dt), meta_cols)
+  feat_mat   <- as.matrix(feat_log1p_dt[, ..feature_cols])
+  spearman_result    <- spearman_matrix(feat_mat)
 
-  n     <- length(fcols)
-  df    <- expand.grid(Var1 = fcols, Var2 = fcols, stringsAsFactors = FALSE)
-  idx     <- cbind(df$Var1, df$Var2)
-  df$rho  <- cr$rho[idx]
-  df$pval <- cr$pval[idx]
-  df$lbl  <- ifelse(df$Var1 == df$Var2, "1.00",
-                    paste0(sprintf("%.2f", df$rho), "\n", sprintf("%.2e", df$pval)))
+  n_feat     <- length(feature_cols)
+  tile_df    <- expand.grid(Var1 = feature_cols, Var2 = feature_cols, stringsAsFactors = FALSE)
+  mat_idx     <- cbind(tile_df$Var1, tile_df$Var2)
+  tile_df$rho  <- spearman_result$rho[mat_idx]
+  tile_df$pval <- spearman_result$pval[mat_idx]
+  tile_df$lbl  <- ifelse(tile_df$Var1 == tile_df$Var2, "1.00",
+                    paste0(sprintf("%.2f", tile_df$rho), "\n", sprintf("%.2e", tile_df$pval)))
 
   # Order by feature group if provided, else keep original order
   if (!is.null(feature_groups)) {
-    ord <- fcols[order(match(feature_groups[fcols], names(GROUP_COLORS)))]
+    feature_order <- feature_cols[order(match(feature_groups[feature_cols], names(GROUP_COLORS)))]
   } else {
-    ord <- fcols
+    feature_order <- feature_cols
   }
-  df$Var1 <- factor(df$Var1, levels = ord)
-  df$Var2 <- factor(df$Var2, levels = rev(ord))
+  tile_df$Var1 <- factor(tile_df$Var1, levels = feature_order)
+  tile_df$Var2 <- factor(tile_df$Var2, levels = rev(feature_order))
 
-  txt_sz  <- if (n > 18) 1.8 else if (n > 12) 2.2 else 2.8
-  fig_sz  <- max(7, n * 0.48 + 2.5)
+  text_size  <- if (n_feat > 18) 1.8 else if (n_feat > 12) 2.2 else 2.8
+  fig_size  <- max(7, n_feat * 0.48 + 2.5)
 
-  p <- ggplot(df, aes(x = Var1, y = Var2, fill = rho)) +
+  p <- ggplot(tile_df, aes(x = Var1, y = Var2, fill = rho)) +
     geom_tile(color = "white", linewidth = 0.25) +
-    geom_text(aes(label = lbl), size = txt_sz, lineheight = 0.85) +
+    geom_text(aes(label = lbl), size = text_size, lineheight = 0.85) +
     scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#D6604D",
                          midpoint = 0, limits = c(-1, 1), name = "rho") +
     labs(title    = paste("Feature Correlations —", cond_label),
@@ -539,7 +539,7 @@ make_corr_heatmap_gg <- function(feat_log1p_dt, cond_label, out_path,
     theme(axis.text.x    = element_text(angle = 45, hjust = 1, size = 7.5),
           axis.text.y    = element_text(size = 7.5),
           legend.position = "right")
-  ggsave(out_path, p, width = fig_sz, height = fig_sz * 0.92)
+  ggsave(out_path, p, width = fig_size, height = fig_size * 0.92)
   invisible(p)
 }
 
@@ -582,11 +582,13 @@ make_cond_scatter <- function(merged_log1p_dt, gene_map, out_dir,
                           cor_result$estimate, cor_result$p.value)
 
     # rank by mean of ctrl and trt (arithmetic mean; Spearman rank is invariant to monotone transforms)
+    # ALT: mean
+    # score <- (ctrl_vals + trt_vals) / 2
     # ALT: distance from origin
     # score <- sqrt(ctrl_vals^2 + trt_vals^2)
     # ALT: max of the two conditions
     # score <- pmax(ctrl_vals, trt_vals, na.rm = TRUE)
-    score   <- (ctrl_vals + trt_vals) / 2
+    score <- ifelse(trt_vals - ctrl_vals > 0, trt_vals, 0)
     top_idx <- order(score, decreasing = TRUE, na.last = TRUE)[seq_len(min(top_n, sum(complete)))]
     is_top  <- logical(length(ctrl_vals))
     is_top[top_idx] <- TRUE
@@ -614,61 +616,63 @@ make_cond_scatter <- function(merged_log1p_dt, gene_map, out_dir,
                   color = "#2166AC", se = FALSE, linewidth = 0.8, linetype = "dashed") +
       annotate("text", x = -Inf, y = Inf, label = cor_label,
                hjust = -0.1, vjust = 1.3, size = 3.5, color = "#2166AC") +
-      labs(title = paste(sub("_$", "", ctrl_suffix), "vs",
-                         sub("_$", "", trt_suffix), "—", feature_names[i]),
+      labs(title = paste(sub("^_|_$", "", ctrl_suffix), "vs",
+                         sub("^_|_$", "", trt_suffix), "—", feature_names[i]),
            x = ctrl_cols[i], y = trt_cols[i]) +
       theme_bw(base_size = 16)
     print(p)
   }
   dev.off()
-  cat("  Condition scatter:", basename(out_path), "(", length(cols_c1), "pages)\n")
+  cat("  Condition scatter:", basename(out_path), "(", length(ctrl_cols), "pages)\n")
 }
 
 make_within_diet_scatter <- function(feat_log1p_dt, cond_label, out_dir, gene_map) {
-  meta  <- c("gene_id", "SYMBOL")
-  fcols <- setdiff(colnames(feat_log1p_dt), meta)
-  n     <- length(fcols)
-  if (n < 2) return(invisible(NULL))
+  meta_cols  <- c("gene_id", "SYMBOL")
+  feature_cols <- setdiff(colnames(feat_log1p_dt), meta_cols)
+  n_feat     <- length(feature_cols)
+  if (n_feat < 2) {
+    return(invisible(NULL))
+  }
 
-  sym_up  <- toupper(feat_log1p_dt$SYMBOL)
-  map_up  <- toupper(gene_map$drosophila_symbol)
-  is_ann  <- sym_up %in% map_up
-  lbl_vec <- ifelse(is_ann, gene_map$label[match(sym_up, map_up)], "")
+  symbol_uc  <- toupper(feat_log1p_dt$SYMBOL)
+  map_uc  <- toupper(gene_map$drosophila_symbol)
+  is_ann  <- symbol_uc %in% map_uc
+  gene_labels <- ifelse(is_ann, gene_map$label[match(symbol_uc, map_uc)], "")
 
-  slug     <- gsub("[^A-Za-z0-9]", "_", tolower(cond_label))
-  out_path <- file.path(out_dir, paste0(slug, "_within_diet_feature_pairs.pdf"))
+  label_slug     <- gsub("[^A-Za-z0-9]", "_", tolower(cond_label))
+  out_path <- file.path(out_dir, paste0(label_slug, "_within_diet_feature_pairs.pdf"))
   pdf(out_path, width = 6, height = 6)
-  for (i in seq_len(n - 1)) {
-    for (j in seq(i + 1, n)) {
-      xv <- feat_log1p_dt[[fcols[i]]]
-      yv <- feat_log1p_dt[[fcols[j]]]
-      ok <- !is.na(xv) & !is.na(yv)
-      if (sum(ok) < 5) next
-      ct_r    <- suppressWarnings(
-        cor.test(xv[ok], yv[ok], method = "spearman", exact = FALSE))
-      rho_lbl <- sprintf("rho = %.3f\np = %.2e", ct_r$estimate, ct_r$p.value)
-      df_p    <- data.frame(x = xv, y = yv, ann = is_ann, lbl = lbl_vec)
-      p <- ggplot(df_p, aes(x = x, y = y)) +
-        geom_point(data = df_p[!df_p$ann, ],
+  for (i in seq_len(n_feat - 1)) {
+    for (j in seq(i + 1, n_feat)) {
+      feat1_vals <- feat_log1p_dt[[feature_cols[i]]]
+      feat2_vals <- feat_log1p_dt[[feature_cols[j]]]
+      complete <- !is.na(feat1_vals) & !is.na(feat2_vals)
+      if (sum(complete) < 5) next
+      cor_result    <- suppressWarnings(
+        cor.test(feat1_vals[complete], feat2_vals[complete], method = "spearman", exact = FALSE))
+      cor_label <- sprintf("rho = %.3f\np = %.2e", cor_result$estimate, cor_result$p.value)
+      plot_df    <- data.frame(x = feat1_vals, y = feat2_vals, ann = is_ann, lbl = gene_labels)
+      p <- ggplot(plot_df, aes(x = x, y = y)) +
+        geom_point(data = plot_df[!plot_df$ann, ],
                    color = "grey70", alpha = 0.35, size = 0.7) +
-        geom_point(data = df_p[df_p$ann, ],
+        geom_point(data = plot_df[plot_df$ann, ],
                    color = "#D7191C", size = 2.5) +
-        geom_text_repel(data = df_p[df_p$ann, ],
+        geom_text_repel(data = plot_df[plot_df$ann, ],
                         aes(label = lbl), color = "#D7191C",
                         size = 3, max.overlaps = 30) +
         geom_smooth(method = "lm", formula = y ~ x,
                     color = "grey40", se = FALSE,
                     linewidth = 0.7, linetype = "dashed") +
-        annotate("text", x = -Inf, y = Inf, label = rho_lbl,
+        annotate("text", x = -Inf, y = Inf, label = cor_label,
                  hjust = -0.1, vjust = 1.3, size = 3.5, color = "grey30") +
         labs(title = paste("Feature pair —", cond_label),
-             x = fcols[i], y = fcols[j]) +
+             x = feature_cols[i], y = feature_cols[j]) +
         theme_bw(base_size = 12)
       print(p)
     }
   }
   dev.off()
-  n_pairs <- n * (n - 1) / 2
+  n_pairs <- n_feat * (n_feat - 1) / 2
   cat("  Within-diet scatter:", basename(out_path), "(", n_pairs, "pages)\n")
 }
 

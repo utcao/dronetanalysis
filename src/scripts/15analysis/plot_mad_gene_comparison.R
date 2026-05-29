@@ -168,11 +168,11 @@ cat("Computing MAD...\n")
 
 # Exclude focus gene from the MAD pool (comparing it to itself is uninformative)
 other_ids  <- setdiff(expr_dt[[gene_col]], args$focus_gene)
-expr_other <- as.matrix(expr_dt[get(gene_col) %in% other_ids, ..sample_cols])
-rownames(expr_other) <- expr_dt[get(gene_col) %in% other_ids, get(gene_col)]
+mad_expr_mat <- as.matrix(expr_dt[get(gene_col) %in% other_ids, ..sample_cols])
+rownames(mad_expr_mat) <- expr_dt[get(gene_col) %in% other_ids, get(gene_col)]
 
-mad_low  <- apply(expr_other[, low_samples,  drop = FALSE], 1, mad, na.rm = TRUE)
-mad_high <- apply(expr_other[, high_samples, drop = FALSE], 1, mad, na.rm = TRUE)
+mad_low  <- log2(apply(2^mad_expr_mat[, low_samples,  drop = FALSE], 1, mad, na.rm = TRUE))
+mad_high <- log2(apply(2^mad_expr_mat[, high_samples, drop = FALSE], 1, mad, na.rm = TRUE))
 
 n_genes <- length(mad_low)
 cat("  MAD computed for", n_genes, "genes\n")
@@ -182,9 +182,9 @@ cat("  MAD HIGH — median:", round(median(mad_high), 4),
     " | range: [", round(min(mad_high), 4), ",", round(max(mad_high), 4), "]\n\n")
 
 # ----- 10. Wilcoxon rank-sum test -----
-wt <- wilcox.test(mad_low, mad_high, paired = FALSE)
+wilcox_result <- wilcox.test(mad_low, mad_high, paired = FALSE)
 cat("  Wilcoxon rank-sum test:\n")
-cat("  ", format_pval(wt$p.value), "\n\n")
+cat("  ", format_pval(wilcox_result$p.value), "\n\n")
 
 # ----- 11. Assemble long-format data frame -----
 plot_df <- data.frame(
@@ -209,36 +209,36 @@ gene_label <- if (!is.null(args$gene_symbol)) {
 mean_low  <- mean(mad_low,  na.rm = TRUE)
 mean_high <- mean(mad_high, na.rm = TRUE)
 
-title_str    <- paste0("Gene-level MAD Variability\n",
+plot_title    <- paste0("Gene-level MAD Variability\n",
                        "Focus: ", gene_label, "  |  Condition: ", args$condition_label)
-subtitle_str <- paste0(format_pval(wt$p.value),
+plot_subtitle <- paste0(format_pval(wilcox_result$p.value),
                        "  |  mean LOW = ", round(mean_low, 4),
                        ",  mean HIGH = ", round(mean_high, 4))
 
 # Append partner type to subtitle if not "all"
 if (args$partner_type != "all")
-  subtitle_str <- paste0(subtitle_str, "  [", args$partner_type, " partners only]")
+  plot_subtitle <- paste0(plot_subtitle, "  [", args$partner_type, " partners only]")
 
-colors_groups <- c("LOW" = "#2E86AB", "HIGH" = "#A23B72")
+group_colors <- c("LOW" = "#2E86AB", "HIGH" = "#A23B72")
 
 # Star annotation y-position: just above the violin max
 y_max  <- max(plot_df$mad_value, na.rm = TRUE)
 y_star <- y_max * 1.08
 
-p <- ggplot(plot_df, aes(x = group, y = mad_value, fill = group)) +
+mad_plot <- ggplot(plot_df, aes(x = group, y = mad_value, fill = group)) +
   geom_violin(alpha = 0.55, trim = FALSE, linewidth = 0.4) +
   geom_boxplot(width = 0.18, alpha = 0.85, outlier.alpha = 0.25, linewidth = 0.4) +
   geom_jitter(width = 0.07, size = 0.45, alpha = 0.12, color = "black") +
   annotate("text", x = 1.5, y = y_star,
-           label = format_pval(wt$p.value), size = 6, vjust = 0) +
+           label = format_pval(wilcox_result$p.value), size = 6, vjust = 0) +
   annotate("segment", x = 1, xend = 2, y = y_max * 1.03, yend = y_max * 1.03,
            linewidth = 0.35, color = "grey40") +
-  scale_fill_manual(values = colors_groups) +
+  scale_fill_manual(values = group_colors) +
   labs(
-    title    = title_str,
-    subtitle = subtitle_str,
+    title    = plot_title,
+    subtitle = plot_subtitle,
     x        = paste0("Sample group (split by ", gene_label, " expression)"),
-    y        = "MAD across samples (VOOM)",
+    y        = "log2(MAD) across samples (VOOM)",
     caption  = paste0("n_genes = ", n_genes,
                       "  |  n_LOW = ", k_low, " samples",
                       "  |  n_HIGH = ", k_high, " samples")
@@ -256,15 +256,15 @@ p <- ggplot(plot_df, aes(x = group, y = mad_value, fill = group)) +
 
 # ----- 13. Save outputs -----
 partner_suffix <- if (args$partner_type == "all") "" else paste0("_", args$partner_type)
-out_stem <- file.path(args$output_dir,
+output_stem <- file.path(args$output_dir,
                       paste0(args$focus_gene, "_mad_variability", partner_suffix))
 
-pdf_path <- paste0(out_stem, ".pdf")
-ggsave(pdf_path, p, width = 6, height = 7)
+pdf_path <- paste0(output_stem, ".pdf")
+ggsave(pdf_path, mad_plot, width = 6, height = 7)
 cat("  Saved plot: ", pdf_path, "\n")
 
 if (args$save_csv) {
-  csv_path <- paste0(out_stem, ".csv")
+  csv_path <- paste0(output_stem, ".csv")
   write.csv(plot_df, csv_path, row.names = FALSE)
   cat("  Saved data: ", csv_path, "\n")
 }

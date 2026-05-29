@@ -46,8 +46,8 @@ compute_mad_stats <- function(focus_gene, expr_mat, gene_ids,
     other_idx <- which(gene_ids != focus_gene)
     expr_other <- expr_mat[other_idx, , drop = FALSE]
 
-    mad_low  <- apply(expr_other[, low_idx,  drop = FALSE], 1, mad, na.rm = TRUE)
-    mad_high <- apply(expr_other[, high_idx, drop = FALSE], 1, mad, na.rm = TRUE)
+    mad_low  <- log2(apply(2^expr_other[, low_idx,  drop = FALSE], 1, mad, na.rm = TRUE))
+    mad_high <- log2(apply(2^expr_other[, high_idx, drop = FALSE], 1, mad, na.rm = TRUE))
 
     wt <- wilcox.test(mad_low, mad_high, paired = FALSE, exact = FALSE)
 
