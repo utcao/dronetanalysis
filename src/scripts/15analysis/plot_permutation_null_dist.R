@@ -79,14 +79,14 @@ if (!is.null(pvals_tsv_path) && file.exists(pvals_tsv_path)) {
 }
 
 # ----- Discover per-gene TSV files -----
-tsv_files <- list.files(null_tsv_dir, pattern = "_null_dist\\.tsv\\.gz$", full.names = TRUE)
-if (length(tsv_files) == 0) {
+null_tsv_files <- list.files(null_tsv_dir, pattern = "_null_dist\\.tsv\\.gz$", full.names = TRUE)
+if (length(null_tsv_files) == 0) {
   stop(sprintf("No *_null_dist.tsv.gz files found in: %s", null_tsv_dir))
 }
-cat(sprintf("Found %d null distribution TSV files.\n", length(tsv_files)))
+cat(sprintf("Found %d null distribution TSV files.\n", length(null_tsv_files)))
 
 # ----- Process each gene -----
-for (tsv_path in tsv_files) {
+for (tsv_path in null_tsv_files) {
   gene_tag <- sub("_null_dist\\.tsv\\.gz$", "", basename(tsv_path))
   gene_id  <- sub("^[0-9]+_", "", gene_tag)  # strip leading NNNN_
 
@@ -100,11 +100,11 @@ for (tsv_path in tsv_files) {
   if (is.null(null_dt) || nrow(null_dt) == 0) next
 
   # Determine metrics to plot
-  avail_metrics <- setdiff(names(null_dt), c("gene_id", "perm_idx"))
+  available_metrics <- setdiff(names(null_dt), c("gene_id", "perm_idx"))
   if (!is.null(metrics_filter)) {
-    plot_metrics <- intersect(metrics_filter, avail_metrics)
+    plot_metrics <- intersect(metrics_filter, available_metrics)
   } else {
-    plot_metrics <- avail_metrics
+    plot_metrics <- available_metrics
   }
   if (length(plot_metrics) == 0) {
     cat(sprintf("  No metrics to plot for %s. Skipping.\n", gene_id))
@@ -112,25 +112,25 @@ for (tsv_path in tsv_files) {
   }
 
   # Look up p-values row for this gene
-  pval_row <- NULL
+  gene_pval_row <- NULL
   if (!is.null(pvals_dt)) {
-    pval_row <- pvals_dt[gene_id == gene_id]
-    if (nrow(pval_row) == 0) pval_row <- NULL
+    gene_pval_row <- pvals_dt[gene_id == ..gene_id]
+    if (nrow(gene_pval_row) == 0) gene_pval_row <- NULL
   }
 
   # Open PDF
   pdf_path <- file.path(output_dir, sprintf("%s_permutation_null.pdf", gene_tag))
   n_pages  <- length(plot_metrics)
   # Use a 2-column layout if many metrics
-  ncol_lay <- if (n_pages > 4) 2L else 1L
-  nrow_lay <- ceiling(n_pages / ncol_lay)
-  pdf_width  <- 7 * ncol_lay
-  pdf_height <- 4 * nrow_lay
+  layout_ncols <- if (n_pages > 4) 2L else 1L
+  layout_nrows <- ceiling(n_pages / layout_ncols)
+  pdf_width  <- 7 * layout_ncols
+  pdf_height <- 4 * layout_nrows
 
   pdf(pdf_path, width = pdf_width, height = pdf_height)
-  par_old <- par(no.readonly = TRUE)
+  old_par <- par(no.readonly = TRUE)
 
-  plot_list <- list()
+  page_plots <- list()
 
   for (m in plot_metrics) {
     null_vals <- null_dt[[m]]
@@ -138,18 +138,18 @@ for (tsv_path in tsv_files) {
 
     # Observed value
     obs_col <- paste0("obs_", m)
-    if (!is.null(pval_row) && obs_col %in% names(pval_row)) {
-      obs_val <- as.numeric(pval_row[[obs_col]][1])
+    if (!is.null(gene_pval_row) && obs_col %in% names(gene_pval_row)) {
+      obs_val <- as.numeric(gene_pval_row[[obs_col]][1])
     } else {
       obs_val <- NA_real_
     }
 
     # P-value
     pval_col <- paste0("pval_", m)
-    if (!is.null(pval_row) && pval_col %in% names(pval_row)) {
-      pval_val <- as.numeric(pval_row[[pval_col]][1])
+    if (!is.null(gene_pval_row) && pval_col %in% names(gene_pval_row)) {
+      pval_obs <- as.numeric(gene_pval_row[[pval_col]][1])
     } else {
-      pval_val <- NA_real_
+      pval_obs <- NA_real_
     }
 
     # Null summary
@@ -157,16 +157,16 @@ for (tsv_path in tsv_files) {
     null_sd   <- sd(null_vals,   na.rm = TRUE)
 
     # Human-readable metric label
-    m_label <- if (m %in% names(METRIC_LABELS)) METRIC_LABELS[[m]] else m
+    metric_label <- if (m %in% names(METRIC_LABELS)) METRIC_LABELS[[m]] else m
 
     # Build annotation string
-    if (!is.na(pval_val)) {
-      stars    <- get_sig_stars(pval_val)
-      ann_text <- sprintf("p = %.4f %s\nNull: mean=%.3f, sd=%.3f\nn = %d permutations",
-                          pval_val, stars, null_mean, null_sd, n_perm)
+    if (!is.na(pval_obs)) {
+      stars      <- get_sig_stars(pval_obs)
+      annot_text <- sprintf("p = %.4f %s\nNull: mean=%.3f, sd=%.3f\nn = %d permutations",
+                            pval_obs, stars, null_mean, null_sd, n_perm)
     } else {
-      ann_text <- sprintf("Null: mean=%.3f, sd=%.3f\nn = %d permutations",
-                          null_mean, null_sd, n_perm)
+      annot_text <- sprintf("Null: mean=%.3f, sd=%.3f\nn = %d permutations",
+                            null_mean, null_sd, n_perm)
     }
 
     # Plot data frame
@@ -182,14 +182,14 @@ for (tsv_path in tsv_files) {
     x_pad <- (x_max - x_min) * 0.1
     if (x_pad == 0) x_pad <- 1
 
-    g <- ggplot(plot_df, aes(x = value)) +
+    hist_plot <- ggplot(plot_df, aes(x = value)) +
       geom_histogram(fill = "grey65", colour = "white", bins = 30) +
       labs(
         title    = sprintf("%s — %s", gene_id, condition_label),
-        subtitle = m_label,
-        x        = m_label,
+        subtitle = metric_label,
+        x        = metric_label,
         y        = "Count (permutations)",
-        caption  = ann_text
+        caption  = annot_text
       ) +
       xlim(x_min - x_pad, x_max + x_pad) +
       theme_bw(base_size = 11) +
@@ -201,7 +201,7 @@ for (tsv_path in tsv_files) {
 
     # Add observed value line
     if (!is.na(obs_val)) {
-      g <- g +
+      hist_plot <- hist_plot +
         geom_vline(xintercept = obs_val, colour = "firebrick", linewidth = 1, linetype = "dashed") +
         annotate("text",
                  x     = obs_val,
@@ -211,16 +211,16 @@ for (tsv_path in tsv_files) {
                  colour = "firebrick", size = 3)
     }
 
-    plot_list[[m]] <- g
+    page_plots[[m]] <- hist_plot
   }
 
   # Print all plots to PDF
-  for (g in plot_list) {
-    print(g)
+  for (hist_plot in page_plots) {
+    print(hist_plot)
   }
 
   dev.off()
-  par(par_old)
+  par(old_par)
   cat(sprintf("    Saved %s\n", pdf_path))
 }
 
