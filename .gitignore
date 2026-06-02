@@ -12,7 +12,7 @@ manuscript/
 planning/
 results/
 archives
-logs*
+log*
 ## for test data or scripts without synchronization
 src/test/
 
