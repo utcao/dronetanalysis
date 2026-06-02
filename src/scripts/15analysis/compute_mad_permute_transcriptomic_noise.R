@@ -322,7 +322,7 @@ if (!is.null(args$focus_genes) && any(!sapply(example_data, is.null))) {
   suppressPackageStartupMessages(library(ggplot2))
   plot_file <- sub("\\.xlsx$", "_example_distributions.pdf", args$output_file)
 
-  pdf(plot_file, width = 7, height = 4.5)
+  pdf(plot_file, width = 8, height = 4.5)
   for (ex in example_data[!sapply(example_data, is.null)]) {
     if (is.null(ex$null_deltas)) {
       next
@@ -343,9 +343,9 @@ if (!is.null(args$focus_genes) && any(!sapply(example_data, is.null))) {
       geom_vline(xintercept =  obs_delta,      colour = "firebrick", linewidth = 1.2) +
       geom_vline(xintercept = -abs(obs_delta), colour = "firebrick", linewidth = 0.8,
                  linetype = "dashed") +
-      annotate("text", x = obs_delta, y = Inf,
+      annotate("text", x = obs_delta*0.5, y = Inf,
                label  = sprintf("obs = %.4f", obs_delta),
-               colour = "firebrick", vjust = 1.5, hjust = -0.08, size = 3.2) +
+               colour = "firebrick", vjust = 1.5, hjust = -0.09, size = 5.5) +
       labs(title    = gene_label,
            subtitle = pval_label,
            x        = expression(Delta * " mean MAD (permuted)"),
