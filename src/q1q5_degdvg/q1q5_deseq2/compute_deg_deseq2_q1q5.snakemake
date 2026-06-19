@@ -1,0 +1,95 @@
+# ==============================================================================
+# compute_deg_deseq2_q1q5.snakemake
+#
+# Identify differentially expressed genes (DEG) by comparing the bottom (Q1)
+# vs top (Q5) expression quintile samples of each focal gene, separately for
+# CT (control) and HS (high-sugar) conditions, using DESeq2.
+#
+# For each focal gene × condition pair the workflow:
+#   1. Filters samples to the given condition (CT: treatment=1, HS: treatment=2)
+#   2. Ranks samples by CPM expression of the focal gene
+#   3. Retains the bottom 20% (Q1) and top 20% (Q5) — drops the middle 60%
+#   4. Fits a negative-binomial GLM via DESeq2 with empirical Bayes dispersion
+#   5. Applies Wald test (default) or LRT for the Q1 vs Q5 contrast
+#   6. Applies BH FDR correction and classifies each gene as up_deg / down_deg / NS
+#
+# Focal genes to analyse: listed in src/q1q5_degdvg/shared/focal_genes.csv.
+# Required column: gene_id (FlyBase ID).  Optional columns: symbol, description, etc.
+# Add or remove rows there — no changes to this file needed.
+#
+# ENVIRONMENT:
+#   Snakemake: use the base conda env (/tmp/global2/caoyt/miniforge3/bin/snakemake)
+#              which has the cluster-generic executor plugin (required for Snakemake >=8).
+#   R / DESeq2: child jobs call Rscript via its full path inside the ganlss env
+#              (RSCRIPT variable below), so no conda activation is needed in child jobs.
+#
+# USAGE (run from code/dronetanalysis/):
+#   dry run  : /tmp/global2/caoyt/miniforge3/bin/snakemake \
+#                -s src/q1q5_degdvg/q1q5_deseq2/compute_deg_deseq2_q1q5.snakemake -n -p
+#   local    : /tmp/global2/caoyt/miniforge3/bin/snakemake \
+#                -s src/q1q5_degdvg/q1q5_deseq2/compute_deg_deseq2_q1q5.snakemake -j 8 -p
+#   cluster  : /tmp/global2/caoyt/miniforge3/bin/snakemake \
+#                -s src/q1q5_degdvg/q1q5_deseq2/compute_deg_deseq2_q1q5.snakemake \
+#                --profile src/q1q5_degdvg/q1q5_deseq2/profiles/sge
+#   qsub wrapper: qsub src/q1q5_degdvg/q1q5_deseq2/submit_deseq2_q1q5.sh
+#
+# Each rule uses threads: 4 (passed to MulticoreParam inside R).
+# Cluster resources per job: 4 slots, 20 GB, 12 h (see profiles/sge/config.yaml).
+#
+# OUTPUT (per focal gene × condition):
+#   {DESEQ2_DIR}/{gene}_{cond}_Q1vsQ5_deseq2_deg.csv     — per-gene results
+#   {DESEQ2_DIR}/{gene}_{cond}_Q1vsQ5_deseq2_deg_sum.csv — classification counts
+#   {LOG_DIR}/{gene}_{cond}.log                           — full R stdout/stderr
+# ==============================================================================
+
+# --- paths ---
+RSCRIPT    = "/tmp/global2/caoyt/miniforge3/envs/ganlss/bin/Rscript"
+DESEQ2_DIR = "../../results/deseq2_0609"
+LOG_DIR    = "../../logs/deseq2_0609"
+
+# --- conditions: label → integer code used in the metadata 'treatment' column ---
+CONDITIONS = {"CT": 1, "HS": 2}
+
+# --- focal genes: read gene_id column from CSV so this workflow does not need editing ---
+import csv
+with open("src/q1q5_degdvg/shared/focal_genes.csv") as fh:
+    FOCAL_GENES = [row["gene_id"] for row in csv.DictReader(fh)]
+
+# ==============================================================================
+
+rule all:
+    input:
+        expand(
+            DESEQ2_DIR + "/{gene}_{cond}_Q1vsQ5_deseq2_deg.csv",
+            gene=FOCAL_GENES,
+            cond=CONDITIONS.keys()
+        )
+
+rule deseq2_quintile:
+    # Fit DESeq2 models for one focal gene in one condition.
+    # run_deseq2_quintile_analysis.R uses argparse named flags:
+    #   --focal-gene    FlyBase gene ID
+    #   --full-run      analyse all genes (no test-mode cap)
+    #   --condition-val integer condition code (1=CT, 2=HS)
+    output:
+        main    = DESEQ2_DIR + "/{gene}_{cond}_Q1vsQ5_deseq2_deg.csv",
+        summary = DESEQ2_DIR + "/{gene}_{cond}_Q1vsQ5_deseq2_deg_sum.csv"
+    params:
+        condition_val = lambda wildcards: CONDITIONS[wildcards.cond],
+        out_dir       = DESEQ2_DIR
+    threads: 4
+    resources:
+        mem_gb   = 20,
+        walltime = "12:0:0"
+    log:
+        LOG_DIR + "/{gene}_{cond}.log"
+    shell:
+        """
+        mkdir -p {LOG_DIR}
+        {RSCRIPT} src/q1q5_degdvg/q1q5_deseq2/run_deseq2_quintile_analysis.R \
+            --focal-gene {wildcards.gene} \
+            --full-run \
+            --condition-val {params.condition_val} \
+            --out-dir {params.out_dir} \
+            > {log} 2>&1
+        """
