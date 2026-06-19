@@ -1,4 +1,0 @@
-# Focal gene list — one Dmel gene ID per line.
-# Lines starting with # are ignored.
-# Used by Snakefile to expand the {gene} wildcard.
-FBgn0027560

@@ -34,6 +34,8 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [GUIDE-13-Condition-Comparison-Analysis.md](GUIDE-13-Condition-Comparison-Analysis.md) | `analyze_conditions.R` — comprehensive CT vs HS comparison: PCA, delta barplots, violin/box plots, heatmaps, scatterplots, and summary tables |
 | [GUIDE-14-Module-Analysis.md](GUIDE-14-Module-Analysis.md) | Module-level scripts: `module_enrichment.R` (GO/KEGG), `module_overlap_analysis.R` (Jaccard + Fisher), `module_preservation_netrep.R` (NetRep), `visualise_network.R` (igraph) |
 | [GUIDE-15-MAD-Rank-Shift-Plot.md](GUIDE-15-MAD-Rank-Shift-Plot.md) | `figures/plot_mad_rank_shift.R` — dumbbell plot of genome-wide MAD rank with selected gene group highlighted (solid = CT rank, hollow = TR rank) |
+| [GUIDE-19-GAMLSS-DEG-DVG-Q1Q5.md](GUIDE-19-GAMLSS-DEG-DVG-Q1Q5.md) | GAMLSS DEG/DVG analysis comparing bottom (Q1) vs top (Q5) expression quintile samples of a focal gene; NBI three-model LR test design; SGE Snakemake workflow; output column reference |
+| [GUIDE-20-DESeq2-limma-voom-DEG-Q1Q5.md](GUIDE-20-DESeq2-limma-voom-DEG-Q1Q5.md) | DESeq2 and limma-voom DEG analysis with the same Q1/Q5 focal-gene stratification design; side-by-side output reference (baseMean, log2FC_shrunken vs AveExpr, B-statistic); directional class annotation |
 
 ### ⚡ Optimization Guides
 
@@ -42,6 +44,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) | Vectorized vs batch processing modes to manage memory (12-30 GB) |
 | [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) | Sparse storage modes reducing disk usage from 7 TB to 0.9 TB (common) or 0.3 TB (minimal) |
 | [OPTIMIZATION-03-Network-Reconstruction.md](OPTIMIZATION-03-Network-Reconstruction.md) | Stage 3 performance optimization providing 200-800x speedup for network reconstruction |
+| [OPTIMIZATION-04-Snakemake-Efficiency.md](OPTIMIZATION-04-Snakemake-Efficiency.md) | Efficient Snakemake patterns (centralized paths, CSV gene lists, cluster-generic executor, master qsub job, multi-file `include:` organization) vs naïve approach |
 
 ### 🔧 Critical Fixes
 
@@ -57,6 +60,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 |----------|-------------|
 | [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) | Statistical testing methods (bootstrap, Fisher's Z) and efficient pipeline design |
 | [REFERENCE-02-Script-Naming-Convention.md](REFERENCE-02-Script-Naming-Convention.md) | Naming convention for `src/scripts/15analysis/` scripts (`<verb>_<metric>_<description>`), rename table, directory layout, and extension guide |
+| [REFERENCE-03-DEG-DVG-Identification.md](REFERENCE-03-DEG-DVG-Identification.md) | Concept reference for DEG and DVG identification: Q1/Q5 design rationale, GAMLSS vs DESeq2 vs limma-voom model comparison, normalisation strategies, contrast coding, directional annotation, when to use each method |
 
 ### 📤 Pipeline Results
 
@@ -210,6 +214,15 @@ bash src/SGE_scripts/run_bootstrap_pipeline.sh \
 
 ## Recent Updates
 
+### 2026-06-09
+- ✅ **Unified Q1/Q5 DEG/DVG analysis framework**: Reorganised into `src/q1q5_degdvg/` with shared preprocessor and focal gene list; three parallel method stacks (GAMLSS, DESeq2, limma-voom)
+  - `src/q1q5_degdvg/shared/focal_genes.csv` — annotated focal gene list (gene_id + symbol + description); all Snakefiles read `gene_id` column
+  - `src/q1q5_degdvg/shared/preprocess_quintile.R` — shared condition filter → quintile split → SV merge; returns raw counts for all methods
+  - `src/q1q5_degdvg/q1q5_gamlss/` — GAMLSS stack (moved from `src/gamlss_q1q5/`); `classify_gamlss()` updated with directional labels (`up_deg`, `down_deg`, `up_dvg`, `down_dvg`, `Both`, `NS`)
+  - `src/q1q5_degdvg/q1q5_deseq2/` — DESeq2 stack: NB GLM, size factors, `lfcShrink(type="normal")`, Wald/LRT test; 20 GB / 12 h per job
+  - `src/q1q5_degdvg/q1q5_limma_voom/` — limma-voom stack: TMM + voom + `lmFit→eBayes→topTable`; vectorized, 1 worker; 10 GB / 2 h per job
+- ✅ **New docs**: Added [GUIDE-20](GUIDE-20-DESeq2-limma-voom-DEG-Q1Q5.md) (DESeq2 + limma-voom workflow), [REFERENCE-03](REFERENCE-03-DEG-DVG-Identification.md) (DEG/DVG concepts + method comparison); added [GUIDE-19](GUIDE-19-GAMLSS-DEG-DVG-Q1Q5.md) and [OPTIMIZATION-04](OPTIMIZATION-04-Snakemake-Efficiency.md) (Snakemake patterns)
+
 ### 2026-04-27
 - ✅ **Script renames**: Applied `<verb>_<metric>_<description>` naming convention to 9 scripts in `src/scripts/15analysis/`; `module_*` and `visualise_network.R` left unchanged; `run_variability_batch.py` unchanged
 - ✅ **New folder**: `src/scripts/15analysis/figures/` — ad-hoc post-pipeline visualization scripts
@@ -313,6 +326,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2026-04-27
+**Last Updated:** 2026-06-09
 **Pipeline Version:** 2.3 (permutation test: Stage 7 + Snakefile_permutation)
 **Status:** ✅ All documentation current

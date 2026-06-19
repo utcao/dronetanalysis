@@ -1,0 +1,54 @@
+# ==============================================================================
+# Snakemake SGE profile - src/gamlss_q1q5/profiles/sge/config.yaml
+#
+# Snakemake 8+ dropped --cluster in favour of executor plugins.
+# This profile uses the cluster-generic executor (bundled with snakemake >=8).
+# Run Snakemake from the base conda env; Rscript is invoked via its full path
+# inside the ganlss env so no conda activation is needed in the child jobs.
+#
+# USAGE (from code/dronetanalysis/):
+#   snakemake -s src/gamlss_q1q5/compute_degdvg_gamlss_q1q5.snakemake \
+#             --profile src/gamlss_q1q5/profiles/sge
+#
+# KEYS (Snakemake 9 profile YAML - same names as CLI flags, without '--'):
+#   executor                    -> --executor
+#   cluster-generic-submit-cmd  -> --cluster-generic-submit-cmd
+#   jobs                        -> --jobs / -j
+#   latency-wait                -> --latency-wait
+# ==============================================================================
+
+executor: cluster-generic
+
+# Child job qsub template - one job per focal gene x condition.
+# Snakemake expands: {threads}, {resources.*}, {rule}, {wildcards.*}, {jobid}
+# {threads}               from  threads: 4  in the rule
+# {resources.mem_gb}      from  resources: mem_gb = 25  in the rule
+# {resources.walltime}    from  resources: walltime = "48:0:0"  in the rule
+# Note: 'runtime' is reserved by Snakemake >=7 (integer minutes only);
+#       'walltime' is a plain user resource that accepts HH:MM:SS strings.
+cluster-generic-submit-cmd: >-
+  qsub
+  -A child_gamlss_q1q5
+  -pe parallel {threads}
+  -l h_vmem={resources.mem_gb}G
+  -l h_rt={resources.walltime}
+  -N gamlss_{rule}_{wildcards.gene}_{wildcards.cond}
+  -j y
+  -cwd
+  -o /dev/null
+
+# Max child jobs in the queue at once (not a core count - raise freely).
+jobs: 50
+
+# Seconds to wait for output files to appear on NFS after a job finishes.
+# Without this, Snakemake may declare output "missing" before the FS syncs.
+latency-wait: 120
+
+# Continue with remaining genes if one gene's job fails.
+keep-going: true
+
+# Re-run rules whose output files exist but are incomplete (e.g. from a crash).
+rerun-incomplete: true
+
+# Print the shell command for each submitted job.
+printshellcmds: true
