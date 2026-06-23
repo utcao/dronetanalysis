@@ -228,6 +228,6 @@ cat("Total genes tested:            ", n_tested, "\n")
 cat("Significant (FDR < 0.05):      ", n_sig, " (", pct_sig, "%)\n", sep = "")
 cat("  \u2191 Increased variability (HIGH > LOW):  ",
     n_increased, " (", pct_inc, "% of total)\n", sep = "")
-cat("  \u2193 Decreased variability (LOW > HIGH):  ",
+cat("  \u2193 Decreased variability (HIGH < LOW):  ",
     n_decreased, " (", pct_dec, "% of total)\n", sep = "")
 cat("Results saved to: ", args$output_file, "\n")
