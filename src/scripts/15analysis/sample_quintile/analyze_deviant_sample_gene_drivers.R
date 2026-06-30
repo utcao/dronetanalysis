@@ -35,11 +35,11 @@
 #
 # Usage:
 #   Rscript analyze_deviant_sample_gene_drivers.R \
-#     --sample-metrics  results/quintile_overlap_ct/sample_quintile_counts.tsv \
-#     --quintile-matrix results/quintile_overlap_ct/quintile_matrix.rds \
-#     --expr-file       data/processed/VST/vstdataCtrl.txt \
-#     --output-dir      results/deviant_gene_drivers_ct \
-#     --top-pct         5,10,30 \
+#     --sample-metrics  results/quintile_overlap_voom_ct/sample_quintile_counts.tsv \
+#     --quintile-matrix results/quintile_overlap_voom_ct/quintile_matrix.rds \
+#     --expr-file       data/processed/VOOM/voomdataCtrl.txt \
+#     --output-dir      results/deviant_gene_drivers_voom_ct \
+#     --top-pct         10,30 \
 #     --n-top-genes     1000 \
 #     --n-random        100 \
 #     --cor-method      spearman \
@@ -70,10 +70,10 @@ parser$add_argument("--output-dir",      required = TRUE,
                     help = "Directory for all outputs (created if absent)")
 parser$add_argument("--top-pct",         default = "10,30",
                     help = "Comma-separated percentile thresholds (default: '10,30')")
-parser$add_argument("--n-top-genes",     type = "integer", default = 100L,
-                    help = "Top-N genes per method for heatmaps (default: 100)")
-parser$add_argument("--n-random",        type = "integer", default = 100L,
-                    help = "Random gene sets for bootstrap comparison (default: 100)")
+parser$add_argument("--top-n",           type = "integer", default = NULL,
+                    help = "Select top-N genes per method by score rank (mutually exclusive with --freq-threshold; default when neither given: 100)")
+parser$add_argument("--n-random",        type = "integer", default = 10L,
+                    help = "Random gene sets for bootstrap comparison (default: 10)")
 parser$add_argument("--cor-method",      default = "spearman",
                     choices = c("spearman", "pearson"),
                     help = "Correlation method (default: spearman)")
@@ -83,10 +83,12 @@ parser$add_argument("--condition-label", default = "Condition",
                     help = "Label used in plot titles (default: 'Condition')")
 parser$add_argument("--skip-enrichment", action = "store_true", default = FALSE,
                     help = "Disable pathway enrichment (default: enrichment runs)")
-parser$add_argument("--utils-dir",       default = NULL,
-                    help = "Directory containing utils_pathways.R (auto-resolved if absent)")
+# parser$add_argument("--utils-dir",       default = NULL,
+#                     help = "Directory containing utils_pathways.R (auto-resolved if absent)")
 parser$add_argument("--kegg-cache",      default = NULL,
                     help = "Path to RDS KEGG cache; created on first run if absent")
+parser$add_argument("--freq-threshold",  type = "double",  default = NULL,
+                    help = "Select genes with freq_q >= threshold [0,1] (mutually exclusive with --top-n)")
 args <- parser$parse_args()
 
 cat("=== Deviant-Sample Gene Driver Analysis ===\n")
@@ -101,11 +103,30 @@ for (f in c(args$sample_metrics, args$quintile_matrix, args$expr_file))
 dir.create(args$output_dir, recursive = TRUE, showWarnings = FALSE)
 
 top_pcts    <- as.integer(trimws(strsplit(args$top_pct, ",")[[1L]]))
-n_top       <- args$n_top_genes
 n_rand      <- args$n_random
 cor_method  <- args$cor_method
 padj_thresh <- args$padj_max
-n_steps     <- 100L
+
+if (!is.null(args$top_n) && !is.null(args$freq_threshold))
+  stop("--top-n and --freq-threshold are mutually exclusive; provide only one.")
+if (is.null(args$top_n) && is.null(args$freq_threshold))
+  args$top_n <- 100L
+use_top_n       <- !is.null(args$top_n)
+use_freq_thresh <- !is.null(args$freq_threshold)
+n_top           <- args$top_n          # NULL in threshold mode; overridden per-Q
+freq_threshold  <- args$freq_threshold # NULL in top-N mode
+sel_tag         <- if (use_top_n) sprintf("top%d", args$top_n) else sprintf("freq%.2f", freq_threshold)
+n_steps <- 100L
+
+script_dir <- tryCatch(
+  dirname(normalizePath(
+    sub("--file=", "",
+        grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1L]),
+    mustWork = FALSE
+  )),
+  error = function(e) getwd()
+)
+source(file.path(script_dir, "utils_sample_quintile.R"))
 
 # ---- Load inputs ------------------------------------------------------------
 cat("Loading sample metrics...\n")
@@ -137,122 +158,11 @@ qmat     <- qmat[, common_samps, drop = FALSE]
 expr_mat <- expr_mat[, common_samps, drop = FALSE]
 cat("  Common samples:", length(common_samps), "\n\n")
 
-# ---- Sequential heatmap colour builder for absolute correlation ∈ [0, 1] ----
-make_hm_colors <- function(vals) {
-  bk <- seq(min(vals, na.rm = TRUE), max(vals, na.rm = TRUE),
-            length.out = 2L * n_steps + 1L)
-  cl <- colorRampPalette(c("#FFFFFF", "#D6604D"))(2L * n_steps)
-  list(breaks = bk, colors = cl)
-}
-
-# ---- Draw one correlation heatmap to the active PDF device ------------------
-# Returns TRUE on success, FALSE if gene set is too small.
-draw_cor_heatmap <- function(gene_set, sample_set, fq_named, or_named,
-                             method_label, basis_label, q_label,
-                             show_names, cond_label, cor_meth, expr_mat) {
-  gs <- intersect(gene_set, rownames(expr_mat))
-  if (length(gs) < 2L) {
-    message("    [skip ", method_label, " (", basis_label,
-            "): < 2 genes in expression matrix]")
-    return(FALSE)
-  }
-  sub_mat <- expr_mat[gs, sample_set, drop = FALSE]
-  abs_cor_mat <- cor(t(sub_mat), method = cor_meth) |> abs()
-  diag(abs_cor_mat) <- NA_real_
-
-  hm      <- make_hm_colors(abs_cor_mat[!is.na(abs_cor_mat)])
-
-  # Continuous gene-level annotations; pheatmap expects 2-colour vectors for
-  # continuous variables (low-to-high gradient).
-  ann_df  <- data.frame(
-    freq_q     = fq_named[gs],
-    odds_ratio = pmin(or_named[gs], 50),   # cap extreme ORs for display
-    row.names  = gs
-  )
-  ann_colors <- list(
-    freq_q     = c("#FFFFFF", "#D6604D"),
-    odds_ratio = c("#FFFFFF", "#4393C3")
-  )
-
-  pheatmap(
-    mat               = abs_cor_mat,
-    color             = hm$colors,
-    breaks            = hm$breaks,
-    cluster_rows      = TRUE,
-    cluster_cols      = TRUE,
-    show_rownames     = show_names,
-    show_colnames     = show_names,
-    annotation_row    = ann_df,
-    annotation_colors = ann_colors,
-    border_color      = NA,
-    na_col            = "grey90",
-    main              = sprintf(
-      "%s  |  %s  —  %s\nbasis: %s  |  n_genes=%d  n_samples=%d  method=%s",
-      cond_label, q_label, method_label, basis_label,
-      length(gs), length(sample_set), cor_meth
-    )
-  )
-  TRUE
-}
-
-# ---- Bootstrap co-expression comparison (driver vs random gene sets) --------
-# Returns a ggplot object.
-make_bootstrap_boxplot <- function(driver_sets, sample_set, q_label,
-                                   cond_label, pct_label, cor_meth,
-                                   n_random, expr_mat) {
-  rows <- vector("list", length(driver_sets))
-  for (mi in seq_along(driver_sets)) {
-    m_name <- names(driver_sets)[mi]
-    gs     <- intersect(driver_sets[[mi]], rownames(expr_mat))
-    if (length(gs) < 2L) next
-
-    cor_obs <- cor(t(expr_mat[gs, sample_set, drop = FALSE]), method = cor_meth)
-    obs_v   <- cor_obs[upper.tri(cor_obs)]
-
-    pool    <- setdiff(rownames(expr_mat), gs)
-    rand_v  <- vapply(seq_len(n_random), function(.) {
-      rg <- sample(pool, min(length(gs), length(pool)), replace = FALSE)
-      rc <- cor(t(expr_mat[rg, sample_set, drop = FALSE]), method = cor_meth)
-      mean(rc[upper.tri(rc)], na.rm = TRUE)
-    }, numeric(1L))
-
-    rows[[mi]] <- rbind(
-      data.table(method = m_name, group = "Driver genes", value = abs(obs_v)),
-      data.table(method = m_name, group = "Random genes", value = abs(rand_v))
-    )
-  }
-  plot_dt <- rbindlist(Filter(Negate(is.null), rows))
-  if (nrow(plot_dt) == 0L) return(NULL)
-
-  ggplot(plot_dt, aes(x = group, y = value, fill = group)) +
-    geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.4,
-                 linewidth = 0.5, alpha = 0.85) +
-    facet_wrap(~method, nrow = 1) +
-    scale_fill_manual(values = c("Driver genes" = "#D6604D",
-                                  "Random genes" = "#92C5DE")) +
-    geom_hline(yintercept = 0, linetype = "dashed",
-               colour = "grey40", linewidth = 0.5) +
-    labs(
-      title    = sprintf(
-        "Co-expression: driver genes vs. random gene sets  —  %s  |  %s",
-        q_label, cond_label
-      ),
-      subtitle = sprintf(
-        "top-%s%%  |  deviant-block samples n=%d  |  %d random sets  |  method=%s",
-        pct_label, length(sample_set), n_random, cor_meth
-      ),
-      x = NULL,
-      y = sprintf("absolute %s correlation (pairwise)", cor_meth)
-    ) +
-    theme_bw(base_size = 11) +
-    theme(legend.position   = "none",
-          plot.title        = element_text(face = "bold"),
-          strip.background  = element_rect(fill = "grey92"),
-          strip.text        = element_text(face = "bold"))
-}
+# Visualisation helpers defined in utils_sample_quintile.R (sourced above)
 
 # ---- Dominant quintile per sample -------------------------------------------
 freq_cols <- paste0("Q", 1:5, "_freq")
+# select dominant quintile by max frequency (ties broken by lowest quintile)
 dom_q     <- apply(as.matrix(sample_dt[, ..freq_cols]), 1L, which.max)
 sample_dt[, dominant_quintile := as.integer(dom_q)]
 
@@ -262,33 +172,34 @@ sample_dt[, dominant_quintile := as.integer(dom_q)]
 enrich_active <- !args$skip_enrichment
 
 if (enrich_active) {
-  # Resolve utils_pathways.R
-  resolve_utils <- function(utils_dir) {
-    if (!is.null(utils_dir)) {
-      path <- file.path(utils_dir, "utils_pathways.R")
-      if (file.exists(path)) return(path)
-      stop("utils_pathways.R not found in --utils-dir: ", utils_dir)
-    }
-    script_dir <- tryCatch(
-      dirname(normalizePath(
-        sub("--file=", "",
-            grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1L]),
-        mustWork = FALSE
-      )),
-      error = function(e) getwd()
-    )
-    candidates <- c(
-      file.path(script_dir, "..", "..", "utils", "utils_pathways.R"),
-      file.path(script_dir, "..", "utils", "utils_pathways.R")
-    )
-    found <- Filter(file.exists, normalizePath(candidates, mustWork = FALSE))
-    if (length(found) == 0L)
-      stop("Cannot auto-resolve utils_pathways.R. Pass --utils-dir.")
-    found[1L]
-  }
-  utils_path <- resolve_utils(args$utils_dir)
-  cat("Sourcing pathway utils:", utils_path, "\n")
-  source(utils_path)
+  # utils_pathways.R is sourced here but none of its functions are used;
+  # enrichment calls clusterProfiler/org.Dm.eg.db directly.
+  # resolve_utils <- function(utils_dir) {
+  #   if (!is.null(utils_dir)) {
+  #     path <- file.path(utils_dir, "utils_pathways.R")
+  #     if (file.exists(path)) return(path)
+  #     stop("utils_pathways.R not found in --utils-dir: ", utils_dir)
+  #   }
+  #   script_dir <- tryCatch(
+  #     dirname(normalizePath(
+  #       sub("--file=", "",
+  #           grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1L]),
+  #       mustWork = FALSE
+  #     )),
+  #     error = function(e) getwd()
+  #   )
+  #   candidates <- c(
+  #     file.path(script_dir, "..", "..", "utils", "utils_pathways.R"),
+  #     file.path(script_dir, "..", "utils", "utils_pathways.R")
+  #   )
+  #   found <- Filter(file.exists, normalizePath(candidates, mustWork = FALSE))
+  #   if (length(found) == 0L)
+  #     stop("Cannot auto-resolve utils_pathways.R. Pass --utils-dir.")
+  #   found[1L]
+  # }
+  # utils_path <- resolve_utils(args$utils_dir)
+  # cat("Sourcing pathway utils:", utils_path, "\n")
+  # source(utils_path)
 
   # Convert all expression-matrix genes (full transcriptome) to ENTREZID once
   cat("Converting background genes (full expr matrix) -> ENTREZID...\n")
@@ -487,6 +398,54 @@ for (pct in top_pcts) {
     setdiff(sample_dt$sample_id, deviant_dt$sample_id), common_samps
   )
 
+  # ---- Method 1 pre-pass: quintile frequency for all Q (reused in Q loop) ---
+  # Also identifies dominant genes (union across Q1–Q5) for the filtered heatmap.
+  freq_q_list     <- vector("list", 5L)
+  is_dominant_any <- rep(FALSE, n_genes)
+  names(is_dominant_any) <- gene_ids
+  for (q_dom in 1:5) {
+    deviant_q_dom_ids <- intersect(
+      deviant_dt[dominant_quintile == q_dom, sample_id], common_samps
+    )
+    if (length(deviant_q_dom_ids) < 5L) next
+    freq_q_dom           <- rowMeans(qmat[, deviant_q_dom_ids, drop = FALSE] == q_dom,
+                                     na.rm = TRUE)
+    freq_q_list[[q_dom]] <- freq_q_dom
+    is_q_dominant   <- if (use_top_n) {
+      rank(-freq_q_dom, ties.method = "average") <= args$top_n
+    } else {
+      freq_q_dom >= freq_threshold
+    }
+    is_dominant_any <- is_dominant_any | is_q_dominant
+  }
+  n_dominant_total <- sum(is_dominant_any)
+  gene_ids_filt    <- gene_ids[!is_dominant_any]
+  n_genes_filt     <- length(gene_ids_filt)
+  sel_desc <- if (use_top_n) sprintf("top-%d per Q", args$top_n) else sprintf("freq_q >= %.2f", freq_threshold)
+  cat(sprintf("  Dominant genes (%s): %d removed, %d retained\n",
+              sel_desc, n_dominant_total, n_genes_filt))
+
+  if (n_dominant_total > 0L) {
+    out_dom <- file.path(args$output_dir,
+                         sprintf("gene_drivers_%dpct_dominant_%s.tsv", pct, sel_tag))
+    fwrite(data.table(gene_id = gene_ids[is_dominant_any]),
+           out_dom, sep = "\t")
+    cat("  Dominant genes TSV ->", out_dom, "\n")
+  }
+
+  qmat_filt_all <- qmat[gene_ids_filt, common_samps, drop = FALSE]
+  freq_mat_filt <- t(apply(qmat_filt_all, 2L,
+                           function(s) tabulate(s, nbins = 5L) / n_genes_filt))
+  out_hm_filt <- file.path(args$output_dir,
+                            sprintf("quintile_heatmap_filtered_%dpct_%s.pdf", pct, sel_tag))
+  draw_quintile_freq_heatmap(
+    freq_mat   = freq_mat_filt,
+    cond_label = sprintf("%s | all-Q filtered (removed=%d, %s)",
+                         args$condition_label, n_dominant_total, sel_desc),
+    n_steps    = n_steps,
+    out_pdf    = out_hm_filt
+  )
+
   for (q in 1:5) {
     deviant_q_ids <- intersect(
       deviant_dt[dominant_quintile == q, sample_id], common_samps
@@ -503,13 +462,12 @@ for (pct in top_pcts) {
     qmat_nd <- qmat[, non_deviant_ids,  drop = FALSE]
     q_int   <- as.integer(q)
 
-    # ---- Method 1: quintile frequency ---------------------------------------
-    cat("    Method 1: quintile frequency...\n")
-    freq_q_m1 <- rowMeans(qmat_dq == q_int, na.rm = TRUE)
+    # ---- Method 1: quintile frequency (pre-computed in dominance pre-pass) ---
+    freq_q_m1 <- freq_q_list[[q]]
     rank_freq <- rank(-freq_q_m1, ties.method = "average")
 
-    # ---- Method 3: odds ratio + Fisher's exact (BH) ------------------------
-    cat("    Method 3: odds ratio + Fisher test (", n_genes, "genes)...\n")
+    # ---- Method 2: odds ratio + Fisher's exact (BH) ------------------------
+    cat("    Method 2: odds ratio + Fisher test (", n_genes, "genes)...\n")
     a_vec <- rowSums(qmat_dq == q_int, na.rm = TRUE)
     b_vec <- n_dq - a_vec
     c_vec <- rowSums(qmat_nd == q_int, na.rm = TRUE)
@@ -528,7 +486,7 @@ for (pct in top_pcts) {
     padj_fisher <- p.adjust(p_fisher, method = "BH")
     rank_or     <- rank(-or_vec, ties.method = "average")
 
-    # ---- Method 2: consensus rank aggregation --------------------------------
+    # ---- Method 3: consensus rank aggregation --------------------------------
     rank_consensus <- (rank_freq + rank_or) / 2
 
     # Build full gene results table
@@ -543,37 +501,43 @@ for (pct in top_pcts) {
       rank_consensus = rank_consensus
     )
 
-    # Top-N per method
-    m1_genes <- gene_dt[order(rank_freq)][seq_len(min(n_top, .N)), gene_id]
+    # ---- Gene selection (M1 by top-N rank or freq_q threshold) ----------------
+    if (use_top_n) {
+      m1_genes  <- gene_dt[order(rank_freq)][seq_len(min(n_top, .N)), gene_id]
+      n_top_eff <- n_top
+    } else {
+      m1_genes  <- gene_dt[freq_q >= freq_threshold, gene_id]
+      n_top_eff <- length(m1_genes)
+    }
 
     M2_pool  <- gene_dt[!is.na(padj_fisher) & padj_fisher < padj_thresh]
     M2_genes <- if (nrow(M2_pool) >= 2L) {
-      M2_pool[order(rank_OR)][seq_len(min(n_top, nrow(M2_pool))), gene_id]
+      M2_pool[order(rank_OR)][seq_len(min(n_top_eff, nrow(M2_pool))), gene_id]
     } else {
       cat(sprintf("    M2: no genes pass padj < %.2f — using top %d by OR\n",
-                  padj_thresh, n_top))
-      gene_dt[order(rank_OR)][seq_len(min(n_top, .N)), gene_id]
+                  padj_thresh, n_top_eff))
+      gene_dt[order(rank_OR)][seq_len(min(n_top_eff, .N)), gene_id]
     }
 
     M3_pool  <- gene_dt[is.na(padj_fisher) | padj_fisher < padj_thresh]
     M3_genes <- if (nrow(M3_pool) >= 2L) {
-      M3_pool[order(rank_consensus)][seq_len(min(n_top, nrow(M3_pool))), gene_id]
+      M3_pool[order(rank_consensus)][seq_len(min(n_top_eff, nrow(M3_pool))), gene_id]
     } else {
-      gene_dt[order(rank_consensus)][seq_len(min(n_top, .N)), gene_id]
+      gene_dt[order(rank_consensus)][seq_len(min(n_top_eff, .N)), gene_id]
     }
 
-    gene_dt[, in_M1_topN      := gene_id %in% m1_genes]
-    gene_dt[, in_M2_topN      := gene_id %in% M2_genes]
-    gene_dt[, in_M3_consensus := gene_id %in% M3_genes]
+    gene_dt[, in_M1_selected   := gene_id %in% m1_genes]
+    gene_dt[, in_M2_topN       := gene_id %in% M2_genes]
+    gene_dt[, in_M3_consensus  := gene_id %in% M3_genes]
     setorder(gene_dt, rank_consensus)
 
-    overlap_m1M2 <- sum(gene_dt$in_M1_topN & gene_dt$in_M2_topN)
-    cat(sprintf("    M1 top-%d | M2 top-%d | overlap=%d | M3 consensus top-%d\n",
+    overlap_m1M2 <- sum(gene_dt$in_M1_selected & gene_dt$in_M2_topN)
+    cat(sprintf("    M1 n=%d | M2 top-%d | overlap=%d | M3 consensus top-%d\n",
                 length(m1_genes), length(M2_genes), overlap_m1M2, length(M3_genes)))
 
     # Write gene driver TSV
     out_gene <- file.path(args$output_dir,
-                          sprintf("gene_drivers_Q%d_%dpct.tsv", q, pct))
+                          sprintf("gene_drivers_Q%d_%dpct_%s.tsv", q, pct, sel_tag))
     fwrite(gene_dt, out_gene, sep = "\t")
     cat("    Gene drivers ->", out_gene, "\n")
 
@@ -582,9 +546,9 @@ for (pct in top_pcts) {
       enrich_dir <- file.path(args$output_dir, "enrichment")
       dir.create(enrich_dir, recursive = TRUE, showWarnings = FALSE)
       for (mset_enrich in list(
-        list(genes = m1_genes, tag = sprintf("Q%d_%dpct_M1", q, pct)),
-        list(genes = M2_genes, tag = sprintf("Q%d_%dpct_M2", q, pct)),
-        list(genes = M3_genes, tag = sprintf("Q%d_%dpct_M3", q, pct))
+        list(genes = m1_genes, tag = sprintf("Q%d_%dpct_%s_M1", q, pct, sel_tag)),
+        list(genes = M2_genes, tag = sprintf("Q%d_%dpct_%s_M2", q, pct, sel_tag)),
+        list(genes = M3_genes, tag = sprintf("Q%d_%dpct_%s_M3", q, pct, sel_tag))
       )) {
         out_enrich_stem <- file.path(enrich_dir,
                                      paste0("enrichment_", mset_enrich$tag))
@@ -604,8 +568,24 @@ for (pct in top_pcts) {
     fq_named <- setNames(gene_dt$freq_q,     gene_dt$gene_id)
     or_named <- setNames(gene_dt$odds_ratio, gene_dt$gene_id)
 
-    show_names <- (n_top <= 60L)
+    show_names <- (n_top_eff <= 60L)
     q_label    <- sprintf("Q%d deviant", q)
+
+    # ---- Distribution plots --------------------------------------------------
+    out_dist <- file.path(args$output_dir,
+                          sprintf("distribution_drivers_Q%d_%dpct_%s.pdf", q, pct, sel_tag))
+    cat("    Distribution plot ->", out_dist, "\n")
+    p_dist <- make_distribution_plot(
+      gene_dt        = gene_dt,
+      q_label        = q_label,
+      cond_label     = args$condition_label,
+      pct_label      = as.character(pct),
+      n_top          = if (use_top_n)       n_top_eff      else NULL,
+      freq_threshold = if (use_freq_thresh) freq_threshold else NULL
+    )
+    pdf(out_dist, width = 13, height = 5)
+    print(p_dist)
+    invisible(dev.off())
 
     # # ---- Heatmaps ------------------------------------------------------------
     # out_hm <- file.path(args$output_dir,
@@ -641,7 +621,7 @@ for (pct in top_pcts) {
 
     # ---- Bootstrap comparison boxplot ----------------------------------------
     out_box <- file.path(args$output_dir,
-                         sprintf("coexpression_comparison_Q%d_%dpct.pdf", q, pct))
+                         sprintf("coexpression_comparison_Q%d_%dpct_%s.pdf", q, pct, sel_tag))
     cat("    Bootstrap comparison ->", out_box, "\n")
 
     p_box <- make_bootstrap_boxplot(

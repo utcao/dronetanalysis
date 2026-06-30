@@ -72,11 +72,13 @@ suppressPackageStartupMessages({
 # ---- CLI --------------------------------------------------------------------
 parser <- ArgumentParser(description = "Sample quintile overlap analysis")
 parser$add_argument("--expr-file",       required = TRUE,
-                    help = "VOOM expression matrix (tab-sep, genes x samples)")
+                    help = "VOOM/VST expression matrix (tab-sep, genes x samples)")
 parser$add_argument("--output-dir",      required = TRUE,
                     help = "Directory for all output files (created if absent)")
 parser$add_argument("--condition-label", default = "Condition",
                     help = "Label used in plot titles (default: 'Condition')")
+parser$add_argument("--select-gene", default = NA,
+                    help = "file path to the gene list for restricting analysis (default: NA - no filter)")
 parser$add_argument("--seed",            type = "integer", default = 42,
                     help = "Random seed for tie-breaking in ranks (default: 42)")
 args <- parser$parse_args()
@@ -91,6 +93,20 @@ if (!file.exists(args$expr_file))
 
 dir.create(args$output_dir, recursive = TRUE, showWarnings = FALSE)
 set.seed(args$seed)
+
+# ---- Source shared helpers ---------------------------------------------------
+# find the directory of this script based on where the script was invoked from (Rscript --file=...) 
+script_dir <- tryCatch(
+  dirname(normalizePath(
+    sub("--file=", "",
+        grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1L]),
+    mustWork = FALSE
+  )),
+  error = function(e) getwd()
+)
+source(file.path(script_dir, "utils_sample_quintile.R"))
+
+n_steps <- 100L   # colour steps per side for heatmap diverging palette
 
 # ---- Load expression matrix -------------------------------------------------
 cat("Loading expression matrix...\n")
@@ -353,53 +369,20 @@ invisible(dev.off())
 cat("  Distribution ->", dist_pdf, "\n")
 
 # ---- Plot 2: Clustered heatmap (samples x Q1-Q5) ----------------------------
+# draw_quintile_freq_heatmap is defined in utils_sample_quintile.R
 cat("Plotting clustered heatmap...\n")
 
 hm_mat           <- freq_mat
 rownames(hm_mat) <- sample_cols
-colnames(hm_mat) <- paste0("Q", 1:5)
-
-# Diverging palette centred at 0.20: blue (under-represented) -> white -> red
-n_steps   <- 100L
-lo_breaks <- seq(max(0,   min(hm_mat)), 0.20, length.out = n_steps + 1L)
-hi_breaks <- seq(0.20, min(1, max(hm_mat)), length.out = n_steps + 1L)
-hm_breaks <- unique(c(lo_breaks, hi_breaks[-1L]))
-
-n_lo  <- sum(hm_breaks <  0.20)
-n_hi  <- sum(hm_breaks >  0.20)
-# pheatmap requires length(color) == length(breaks) - 1.
-# With 201 breaks: n_lo (100) + n_hi (100) = 200 colors exactly.
-# The midpoint break at 0.20 is a boundary; both palettes approach white there,
-# so the transition is smooth without an explicit mid colour.
-hm_colors <- c(
-  colorRampPalette(c("#2166AC", "#FFFFFF"))(n_lo),
-  colorRampPalette(c("#FFFFFF", "#D6604D"))(n_hi)
-)
-
-# Scale PDF height: ~0.018 inch per row, minimum 6 inches
-hm_height <- max(6, ceiling(n_samples * 0.018))
 
 hm_pdf <- file.path(args$output_dir, "quintile_heatmap.pdf")
-pdf(hm_pdf, width = 6, height = hm_height)
-pheatmap(
-  mat           = hm_mat,
-  color         = hm_colors,
-  breaks        = hm_breaks,
-  cluster_rows  = TRUE,
-  cluster_cols  = FALSE,
-  show_rownames = FALSE,
-  show_colnames = TRUE,
-  fontsize_col  = 12,
-  border_color  = NA,
-  main          = sprintf(
-    "Sample Quintile Frequency  -  %s\n(rows clustered; expected freq ~0.20 per quintile)",
-    args$condition_label
-  )
-  # silent = TRUE omitted: pheatmap draws directly to the active device (our PDF).
-  # With silent = TRUE the plot is returned as a gtable but never drawn.
+draw_quintile_freq_heatmap(
+  freq_mat   = hm_mat,
+  cond_label = args$condition_label,
+  n_steps    = n_steps,
+  out_pdf    = hm_pdf
 )
-invisible(dev.off())
-cat("  Heatmap ->", hm_pdf, "\n\n")
+cat("\n")
 
 # ---- Console summary --------------------------------------------------------
 cat("=== Summary ===\n")
