@@ -29,6 +29,12 @@
 #     (compatible with plot_permutation_null_dist.R)
 #   - Optional permutation_pvals.tsv for plot_permutation_null_dist.R
 #
+# DATA NOTE — input expression values changed over the project timeline:
+#   Before 06/03/2026          : VOOM (log2)
+#   06/03/2026 – 06/17/2026   : log2-reverted VST/VOOM
+#   After  06/17/2026          : VST (log2)  <- current standard
+#   See project CHANGELOG.md for full details.
+#
 # Usage:
 #   Rscript compute_mad_permute_transcriptomic_noise.R \
 #     --expr-file    data/processed/VOOM/voomdataCtrl.txt \
@@ -58,9 +64,9 @@ get_sig_stars <- function(p) {
 
 # ----- Row-wise MAD: use matrixStats if available, else apply fallback -----
 row_mads <- if (requireNamespace("matrixStats", quietly = TRUE)) {
-  function(mat) log2(matrixStats::rowMads(2^mat, na.rm = TRUE) + 1)
+  function(mat) matrixStats::rowMads(mat, na.rm = TRUE)
 } else {
-  function(mat) log2(apply(2^mat, 1, mad, na.rm = TRUE) + 1)
+  function(mat) apply(mat, 1, mad, na.rm = TRUE)
 }
 
 # ----- Core: permutation test for one focus gene -----
@@ -414,12 +420,28 @@ pct_obs     <- round(100 * n_obs_sig   / n_tested, 1)
 pct_perm    <- round(100 * n_perm_sig  / n_tested, 1)
 pct_val     <- round(100 * n_validated / n_tested, 1)
 
+# Direction (sign of obs_delta_mean_mad): + = higher noise in HIGH group (noise-increasing)
+obs_sig_delta  <- results_dt$obs_delta_mean_mad[!is.na(results_dt$obs_p_adj)  & results_dt$obs_p_adj  < 0.05]
+perm_sig_delta <- results_dt$obs_delta_mean_mad[!is.na(results_dt$perm_p_adj) & results_dt$perm_p_adj < 0.05]
+val_delta      <- results_dt$obs_delta_mean_mad[results_dt$validated %in% TRUE]
+
+n_obs_pos  <- sum(obs_sig_delta  > 0, na.rm = TRUE)
+n_obs_neg  <- sum(obs_sig_delta  < 0, na.rm = TRUE)
+n_perm_pos <- sum(perm_sig_delta > 0, na.rm = TRUE)
+n_perm_neg <- sum(perm_sig_delta < 0, na.rm = TRUE)
+n_val_pos  <- sum(val_delta      > 0, na.rm = TRUE)
+n_val_neg  <- sum(val_delta      < 0, na.rm = TRUE)
+
 cat("\n=== Summary ===\n")
 cat("Total genes tested:                   ", n_tested,   "\n")
 cat("Significant — parametric BH < 0.05:   ",
-    n_obs_sig,  " (", pct_obs,  "%)\n", sep = "")
+    n_obs_sig,  " (", pct_obs,  "%)",
+    "  [+noise: ", n_obs_pos, "  -noise: ", n_obs_neg, "]\n", sep = "")
 cat("Significant — permutation BH < 0.05: ",
-    n_perm_sig, " (", pct_perm, "%)\n", sep = "")
+    n_perm_sig, " (", pct_perm, "%)",
+    "  [+noise: ", n_perm_pos, "  -noise: ", n_perm_neg, "]\n", sep = "")
 cat("Validated (both):                     ",
-    n_validated, " (", pct_val, "%)\n", sep = "")
+    n_validated, " (", pct_val, "%)",
+    "  [+noise: ", n_val_pos,  "  -noise: ", n_val_neg,  "]\n", sep = "")
+cat("  (+noise = high expression -> more variability; -noise = less variability)\n")
 cat("Results saved to:", args$output_file, "\n")

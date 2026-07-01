@@ -46,8 +46,8 @@ compute_mad_stats <- function(focus_gene, expr_mat, gene_ids,
     other_idx <- which(gene_ids != focus_gene)
     expr_other <- expr_mat[other_idx, , drop = FALSE]
 
-    mad_low  <- log2(apply(2^expr_other[, low_idx,  drop = FALSE], 1, mad, na.rm = TRUE) + 1)
-    mad_high <- log2(apply(2^expr_other[, high_idx, drop = FALSE], 1, mad, na.rm = TRUE) + 1)
+    mad_low  <- apply(expr_other[, low_idx,  drop = FALSE], 1, mad, na.rm = TRUE)
+    mad_high <- apply(expr_other[, high_idx, drop = FALSE], 1, mad, na.rm = TRUE)
 
     wt <- wilcox.test(mad_low, mad_high, paired = FALSE, exact = FALSE)
 
@@ -228,6 +228,6 @@ cat("Total genes tested:            ", n_tested, "\n")
 cat("Significant (FDR < 0.05):      ", n_sig, " (", pct_sig, "%)\n", sep = "")
 cat("  \u2191 Increased variability (HIGH > LOW):  ",
     n_increased, " (", pct_inc, "% of total)\n", sep = "")
-cat("  \u2193 Decreased variability (LOW > HIGH):  ",
+cat("  \u2193 Decreased variability (HIGH < LOW):  ",
     n_decreased, " (", pct_dec, "% of total)\n", sep = "")
 cat("Results saved to: ", args$output_file, "\n")

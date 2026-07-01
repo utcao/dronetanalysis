@@ -171,8 +171,8 @@ other_ids  <- setdiff(expr_dt[[gene_col]], args$focus_gene)
 mad_expr_mat <- as.matrix(expr_dt[get(gene_col) %in% other_ids, ..sample_cols])
 rownames(mad_expr_mat) <- expr_dt[get(gene_col) %in% other_ids, get(gene_col)]
 
-mad_low  <- log2(apply(2^mad_expr_mat[, low_samples,  drop = FALSE], 1, mad, na.rm = TRUE) + 1)
-mad_high <- log2(apply(2^mad_expr_mat[, high_samples, drop = FALSE], 1, mad, na.rm = TRUE) + 1)
+mad_low  <- apply(mad_expr_mat[, low_samples,  drop = FALSE], 1, mad, na.rm = TRUE)
+mad_high <- apply(mad_expr_mat[, high_samples, drop = FALSE], 1, mad, na.rm = TRUE)
 
 n_genes <- length(mad_low)
 cat("  MAD computed for", n_genes, "genes\n")

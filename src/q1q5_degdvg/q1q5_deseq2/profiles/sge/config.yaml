@@ -1,0 +1,19 @@
+executor: cluster-generic
+
+# >- joins lines with spaces and strips the trailing newline → one-line qsub command
+cluster-generic-submit-cmd: >-
+  qsub
+  -A child_deseq2_q1q5
+  -pe parallel {threads}
+  -l h_vmem={resources.mem_gb}G
+  -l h_rt={resources.walltime}
+  -N deseq2_{rule}_{wildcards.gene}_{wildcards.cond}
+  -j y
+  -cwd
+  -o /dev/null
+
+jobs: 50
+latency-wait: 120
+keep-going: true
+rerun-incomplete: true
+printshellcmds: true
