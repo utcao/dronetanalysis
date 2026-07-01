@@ -110,10 +110,16 @@ run_gamlss_dvgdeg <- function(
   offsets    <- log(dge_obj$samples$lib.size * dge_obj$samples$norm.factors)
 
   # --- fit three NBI models per gene ---
-  # MulticoreParam (fork-based) is far more stable than SnowParam (socket-based)
-  # for long-running GAMLSS jobs on Linux. SerialParam avoids all IPC overhead
-  # when only one worker is requested.
-  bpp <- if (n_workers > 1) MulticoreParam(n_workers) else SerialParam()
+  # bplapply with SerialParam still routes through bploop.lapply / sendMaster on
+  # some BiocParallel versions, triggering "cannot allocate buffer" when serializing
+  # large lists of GAMLSS model objects. Use plain lapply for n_workers == 1 to
+  # bypass BiocParallel IPC entirely.
+  bp_apply <- if (n_workers > 1) {
+    bpp <- MulticoreParam(n_workers)
+    function(X, FUN, ...) bplapply(X, FUN, ..., BPPARAM = bpp)
+  } else {
+    lapply
+  }
 
   # suppress summary() printing — summary.gamlss prints as a side effect
   fit_sum_quiet <- function(m) {
@@ -124,40 +130,35 @@ run_gamlss_dvgdeg <- function(
   }
 
   # m_full: all covariates in mu, treatment in sigma
-  m_full <- bplapply(seq_len(n_genes), fit_one,
+  m_full <- bp_apply(seq_len(n_genes), fit_one,
     dat           = tmm_counts,
     meta          = meta_dt,
     mu_formula    = formula_mu,
     sigma_formula = formula_sigma,
     offsets       = offsets,
-    mu_sum_vars   = mu_sum_covars,
-    BPPARAM       = bpp)
+    mu_sum_vars   = mu_sum_covars)
 
-  m_full_sum <- bplapply(m_full, fit_sum_quiet, BPPARAM = bpp)
+  m_full_sum <- bp_apply(m_full, fit_sum_quiet)
 
   # m_sigma_int: intercept-only sigma — LR test isolates treatment effect on sigma
-  m_sigma_int <- bplapply(seq_len(n_genes), fit_one,
+  m_sigma_int <- bp_apply(seq_len(n_genes), fit_one,
     dat           = tmm_counts,
     meta          = meta_dt,
     mu_formula    = formula_mu,
     sigma_formula = "~ 1",
     offsets       = offsets,
-    mu_sum_vars   = mu_sum_covars,
-    BPPARAM       = bpp)
+    mu_sum_vars   = mu_sum_covars)
 
   # m_mu_nontrt: non-treatment mu — LR test isolates treatment effect on mu
-  m_mu_nontrt <- bplapply(seq_len(n_genes), fit_one,
+  m_mu_nontrt <- bp_apply(seq_len(n_genes), fit_one,
     dat           = tmm_counts,
     meta          = meta_dt,
     mu_formula    = formula_nontrt,
     sigma_formula = formula_sigma,
     offsets       = offsets,
-    mu_sum_vars   = mu_sum_covars,
-    BPPARAM       = bpp)
+    mu_sum_vars   = mu_sum_covars)
 
   # --- per-treatment extraction ---
-  # m_full_sum rows: combined mu + sigma coefficient table from summary.gamlss
-  coef_names <- rownames(m_full_sum[[1]])
   trt_groups <- setdiff(levels(meta_dt[[trt_col]]), ref_group)
 
   # Directional classification: direction encoded in the label.
@@ -179,17 +180,23 @@ run_gamlss_dvgdeg <- function(
   result_list <- foreach(trt = trt_groups) %do% {
     # coefficient name pattern, e.g. "expr_quintileQ5"
     coef_trt <- paste0(trt_col, trt)
-    coef_idx <- grep(coef_trt, coef_names)
-    stopifnot(
-      "expected exactly 2 coefficient matches (one mu, one sigma)" =
-        length(coef_idx) == 2
-    )
 
-    # single-model t-tests from the m_full summary table
-    p_mu_single    <- vapply(m_full_sum,
-      function(m) ifelse(length(m), m[coef_idx[1], "Pr(>|t|)"], NA_real_), numeric(1))
-    p_sigma_single <- vapply(m_full_sum,
-      function(m) ifelse(length(m), m[coef_idx[2], "Pr(>|t|)"], NA_real_), numeric(1))
+    # single-model t-tests from the m_full summary table.
+    # coef_idx is looked up per gene rather than globally from gene-1's summary:
+    # when a gene's model matrix has fewer columns (dropped batch levels), its
+    # summary has fewer rows and a global index derived from gene 1 goes out of bounds.
+    p_mu_single <- vapply(m_full_sum, function(m) {
+      if (!length(m)) return(NA_real_)
+      idx <- grep(coef_trt, rownames(m))
+      if (length(idx) < 1) return(NA_real_)
+      m[idx[1], "Pr(>|t|)"]
+    }, numeric(1))
+    p_sigma_single <- vapply(m_full_sum, function(m) {
+      if (!length(m)) return(NA_real_)
+      idx <- grep(coef_trt, rownames(m))
+      if (length(idx) < 2) return(NA_real_)
+      m[idx[2], "Pr(>|t|)"]
+    }, numeric(1))
 
     # expected CPM at the mean offset
     cpm_count_ctrl <- vapply(m_full,
@@ -284,6 +291,12 @@ run_gamlss_dvgdeg <- function(
     setnames(result_dt, trt_result_cols, paste0(trt_result_cols, "_", trt))
     result_dt
   }
+
+  # Free the model lists — all values have been extracted into result_list.
+  # Calling gc() here reclaims the memory used by 3×n_genes GAMLSS objects
+  # before fwrite allocates its write buffers, preventing OOM on large sample sets.
+  rm(m_full, m_full_sum, m_sigma_int, m_mu_nontrt)
+  gc()
 
   # --- merge all treatment comparisons ---
   dvdg_tab <- purrr::reduce(result_list,
