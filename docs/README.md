@@ -45,6 +45,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) | Sparse storage modes reducing disk usage from 7 TB to 0.9 TB (common) or 0.3 TB (minimal) |
 | [OPTIMIZATION-03-Network-Reconstruction.md](OPTIMIZATION-03-Network-Reconstruction.md) | Stage 3 performance optimization providing 200-800x speedup for network reconstruction |
 | [OPTIMIZATION-04-Snakemake-Efficiency.md](OPTIMIZATION-04-Snakemake-Efficiency.md) | Efficient Snakemake patterns (centralized paths, CSV gene lists, cluster-generic executor, master qsub job, multi-file `include:` organization) vs naïve approach |
+| [OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md](OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md) | Ranked memory mitigations for GAMLSS Q1/Q5 HS OOM: increase mem_gb → tune fwrite → free model lists early → gene-batching (last resort) |
 
 ### 🔧 Critical Fixes
 
@@ -53,6 +54,7 @@ Welcome to the dronetanalysis documentation! This index provides quick navigatio
 | [FIX-01-Critical-Issues-Summary.md](FIX-01-Critical-Issues-Summary.md) | Executive summary of all three critical pipeline fixes |
 | [FIX-02-HDF5-Attributes.md](FIX-02-HDF5-Attributes.md) | Fix for HDF5 64 KB attribute limit by storing gene names as datasets |
 | [FIX-03-HPC-SGE-Pipeline.md](FIX-03-HPC-SGE-Pipeline.md) | Fix for HDF5 concurrent read failure on NFS and inflated mem_mb values on SGE HPC |
+| [FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md](FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md) | Root cause for GAMLSS Q1/Q5 CT `subscript out of bounds` (fixed) and HS `fwrite` OOM (open, see mitigation doc) |
 
 ### 📊 Technical References
 
@@ -121,6 +123,8 @@ Historical development logs and planning documents:
 | `ValueError: All chunk dimensions must be positive` | [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) | Edge Cases |
 | Out of disk space (files ~1.3 GB each) | [OPTIMIZATION-02-Storage.md](OPTIMIZATION-02-Storage.md) | Problem Solved |
 | Stage 1 memory allocation insufficient | [OPTIMIZATION-01-Memory.md](OPTIMIZATION-01-Memory.md) | Memory Requirements by Stage |
+| `Error in { : task 1 failed - "subscript out of bounds"` (GAMLSS Q1/Q5, CT) | [FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md](FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md) | Issue 1 |
+| `Unable to allocate 8 MB * 1 thread buffers ... Cannot allocate memory` in `fwrite` (GAMLSS Q1/Q5, HS) | [OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md](OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md) | Option 1 |
 
 ### Performance Issues
 

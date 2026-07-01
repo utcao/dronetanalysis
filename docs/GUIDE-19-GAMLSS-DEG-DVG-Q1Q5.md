@@ -268,6 +268,8 @@ the `m_full` coefficient table; useful for comparison or when LR tests fail to c
 | `No module named snakemake_executor_plugin_cluster_generic` | Plugin missing from base env | `pip install snakemake-executor-plugin-cluster-generic` in the base conda env |
 | One or both quintile groups are empty | Highly skewed focal gene expression | Inspect CPM distribution; consider reducing `frac_low`/`frac_high` cutoffs in the driver |
 | Models converge for almost no genes | Wrong formula or missing covariates | Check that all columns in `formula_mu` exist in `meta_dt` before calling `run_gamlss_dvgdeg()` |
+| `Error in { : task 1 failed - "subscript out of bounds"` (CT jobs) | Coefficient index derived from one gene's model applied to another gene with a different model-matrix shape | Already fixed via per-gene `grep()` lookup; see [FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md](FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md) |
+| `Unable to allocate 8 MB * 1 thread buffers ... Cannot allocate memory` in `fwrite` (HS jobs, larger n) | Three full-size GAMLSS model lists held concurrently in memory during fitting | See ranked mitigations in [OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md](OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md) |
 
 ---
 
@@ -277,6 +279,8 @@ the `m_full` coefficient table; useful for comparison or when LR tests fail to c
 - [OPTIMIZATION-04-Snakemake-Efficiency.md](OPTIMIZATION-04-Snakemake-Efficiency.md) — Modular Snakemake patterns, cluster-generic executor plugin, multi-file rule organization
 - [REFERENCE-01-Statistical-Methods.md](REFERENCE-01-Statistical-Methods.md) — Statistical methodology reference for differential testing and multiple comparisons
 - [FIX-03-HPC-SGE-Pipeline.md](FIX-03-HPC-SGE-Pipeline.md) — SGE-specific fixes (NFS locking, `latency-wait`, memory allocation)
+- [FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md](FIX-04-GAMLSS-Q1Q5-CT-HS-Errors.md) — Root cause analysis for the CT `subscript out of bounds` and HS `fwrite` OOM errors observed in the 2026-06-23 run
+- [OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md](OPTIMIZATION-05-GAMLSS-Q1Q5-Memory-Mitigation.md) — Ranked memory mitigation options for the HS OOM failures
 
 ---
 

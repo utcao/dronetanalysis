@@ -83,7 +83,7 @@ rule gamlss_quintile:
         out_dir       = GAMLSS_DIR
     threads: 1   # SerialParam; MulticoreParam OOM when serializing 8786 model objects per child
     resources:
-        mem_gb   = 25,         # -> {resources.mem_gb}   in the cluster string
+        mem_gb   = lambda wildcards: 45 if wildcards.cond == "HS" else 30,         # -> {resources.mem_gb}   in the cluster string
         walltime = "240:0:0"   # -> {resources.walltime} in the cluster string
         # Note: 'runtime' is reserved by Snakemake ≥7 and must be integer minutes;
         # 'walltime' is a plain user resource and accepts the HH:MM:SS string qsub needs.
