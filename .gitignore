@@ -5,7 +5,13 @@
 *.Rout
 results*
 test*
+*csv.bk
+*csv
+*txt
+*tsv
 # project folds
+tmp/
+.snakemake/
 .obsidian/
 dataset/
 manuscript/
